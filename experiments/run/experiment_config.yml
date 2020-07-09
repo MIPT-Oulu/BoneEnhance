@@ -3,6 +3,12 @@ strategy:
   stage_names:
     - train
     - eval
+  accumulate_grad:
+    SR: False
+  accumulate_grad_in_iter:
+    SR: False
+  train_starts_at_epoch:
+    SR: 0
 training:
   # General
   experiment: 3D
@@ -51,15 +57,17 @@ model:
 data_sampling:
   train:
     data_provider:
-      bfpn_train:
-        cate: ItemLoader
-        num_samples: 1
-        data_key: "data"
-        target_key: "target"
+      SR:
+        loader_train:
+          cate: ItemLoader
+          batches_per_iter: 1
+          data_key: "data"
+          target_key: "target"
   eval:
     data_provider:
-      bfpn_val:
-        cate: ItemLoader
-        num_samples: 1
-        data_key: "data"
-        target_key: "target"
+      SR:
+        loader_val:
+          cate: ItemLoader
+          batches_per_iter: 1
+          data_key: "data"
+          target_key: "target"
