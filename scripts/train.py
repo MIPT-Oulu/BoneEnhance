@@ -3,16 +3,17 @@ from torch import optim, cuda, nn
 from time import time
 from copy import deepcopy
 import gc
+from omegaconf import OmegaConf
 import cv2
 from functools import partial
 
+from collagen.core import Session
 from collagen.modelzoo.segmentation import EncoderDecoder
-from collagen.losses.segmentation import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss
 from collagen.strategies import Strategy
 
 
 from BoneEnhance.components.training.session import create_data_provider, init_experiment, init_callbacks, save_transforms,\
-    init_loss, parse_grayscale, parse_color
+    init_loss, parse_grayscale
 
 from BoneEnhance.components.splits import build_splits
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
@@ -32,7 +33,7 @@ if __name__ == "__main__":
         # Current experiment
         start_exp = time()
         args = deepcopy(args_base)  # Copy args so that they can be updated
-        config = config_list[experiment]
+        config = OmegaConf.create(config_list[experiment])
 
         # Update arguments according to the configuration file
         parser = partial(parse_grayscale, args=args)
@@ -66,24 +67,29 @@ if __name__ == "__main__":
 
             print(f'Encoder: {backbone}, decoder: {decoder}')
 
-                    # Optimizer
+            # Optimizer
             optimizer = optim.Adam(model.parameters(),
                                    lr=config['training']['lr'],
                                    weight_decay=config['training']['wd'])
             # Callbacks
             train_cbs, val_cbs = init_callbacks(fold, config, args.snapshots_dir, config['training']['snapshot'], model,
                                                 optimizer, data_provider, mean, std)
+
+            # Initialize session
+            session = dict()
+            session['SR'] = Session(data_provider=data_provider,
+                                    train_loader_names=tuple(config['data_sampling']['train']['data_provider'].keys()),
+                                    val_loader_names=tuple(config['data_sampling']['eval']['data_provider'].keys()),
+                                    module=model, loss=loss_criterion, optimizer=optimizer,
+                                    train_callbacks=train_cbs,
+                                    val_callbacks=val_cbs)
+
             # Run training
             strategy = Strategy(data_provider=data_provider,
-                                train_loader_names=tuple(config['data_sampling']['train']['data_provider'].keys()),
-                                val_loader_names=tuple(config['data_sampling']['eval']['data_provider'].keys()),
                                 data_sampling_config=config['data_sampling'],
-                                loss=loss_criterion,
-                                model=model,
+                                strategy_config=config['strategy'],
+                                sessions=session,
                                 n_epochs=config['training']['epochs'],
-                                optimizer=optimizer,
-                                train_callbacks=train_cbs,
-                                val_callbacks=val_cbs,
                                 device=device)
             strategy.run()
 

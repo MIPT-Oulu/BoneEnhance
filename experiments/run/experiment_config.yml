@@ -1,3 +1,8 @@
+strategy:
+  # Support for 'train' or 'eval' stages only
+  stage_names:
+    - train
+    - eval
 training:
   # General
   experiment: 3D

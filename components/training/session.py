@@ -85,7 +85,7 @@ def init_experiment():
 def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimizer, data_provider, mean, std):
     # Snapshot directory
     current_snapshot_dir = snapshots_dir / snapshot_name
-    crop = config['training']['crop_size']
+    crop = config['training']['crop_small']
     log_dir = current_snapshot_dir / f"fold_{fold_id}_log"
     device = next(model.parameters()).device
 
@@ -110,12 +110,6 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
                           prefix=prefix,
                           save_dir=str(current_snapshot_dir),
                           conditions='min', model=model),
-               ItemWiseBinaryJaccardDiceMeter(prefix="eval", name='jaccard',
-                                              parse_output=partial(parse_binary_label, threshold=threshold),
-                                              parse_target=lambda x: x.squeeze().to(device)),
-               ItemWiseBinaryJaccardDiceMeter(prefix="eval", name='dice',
-                                              parse_output=partial(parse_binary_label, threshold=threshold),
-                                              parse_target=lambda x: x.squeeze().to(device)),
                # Reduce LR on plateau
                SimpleLRScheduler('eval/loss', ReduceLROnPlateau(optimizer,
                                                                 patience=int(config['training']['patience']),
@@ -145,12 +139,11 @@ def create_data_provider(args, config, parser, metadata, mean, std):
     # Compile ItemLoaders
     item_loaders = dict()
     for stage in ['train', 'val']:
-        item_loaders[f'bfpn_{stage}'] = ItemLoader(meta_data=metadata[stage],
-                                                   transform=train_test_transforms(config, mean, std,
-                                                   crop_size=tuple(config['training']['crop_size']))[stage],
-                                                   parse_item_cb=parser,
-                                                   batch_size=config['training']['bs'], num_workers=args.num_threads,
-                                                   shuffle=True if stage == "train" else False)
+        item_loaders[f'loader_{stage}'] = ItemLoader(meta_data=metadata[stage],
+                                                     transform=train_test_transforms(config, mean, std)[stage],
+                                                     parse_item_cb=parser,
+                                                     batch_size=config['training']['bs'], num_workers=args.num_threads,
+                                                     shuffle=True if stage == "train" else False)
 
     return DataProvider(item_loaders)
 
@@ -269,7 +262,7 @@ def save_config(path, config, args):
 
 
 def save_transforms(path, config, args, mean, std):
-    transforms = train_test_transforms(config, mean, std, crop_size=tuple(config['training']['crop_size']))
+    transforms = train_test_transforms(config, mean, std)
     # Save the experiment parameters
-    with open(path / 'transforms.json', 'w') as f:
-        f.writelines(json.dumps(transforms['train_list'][1].serialize(), indent=4))
+    with open(path / 'transforms.yaml', 'w') as f:
+        yaml.dump(transforms['train_list'][1].to_yaml(), f)

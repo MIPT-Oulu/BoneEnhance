@@ -6,8 +6,8 @@ if __name__ == "__main__":
     # Initialize experiment
     args, _, _ = init_experiment()
     base_path = args.data_location
-    #images_loc = base_path / 'target'
-    images_loc = base_path / 'input'
+    images_loc = base_path / 'target'
+    #images_loc = base_path / 'input'
 
     # List files
     samples = os.listdir(images_loc)

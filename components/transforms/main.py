@@ -157,12 +157,8 @@ def train_test_transforms(conf, mean=None, std=None):
     # Validation transforms
     val_trf = [
         wrap_solt_double,
-        slc.Stream([
-            slt.Pad(pad_to=crop_small),
-            slt.Crop(crop_mode='c', crop_to=crop_small)
-        ]),
-        unwrap_solt,
-        ApplyTransform(numpy2tens, idx=(0, 1, 2))
+        slc.Stream(),
+        unwrap_solt
     ]
 
     # Use normalize_channel_wise if mean and std not calculated
@@ -180,7 +176,11 @@ def train_test_transforms(conf, mean=None, std=None):
         Compose(large_trf, return_torch=False)
     ]
 
-    val_trf_cmp = Compose(val_trf, return_torch=False)
+    val_trf_cmp = [
+        Compose(val_trf, return_torch=False),
+        Compose(small_trf, return_torch=False),
+        Compose(large_trf, return_torch=False)
+    ]
 
     return {'train': train_trf_cmp, 'val': val_trf_cmp,
             'train_list': random_trf, 'val_list': val_trf}
