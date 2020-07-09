@@ -1,0 +1,15 @@
+opencv-python
+dill
+numpy
+matplotlib
+pandas
+scipy
+pyyaml
+h5py
+scikit-image
+numba
+setuptools
+scikit-learn
+tqdm
+torch
+cudatoolkit==10.2

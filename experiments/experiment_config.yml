@@ -1,0 +1,59 @@
+training:
+  # General
+  experiment: 3D
+  calc_meanstd: True
+  parse_color: False
+  crop_size: [512, 1024]
+  # Training
+  wd: 0.0001
+  lr: 0.0001
+  n_folds: 4
+  epochs: 60
+  bs: 12
+  # Loss parameters: possible losses are "bce", "jaccard" and "combined"
+  loss: combined
+  log_jaccard: true
+  # Transforms
+  gamma_range: [0.7, 1.5]
+  scale_range: [0.9, 1.1]
+  rotation_range: [-10, 10]
+  shear_range: [-0.1, 0.1]
+  sigma: [1, 5]
+  hsv_range: [0, 50]
+  gain_range_sp: 0.1
+  gain_range_gn: 0.5
+  brightness_range: [5, 15]
+  contrast_range: 0.2
+  translation_range: 30
+  v_range: [0.000001, 0.0009]
+  transform_probability: 0.5
+  # LR reduction
+  use_LR_red: True
+  patience: 5
+  factor: 0.1
+  eps: 1e-7
+inference:
+  calc_inference: True
+  threshold: 0.8
+model:
+  decoder_normalization: IN
+  n_outputs: 1
+  spatial_dropout: 0.1
+  bayesian_dropout: 0.5
+  backbone: resnet34
+  decoder: FPN
+data_sampling:
+  train:
+    data_provider:
+      bfpn_train:
+        cate: ItemLoader
+        num_samples: 1
+        data_key: "data"
+        target_key: "target"
+  eval:
+    data_provider:
+      bfpn_val:
+        cate: ItemLoader
+        num_samples: 1
+        data_key: "data"
+        target_key: "target"
