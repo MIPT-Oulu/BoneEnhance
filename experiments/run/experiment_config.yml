@@ -3,7 +3,8 @@ training:
   experiment: 3D
   calc_meanstd: True
   parse_color: False
-  crop_size: [512, 1024]
+  crop_small: [32, 32]
+  crop_large: [128, 128]
   # Training
   wd: 0.0001
   lr: 0.0001
@@ -13,25 +14,25 @@ training:
   # Loss parameters: possible losses are "bce", "jaccard" and "combined"
   loss: combined
   log_jaccard: true
-  # Transforms
-  gamma_range: [0.7, 1.5]
-  scale_range: [0.9, 1.1]
-  rotation_range: [-10, 10]
-  shear_range: [-0.1, 0.1]
-  sigma: [1, 5]
-  hsv_range: [0, 50]
-  gain_range_sp: 0.1
-  gain_range_gn: 0.5
-  brightness_range: [5, 15]
-  contrast_range: 0.2
-  translation_range: 30
-  v_range: [0.000001, 0.0009]
-  transform_probability: 0.5
   # LR reduction
   use_LR_red: True
   patience: 5
   factor: 0.1
   eps: 1e-7
+transforms:
+  probability: 0.5
+  scale: [0.9, 1.1]
+  translation: 30
+  rotation: [-10, 10]
+  shear: [-0.1, 0.1]
+  gamma: [0.7, 1.5]
+  sigma: [1, 5]
+  hsv: [0, 50]
+  gain_sp: 0.1
+  gain_gn: 0.5
+  brightness: [5, 15]
+  contrast: 0.2
+  v_range: [0.000001, 0.0009]
 inference:
   calc_inference: True
   threshold: 0.8

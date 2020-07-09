@@ -48,7 +48,7 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:-1]), 0)
 
     # Mean and std
-    crop = config['training']['crop_size']
+    crop = config['training']['crop_small']
     mean_std_path = snapshots_dir / f"mean_std_{crop[0]}x{crop[1]}.pth"
     if mean_std_path.is_file() and not config['training']['calc_meanstd']:  # Load
         print('==> Loading mean and std from cache')

@@ -68,115 +68,98 @@ def numpy2tens(x: np.ndarray, dtype='f') -> torch.Tensor:
         raise NotImplementedError
 
 
-def wrap_solt(entry):
-    return DataContainer(entry, 'II', transform_settings={0: {'interpolation': 'bilinear'},
-                                                          1: {'interpolation': 'bilinear'}})
+def wrap_solt_double(entry):
+    return DataContainer(entry, 'II', allow_inconsistency=True, transform_settings={0: {'interpolation': 'bilinear'},
+                                                                                    1: {'interpolation': 'bilinear'}})
+
+
+def wrap_solt_single(entry):
+    return DataContainer(entry, 'I', allow_inconsistency=False, transform_settings={0: {'interpolation': 'bilinear'}})
 
 
 def unwrap_solt(dc):
-    #return dc['images']
     return dc.data
 
 
 def train_test_transforms(conf, mean=None, std=None):
-    trf = conf['training']
-    crop_size = trf['crop_size']
-    prob = trf['transform_probability']
+    trf = conf['transforms']
+    training = conf['training']
+    crop_small = tuple(training['crop_small'])
+    crop_large = tuple(training['crop_large'])
+    prob = trf['probability']
     # Training transforms
-    if trf['experiment'] == '3D':
-        train_transforms = [slc.SelectiveStream([
-            slc.Stream([
-                #slt.Projection(
-                #    slc.Stream([
-                #        slt.Rotate(angle_range=tuple(trf['rotation_range']), p=prob),
-                #        slt.Scale(range_x=tuple(trf['scale_range']),
-                #                        range_y=tuple(trf['scale_range']), same=False, p=prob),
-                        #slt.Shear(range_x=tuple(trf['shear_range']),
-                        #                range_y=tuple(trf['shear_range']), p=prob),
-                        #slt.Translate(range_x=trf['translation_range'], range_y=trf['translation_range'], p=prob)
-                #    ]),
-                #    v_range=tuple(trf['v_range'])),
-                # Spatial
-                slt.Flip(p=prob, axis=-1),
-                #slt.Pad(pad_to=crop_size),
-                slt.Crop(crop_mode='c', crop_to=crop_size),
-
-                # Intensity
-                # Brightness/contrast
-                #slc.SelectiveStream([
-                #    slt.Brightness(brightness_range=tuple(trf['brightness_range']), p=prob),
-                #    slt.Contrast(contrast_range=trf['contrast_range'], p=prob)]),
-                # Noise
-                #slc.SelectiveStream([
-                #    slt.SaltAndPepper(p=prob, gain_range=trf['gain_range_sp']),
-                #    slt.Noise(p=prob, gain_range=trf['gain_range_gn']),
-                #    slc.SelectiveStream([
-                #        slt.Blur(p=prob, blur_type='g', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma'])),
-                #       slt.Blur(p=prob, blur_type='m', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma']))])])
-
+    train_transforms = [slc.SelectiveStream([
+        slc.Stream([
+            slt.Projection(
+                slc.Stream([
+                    slt.Rotate(angle_range=tuple(trf['rotation']), p=prob),
+                    slt.Scale(range_x=tuple(trf['scale']),
+                                    range_y=tuple(trf['scale']), same=False, p=prob),
+                    #slt.Shear(range_x=tuple(trf['shear']),
+                    #                range_y=tuple(trf['shear']), p=prob),
+                    #slt.Translate(range_x=trf['translation'], range_y=trf['translation'], p=prob)
                 ]),
+                v_range=tuple(trf['v_range'])),
+            # Spatial
+            slt.Flip(p=prob, axis=-1),
+            #slt.Pad(pad_to=crop_size),
+            #slt.Crop(crop_mode='c', crop_to=crop_size),
 
-            # Empty stream
-            slc.Stream()
-                #[slt.Pad(pad_to=crop_size),
-                #slt.Crop(crop_mode='r', crop_to=crop_size)])
-            ])
+            # Intensity
+            # Brightness/contrast
+            #slc.SelectiveStream([
+            #    slt.Brightness(brightness=tuple(trf['brightness']), p=prob),
+            #    slt.Contrast(contrast=trf['contrast'], p=prob)]),
+            # Noise
+            #slc.SelectiveStream([
+            #    slt.SaltAndPepper(p=prob, gain=trf['gain_sp']),
+            #    slt.Noise(p=prob, gain=trf['gain_gn']),
+            #    slc.SelectiveStream([
+            #        slt.Blur(p=prob, blur_type='g', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma'])),
+            #       slt.Blur(p=prob, blur_type='m', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma']))])])
 
-        ]
-    """
-    else:
-        train_transforms = [slc.SelectiveStream([
-            slc.Stream([
-                # Projection
-                slt.Projection(
-                    slc.Stream([
-                        slt.Rotate(angle_range=tuple(trf['rotation_range']), p=prob),
-                        slt.Scale(range_x=tuple(trf['scale_range']),
-                                        range_y=tuple(trf['scale_range']), same=False, p=prob),
-                        #slt.RandomShear(range_x=tuple(trf['shear_range']),
-                        #                range_y=tuple(trf['shear_range']), p=prob),
-                        #slt.RandomTranslate(range_x=trf['translation_range'], range_y=trf['translation_range'], p=prob)
-                    ]),
-                    v_range=tuple(trf['v_range'])),
-                # Spatial
-                slt.Flip(p=prob),
-                slt.Pad(pad_to=crop_size),
-                slt.Crop(crop_mode='r', crop_to=crop_size),
-                # Intensity
-                slc.SelectiveStream([
-                    slt.GammaCorrection(gamma_range=tuple(trf['gamma_range']), p=prob),
-                    slt.HSV(h_range=tuple(trf['hsv_range']),
-                                       s_range=tuple(trf['hsv_range']),
-                                       v_range=tuple(trf['hsv_range']), p=prob)]),
-                slc.SelectiveStream([
-                    slt.Brightness(brightness_range=tuple(trf['brightness_range']), p=prob),
-                    slt.Contrast(contrast_range=trf['contrast_range'], p=prob)]),
-                slc.SelectiveStream([
-                    slt.SaltAndPepper(p=prob, gain_range=trf['gain_range_sp']),
-                    slt.Noise(p=prob, gain_range=trf['gain_range_gn']),
-                    slc.SelectiveStream([
-                        slt.Blur(p=prob, blur_type='g', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma'])),
-                        slt.Blur(p=prob, blur_type='m', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma']))])])]),
+            ]),
 
-            # Empty stream
-            slc.Stream([
-                slt.Pad(pad_to=crop_size),
-                slt.Crop(crop_mode='r', crop_to=crop_size)])])
-        ]
-    """
+        # Empty stream
+        slc.Stream()
 
-    train_trf = [
-        wrap_solt,
+        ])]
+
+    # Stream to crop a large and small image from the center
+    small_transforms = [slc.Stream([
+        slt.Pad(pad_to=crop_small),
+        slt.Crop(crop_mode='c', crop_to=crop_small)])]
+
+    large_transforms = [slc.Stream([
+        slt.Pad(pad_to=crop_large),
+        slt.Crop(crop_mode='c', crop_to=crop_large)])]
+
+    random_trf = [
+        wrap_solt_double,
         slc.Stream(train_transforms),
+        unwrap_solt
+    ]
+
+    small_trf = [
+        wrap_solt_single,
+        slc.Stream(small_transforms),
         unwrap_solt,
         ApplyTransform(numpy2tens, (0, 1, 2))
     ]
+
+    large_trf = [
+        wrap_solt_single,
+        slc.Stream(large_transforms),
+        unwrap_solt,
+        ApplyTransform(numpy2tens, (0, 1, 2))
+    ]
+
     # Validation transforms
     val_trf = [
-        wrap_solt,
+        wrap_solt_double,
         slc.Stream([
-            slt.Pad(pad_to=crop_size[1]),
-            slt.Crop(crop_mode='r', crop_to=crop_size)
+            slt.Pad(pad_to=crop_small),
+            slt.Crop(crop_mode='c', crop_to=crop_small)
         ]),
         unwrap_solt,
         ApplyTransform(numpy2tens, idx=(0, 1, 2))
@@ -184,17 +167,23 @@ def train_test_transforms(conf, mean=None, std=None):
 
     # Use normalize_channel_wise if mean and std not calculated
     if mean is not None and std is not None:
-        train_trf.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
+        small_transforms.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
+        large_transforms.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
 
     if mean is not None and std is not None:
         val_trf.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
 
     # Compose transforms
-    train_trf_cmp = Compose(train_trf)
-    val_trf_cmp = Compose(val_trf)
+    train_trf_cmp = [
+        Compose(random_trf, return_torch=False),
+        Compose(small_trf, return_torch=False),
+        Compose(large_trf, return_torch=False)
+    ]
+
+    val_trf_cmp = Compose(val_trf, return_torch=False)
 
     return {'train': train_trf_cmp, 'val': val_trf_cmp,
-            'train_list': train_trf, 'val_list': val_trf}
+            'train_list': random_trf, 'val_list': val_trf}
 
 
 def estimate_mean_std(config, metadata, parse_item_cb, num_threads=8, bs=16):

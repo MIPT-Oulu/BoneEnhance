@@ -35,6 +35,7 @@ def init_experiment():
     parser.add_argument('--workdir', type=pathlib.Path, default='../../Workdir/')
     parser.add_argument('--experiment', type=pathlib.Path, default='../experiments/run')
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--magnification', type=int, default=4)
     parser.add_argument('--num_threads', type=int, default=16)
     parser.add_argument('--gpus', type=int, default=2)
     args = parser.parse_args()
@@ -177,7 +178,7 @@ def parse_item_test(root, entry, transform, data_key, target_key):
     return {data_key: img}
 
 
-def parse_grayscale(root, entry, transform, data_key, target_key, debug=False):
+def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, args=None):
     # Read image and target
     img = cv2.imread(str(entry.fname), -1)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -185,12 +186,25 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False):
     img[:, :, 2] = img[:, :, 0]
 
     target = cv2.imread(str(entry.target_fname), -1)
-    target = cv2.cvtColor(target, cv2.COLOR_BGR2RGB)
+    try:
+        target = cv2.cvtColor(target, cv2.COLOR_BGR2RGB)
+    except:
+        pass
     target[:, :, 1] = target[:, :, 0]
     target[:, :, 2] = target[:, :, 0]
 
-    # Apply transforms
-    img, target = transform((img, target))
+    # Resize target to 4x magnification respect to input
+    if args is not None:
+        resize = (img.shape[1] * args.magnification, img.shape[0] * args.magnification)
+        target = cv2.resize(target, resize)
+
+    # Apply random transforms
+    img, target = transform[0]((img, target))
+
+    # Small crop for input
+    img = transform[1](img)[0]
+    # Large crop for target
+    target = transform[2](target)[0]
 
     # Images are in the format 3xHxW
     # and scaled to 0-1 range

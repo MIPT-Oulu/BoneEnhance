@@ -35,14 +35,14 @@ if __name__ == "__main__":
         config = config_list[experiment]
 
         # Update arguments according to the configuration file
-        parser = parse_grayscale
+        parser = partial(parse_grayscale, args=args)
 
         # Loss
         loss_criterion = init_loss(config, device=device)
 
         # Split training folds
         parser_debug = partial(parser, debug=True)  # Display figures
-        splits_metadata = build_splits(args.data_location, args, config, parser_debug,
+        splits_metadata = build_splits(args.data_location, args, config, parser,#_debug,
                                        args.snapshots_dir, config['training']['snapshot'])
         mean, std = splits_metadata['mean'], splits_metadata['std']
 
