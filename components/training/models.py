@@ -230,20 +230,20 @@ class EnhanceNet(nn.Module):
 
         ######### transform module
         self.trans_layer1 = _make_layers(f[4], f[4], 'conv1_s1', 'relu')
-        self.trans_layer2 = _make_layers(f[3], f[3], 'deconv1x1_s1', 'relu')
+        self.trans_layer2 = _make_layers(f[4], f[4], 'deconv1x1_s1', 'relu')
 
         ######### generation network - deconvolution layers
-        self.deconv_layer10 = _make_layers(2048, 1024, 'deconv4x4_s2', bn='3d', activation='relu')
-        self.deconv_layer8 = _make_layers(1024, 512, 'deconv4x4_s2', bn='3d', activation='relu')
-        self.deconv_layer7 = _make_layers(512, 512, 'deconv3x3_s1', bn='3d', activation='relu')
-        self.deconv_layer6 = _make_layers(512, 256, 'deconv4x4_s2', bn='3d', activation='relu')
-        self.deconv_layer5 = _make_layers(256, 256, 'deconv3x3_s1', bn='3d', activation='relu')
-        self.deconv_layer4 = _make_layers(256, 128, 'deconv4x4_s2', bn='3d', activation='relu')
-        self.deconv_layer3 = _make_layers(128, 128, 'deconv3x3_s1', bn='3d', activation='relu')
-        self.deconv_layer2 = _make_layers(128, 64, 'deconv4x4_s2', bn='3d', activation='relu')
-        self.deconv_layer1 = _make_layers(64, 64, 'deconv3x3_s1', bn='3d', activation='relu')
-        self.deconv_layer0 = _make_layers(64, 1, 'conv1x1_s1', activation='relu')
-        self.output_layer = _make_layers(output_shape[0], output_shape[1], 'conv1_s1')
+        self.deconv_layer10 = _make_layers(f[4], f[3], 'deconv4x4_s2', bn='3d', activation='relu')
+        self.deconv_layer8 = _make_layers(f[3], f[3], 'deconv3x3_s1', bn='3d', activation='relu')
+        self.deconv_layer7 = _make_layers(f[3], f[3], 'deconv3x3_s1', bn='3d', activation='relu')
+        self.deconv_layer6 = _make_layers(f[3], f[2], 'deconv4x4_s2', bn='3d', activation='relu')
+        self.deconv_layer5 = _make_layers(f[2], f[2], 'deconv3x3_s1', bn='3d', activation='relu')
+        self.deconv_layer4 = _make_layers(f[3], f[1], 'deconv4x4_s2', bn='3d', activation='relu')
+        self.deconv_layer3 = _make_layers(f[1], f[1], 'deconv3x3_s1', bn='3d', activation='relu')
+        self.deconv_layer2 = _make_layers(f[1], 1, 'deconv4x4_s2', bn='3d', activation='relu')
+        self.deconv_layer1 = _make_layers(1, 1, 'deconv3x3_s1', bn='3d', activation='relu')
+        self.deconv_layer0 = _make_layers(1, 1, 'conv1x1_s1', activation='relu')
+        self.output_layer = _make_layers(input_shape[0], f[0], 'conv1_s1')
 
         if init_type == 'standard':
             _initialize_weights(self)
@@ -270,22 +270,22 @@ class EnhanceNet(nn.Module):
 
         ### transform module
         x = self.trans_layer1(x)
-        x = x.view(-1, self.__f[4], 2, 4, 4)
+        x = x.view(-1, self.__f[4], 4, 16, 16)
         x = self.trans_layer2(x)
 
         ### generation network
-        deconv10 = self.deconv_layer10(x)
-        deconv8 = self.deconv_layer8(deconv10)
-        deconv7 = self.deconv_layer7(deconv8)
-        deconv6 = self.deconv_layer6(deconv7)
-        deconv5 = self.deconv_layer5(deconv6)
-        deconv4 = self.deconv_layer4(deconv5)
-        deconv3 = self.deconv_layer3(deconv4)
-        deconv2 = self.deconv_layer2(deconv3)
-        deconv1 = self.deconv_layer1(deconv2)
+        x = self.deconv_layer10(x)
+        x = self.deconv_layer8(x)
+        x = self.deconv_layer7(x)
+        #x = self.deconv_layer6(x)
+        #x = self.deconv_layer5(x)
+        x = self.deconv_layer4(x)
+        x = self.deconv_layer3(x)
+        x = self.deconv_layer2(x)
+        x = self.deconv_layer1(x)
 
         ### output
-        out = self.deconv_layer0(deconv1)
+        out = self.deconv_layer0(x)
         out = torch.squeeze(out, 1)
         out = self.output_layer(out)
 
