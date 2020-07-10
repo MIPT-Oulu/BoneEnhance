@@ -78,8 +78,8 @@ if __name__ == "__main__":
             # Initialize session
             session = dict()
             session['SR'] = Session(data_provider=data_provider,
-                                    train_loader_names=tuple(config['data_sampling']['train']['data_provider'].keys()),
-                                    val_loader_names=tuple(config['data_sampling']['eval']['data_provider'].keys()),
+                                    train_loader_names=tuple(config.data_sampling.train.data_provider.SR.keys()),
+                                    val_loader_names=tuple(config.data_sampling.eval.data_provider.SR.keys()),
                                     module=model, loss=loss_criterion, optimizer=optimizer,
                                     train_callbacks=train_cbs,
                                     val_callbacks=val_cbs)
