@@ -27,14 +27,7 @@ def normalize_channel_wise(tensor: torch.Tensor, mean: torch.Tensor, std: torch.
     """
     if len(tensor.size()) != 3:
         raise ValueError
-    # Original version
-    """
-    for channel in range(tensor.size(0)):
-        tensor[channel, :, :] -= mean[channel]
-        tensor[channel, :, :] /= std[channel]
 
-    return tensor
-    """
     # Modified shape
     for channel in range(tensor.size(2)):
         tensor[:, :, channel] -= mean[channel]
@@ -134,12 +127,21 @@ def train_test_transforms(conf, mean=None, std=None):
         slt.Pad(pad_to=crop_large),
         slt.Crop(crop_mode='c', crop_to=crop_large)])]
 
+    # Training transforms
     random_trf = [
         wrap_solt_double,
         slc.Stream(train_transforms),
         unwrap_solt
     ]
 
+    # Validation transforms
+    val_trf = [
+        wrap_solt_double,
+        slc.Stream(),
+        unwrap_solt
+    ]
+
+    # Separate transforms for small and large image (crop and pad)
     small_trf = [
         wrap_solt_single,
         slc.Stream(small_transforms),
@@ -154,20 +156,10 @@ def train_test_transforms(conf, mean=None, std=None):
         ApplyTransform(numpy2tens, (0, 1, 2))
     ]
 
-    # Validation transforms
-    val_trf = [
-        wrap_solt_double,
-        slc.Stream(),
-        unwrap_solt
-    ]
-
-    # Use normalize_channel_wise if mean and std not calculated
+    # Use normalize_channel_wise if mean and std are calculated (training and evaluation)
     if mean is not None and std is not None:
         small_trf.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
         large_trf.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
-
-    if mean is not None and std is not None:
-        val_trf.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
 
     # Compose transforms
     train_trf_cmp = [

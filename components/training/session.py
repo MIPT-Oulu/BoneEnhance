@@ -1,4 +1,3 @@
-import pathlib
 import argparse
 import yaml
 import numpy as np
@@ -8,19 +7,15 @@ import socket
 import torch
 import torch.nn as nn
 import dill
-import json
 import cv2
 import os
+from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
-# from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from functools import partial
 
 from collagen.data import DataProvider, ItemLoader
 from collagen.core.utils import auto_detect_device
-from collagen.callbacks.meters import RunningAverageMeter, ItemWiseBinaryJaccardDiceMeter
-from collagen.callbacks.logging import ScalarMeterLogger
-from collagen.callbacks import ModelSaver, ImageMaskVisualizer, SimpleLRScheduler
+from collagen.callbacks import RunningAverageMeter, ModelSaver, ImageMaskVisualizer, SimpleLRScheduler, ScalarMeterLogger
 from collagen.losses.segmentation import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss
 
 from solt import DataContainer
@@ -31,9 +26,9 @@ from BoneEnhance.components.transforms.main import train_test_transforms
 def init_experiment():
     # Input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_location', type=pathlib.Path, default='../../Data')
-    parser.add_argument('--workdir', type=pathlib.Path, default='../../Workdir/')
-    parser.add_argument('--experiment', type=pathlib.Path, default='../experiments/run')
+    parser.add_argument('--data_location', type=Path, default='../../Data')
+    parser.add_argument('--workdir', type=Path, default='../../Workdir/')
+    parser.add_argument('--experiment', type=Path, default='../experiments/run')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--magnification', type=int, default=4)
     parser.add_argument('--num_threads', type=int, default=16)
@@ -57,10 +52,7 @@ def init_experiment():
                 config_list.append(config)
 
         # Snapshot directory
-        encoder = config['model']['backbone']
-        decoder = config['model']['decoder']
-        experiment = config['training']['experiment']
-        snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{experiment}_{encoder}_{decoder}')
+        snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S')
         (args.snapshots_dir / snapshot_name).mkdir(exist_ok=True, parents=True)
         config['training']['snapshot'] = snapshot_name
 
@@ -82,55 +74,47 @@ def init_experiment():
     return args, config_list, device
 
 
-def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimizer, data_provider, mean, std):
+def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimizer):
     # Snapshot directory
     current_snapshot_dir = snapshots_dir / snapshot_name
-    crop = config['training']['crop_small']
+    crop = config.training.crop_small
     log_dir = current_snapshot_dir / f"fold_{fold_id}_log"
-    device = next(model.parameters()).device
 
     # Tensorboard
-    writer = SummaryWriter(comment='RabbitCCS', log_dir=log_dir, flush_secs=15, max_queue=1)
+    writer = SummaryWriter(comment='BoneEnhance', log_dir=log_dir, flush_secs=15, max_queue=1)
     prefix = f"{crop[0]}x{crop[1]}_fold_{fold_id}"
-
-    # Set threshold
-    if 'threshold' in config['training']:  # Threshold in config file
-        threshold = config['training']['threshold']
-    else:  # Not given
-        threshold = 0.3 if config['training']['log_jaccard'] else 0.5
 
     # Callbacks
     train_cbs = (RunningAverageMeter(prefix="train", name="loss"),
-                 ScalarMeterLogger(writer, comment='training', log_dir=str(log_dir))
-                 )
+                 ScalarMeterLogger(writer, comment='training', log_dir=str(log_dir)))
 
     val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
-               ImageMaskVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
+               #ImageMaskVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
                ModelSaver(metric_names='eval/loss',
                           prefix=prefix,
                           save_dir=str(current_snapshot_dir),
                           conditions='min', model=model),
                # Reduce LR on plateau
                SimpleLRScheduler('eval/loss', ReduceLROnPlateau(optimizer,
-                                                                patience=int(config['training']['patience']),
-                                                                factor=float(config['training']['factor']),
-                                                                eps=float(config['training']['eps']))),
+                                                                patience=int(config.training.patience),
+                                                                factor=float(config.training.factor),
+                                                                eps=float(config.training.eps))),
                ScalarMeterLogger(writer=writer, comment='validation', log_dir=log_dir))
 
     return train_cbs, val_cbs
 
 
 def init_loss(config, device='cuda'):
-    loss = config['training']['loss']
+    loss = config.training.loss
     if loss == 'bce':
         return BCEWithLogitsLoss2d().to(device)
     elif loss == 'jaccard':
-        return SoftJaccardLoss(use_log=config['training']['log_jaccard']).to(device)
+        return SoftJaccardLoss(use_log=config.training.log_jaccard).to(device)
     elif loss == 'mse':
         return nn.MSELoss().to(device)
     elif loss == 'combined':
         return CombinedLoss([BCEWithLogitsLoss2d(),
-                            SoftJaccardLoss(use_log=config['training']['log_jaccard'])]).to(device)
+                            SoftJaccardLoss(use_log=config.training.log_jaccard)]).to(device)
     else:
         raise Exception('No compatible loss selected in experiment_config.yml! Set training->loss accordingly.')
 
@@ -142,7 +126,7 @@ def create_data_provider(args, config, parser, metadata, mean, std):
         item_loaders[f'loader_{stage}'] = ItemLoader(meta_data=metadata[stage],
                                                      transform=train_test_transforms(config, mean, std)[stage],
                                                      parse_item_cb=parser,
-                                                     batch_size=config['training']['bs'], num_workers=args.num_threads,
+                                                     batch_size=config.training.bs, num_workers=args.num_threads,
                                                      shuffle=True if stage == "train" else False)
 
     return DataProvider(item_loaders)
@@ -179,10 +163,7 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, a
     img[:, :, 2] = img[:, :, 0]
 
     target = cv2.imread(str(entry.target_fname), -1)
-    try:
-        target = cv2.cvtColor(target, cv2.COLOR_BGR2RGB)
-    except:
-        pass
+    target = cv2.cvtColor(target, cv2.COLOR_BGR2RGB)
     target[:, :, 1] = target[:, :, 0]
     target[:, :, 2] = target[:, :, 0]
 

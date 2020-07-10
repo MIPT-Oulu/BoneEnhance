@@ -1,4 +1,3 @@
-import cv2
 import pandas as pd
 import pathlib
 import torch
@@ -27,7 +26,7 @@ def build_meta_from_files(base_path, phase='train'):
     input_images.sort()
     target_images.sort()
 
-    #assert len(res), len(target_images)
+    assert len(res), len(target_images)
 
     d_frame = {'fname': [], 'target_fname': []}
 
@@ -62,7 +61,7 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     print('==> Mean:', mean)
     print('==> STD:', std)
 
-    # Group K-Fold by rabbit ID
+    # Group K-Fold by patient ID
     gkf = model_selection.GroupKFold(n_splits=config['training']['n_folds'])
     # K-fold by random shuffle
     #gkf = model_selection.KFold(n_splits=config['training']['n_folds'], shuffle=True, random_state=args.seed)

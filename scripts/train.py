@@ -68,8 +68,8 @@ if __name__ == "__main__":
                                    lr=config.training.lr,
                                    weight_decay=config.training.wd)
             # Callbacks
-            train_cbs, val_cbs = init_callbacks(fold, config, args.snapshots_dir, config.training.snapshot, model,
-                                                optimizer, data_provider, mean, std)
+            train_cbs, val_cbs = init_callbacks(fold, config, args.snapshots_dir,
+                                                config.training.snapshot, model, optimizer)
 
             # Initialize session
             session = dict()
