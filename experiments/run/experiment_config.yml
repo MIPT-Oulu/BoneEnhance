@@ -45,7 +45,7 @@ transforms:
   contrast: 0.2
   v_range: [0.000001, 0.0009]
 inference:
-  calc_inference: True
+  calc_inference: False
   threshold: 0.8
 model:
   decoder_normalization: IN

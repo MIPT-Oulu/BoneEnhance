@@ -8,7 +8,6 @@ import cv2
 from functools import partial
 
 from collagen.core import Session
-from collagen.modelzoo.segmentation import EncoderDecoder
 from collagen.strategies import Strategy
 
 
@@ -17,6 +16,7 @@ from BoneEnhance.components.training.session import create_data_provider, init_e
 
 from BoneEnhance.components.splits import build_splits
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
+from BoneEnhance.components.training.models import EnhanceNet
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
@@ -44,35 +44,31 @@ if __name__ == "__main__":
         # Split training folds
         parser_debug = partial(parser, debug=True)  # Display figures
         splits_metadata = build_splits(args.data_location, args, config, parser,#_debug,
-                                       args.snapshots_dir, config['training']['snapshot'])
+                                       args.snapshots_dir, config.training.snapshot)
         mean, std = splits_metadata['mean'], splits_metadata['std']
 
         # Save transforms list
-        save_transforms(args.snapshots_dir / config['training']['snapshot'], config, args, mean, std)
+        save_transforms(args.snapshots_dir / config.training.snapshot, config, args, mean, std)
 
         # Training for separate folds
-        for fold in range(config['training']['n_folds']):
+        for fold in range(config.training.n_folds):
             print(f'\nTraining fold {fold}')
             # Initialize data provider
             data_provider = create_data_provider(args, config, parser, metadata=splits_metadata[f'fold_{fold}'],
                                                  mean=mean, std=std)
-            # Initialize model model
-            backbone = config['model']['backbone']
-            decoder = config['model']['decoder']
-            model = EncoderDecoder(**config['model'])
+            # Initialize model
+            model = EnhanceNet(config.training.crop_small, args.magnification)
             if args.gpus > 1:
                 model = nn.DataParallel(model).to(device)
             else:
                 model = model.to(device)
 
-            print(f'Encoder: {backbone}, decoder: {decoder}')
-
             # Optimizer
             optimizer = optim.Adam(model.parameters(),
-                                   lr=config['training']['lr'],
-                                   weight_decay=config['training']['wd'])
+                                   lr=config.training.lr,
+                                   weight_decay=config.training.wd)
             # Callbacks
-            train_cbs, val_cbs = init_callbacks(fold, config, args.snapshots_dir, config['training']['snapshot'], model,
+            train_cbs, val_cbs = init_callbacks(fold, config, args.snapshots_dir, config.training.snapshot, model,
                                                 optimizer, data_provider, mean, std)
 
             # Initialize session
@@ -86,10 +82,10 @@ if __name__ == "__main__":
 
             # Run training
             strategy = Strategy(data_provider=data_provider,
-                                data_sampling_config=config['data_sampling'],
-                                strategy_config=config['strategy'],
+                                data_sampling_config=config.data_sampling,
+                                strategy_config=config.strategy,
                                 sessions=session,
-                                n_epochs=config['training']['epochs'],
+                                n_epochs=config.training.epochs,
                                 device=device)
             strategy.run()
 
@@ -102,7 +98,7 @@ if __name__ == "__main__":
         dur = time() - start_exp
         print(f'Model {experiment + 1} trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
 
-        if config['inference']['calc_inference']:
+        if config.inference.calc_inference:
             save_dir = inference_runner_oof(args, config, splits_metadata, device)
 
             evaluation_runner(args, config, save_dir)
