@@ -31,24 +31,20 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     x, y, ch = img_full.shape
     x_out, y_out = x * mag, y * mag
 
-    if x < input_x or y < input_y:
-        pad_image = np.zeros((input_x, input_y, 3))
-        pad_image[:x, :y, :] = img_full
-        img_full = pad_image
-        x_out, y_out = 128, 128
-
     # Cut large image into overlapping tiles
     tiler = ImageSlicer(img_full.shape, tile_size=(input_x, input_y),
                         tile_step=(input_x // 2, input_y // 2), weight=weight)
 
-    tiler_out = ImageSlicer((x_out, y_out, ch), tile_size=(input_x * mag, input_y * mag),
-                            tile_step=(input_x * mag // 2, input_y * mag // 2), weight=weight)
+    x_tile = np.min((input_x * mag, x_out))
+    y_tile = np.min((input_y * mag, y_out))
+    tiler_out = ImageSlicer((x_out, y_out, ch), tile_size=(x_tile, y_tile),
+                            tile_step=(x_tile // 2, y_tile // 2), weight=weight)
 
     # HCW -> CHW. Optionally, do normalization here
     tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]
 
     # Allocate a CUDA buffer for holding entire mask
-    merger = CudaTileMerger((x_out, y_out), channels=3, weight=tiler_out.weight)
+    merger = CudaTileMerger(tiler_out.target_shape, channels=3, weight=tiler_out.weight)
 
     # Run predictions for tiles and accumulate them
     for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler_out.crops)), batch_size=config['training']['bs'],
@@ -72,6 +68,12 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
                 else:
                     plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').squeeze().transpose(1, 2, 0))
                 plt.show()
+
+        # Check for inconsistencies
+        #if pred_batch.shape[2] > x_out:
+        pred_batch = pred_batch[:, :, :x_tile, :]
+        #if pred_batch.shape[3] > y_out:
+        pred_batch = pred_batch[:, :, :, :y_tile]
 
         # Merge on GPU
         merger.integrate_batch(pred_batch, coords_batch)

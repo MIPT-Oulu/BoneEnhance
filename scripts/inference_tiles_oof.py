@@ -80,7 +80,7 @@ if __name__ == "__main__":
             # List validation images
             validation_files = split_config[f'fold_{fold}']['val'].fname.values
 
-            # Model without validation fold
+            # Model without validation images
             model = InferenceModel([model_list[fold]]).to(device)
             model.eval()
 
@@ -89,11 +89,7 @@ if __name__ == "__main__":
                 img_full = cv2.imread(str(file))
 
                 with torch.no_grad():  # Do not update gradients
-                    try:
-                        prediction = inference(model, args, config, img_full, weight=args.weight)
-                    except:
-                        print(f'Image {file} failing. Skipping to next one.')
-                        continue
+                    prediction = inference(model, args, config, img_full, weight=args.weight)
                     prediction = cv2.cvtColor(prediction, cv2.COLOR_RGB2GRAY)
 
                 prediction = (prediction * 255).astype('uint8')
