@@ -25,23 +25,34 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     Calculates inference on one image.
     """
 
+    mag = args.magnification
+    input_x = config['training']['crop_small'][0]
+    input_y = config['training']['crop_small'][1]
     x, y, ch = img_full.shape
+    x_out, y_out = x * mag, y * mag
 
-    input_x = config['training']['crop_size'][0]
-    input_y = config['training']['crop_size'][1]
+    if x < input_x or y < input_y:
+        pad_image = np.zeros((input_x, input_y, 3))
+        pad_image[:x, :y, :] = img_full
+        img_full = pad_image
+        x_out, y_out = 128, 128
 
     # Cut large image into overlapping tiles
     tiler = ImageSlicer(img_full.shape, tile_size=(input_x, input_y),
                         tile_step=(input_x // 2, input_y // 2), weight=weight)
 
+    tiler_out = ImageSlicer((x_out, y_out, ch), tile_size=(input_x * mag, input_y * mag),
+                            tile_step=(input_x * mag // 2, input_y * mag // 2), weight=weight)
+
     # HCW -> CHW. Optionally, do normalization here
     tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]
 
     # Allocate a CUDA buffer for holding entire mask
-    merger = CudaTileMerger(tiler.target_shape, channels=1, weight=tiler.weight)
+    merger = CudaTileMerger((x_out, y_out), channels=3, weight=tiler_out.weight)
 
     # Run predictions for tiles and accumulate them
-    for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler.crops)), batch_size=config['training']['bs'], pin_memory=True):
+    for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler_out.crops)), batch_size=config['training']['bs'],
+                                                pin_memory=True):
         # Move tile to GPU
         if mean is not None and std is not None:
             tiles_batch = tiles_batch.float()
@@ -53,34 +64,34 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
         # Predict and move back to CPU
         pred_batch = inference_model(tiles_batch)
 
-        # Merge on GPU
-        merger.integrate_batch(pred_batch, coords_batch)
-
         # Plot
         if plot:
             for i in range(args.bs):
-                if args.bs != 1:
-                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').squeeze()[i, :, :])
+                if args.bs != 1 and pred_batch.shape[0] != 1:
+                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').transpose(0, 2, 3, 1)[i, :, :])
                 else:
-                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').squeeze())
+                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').squeeze().transpose(1, 2, 0))
                 plt.show()
 
+        # Merge on GPU
+        merger.integrate_batch(pred_batch, coords_batch)
+
     # Normalize accumulated mask and convert back to numpy
-    merged_mask = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
-    merged_mask = tiler.crop_to_orignal_size(merged_mask)
+    merged_pred = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
+    merged_pred = tiler_out.crop_to_orignal_size(merged_pred)
     # Plot
     if plot:
         for i in range(args.bs):
             if args.bs != 1:
-                plt.imshow(merged_mask)
+                plt.imshow(merged_pred)
             else:
-                plt.imshow(merged_mask.squeeze())
+                plt.imshow(merged_pred.squeeze())
             plt.show()
 
     torch.cuda.empty_cache()
     gc.collect()
 
-    return merged_mask.squeeze()
+    return merged_pred.squeeze()
 
 
 def inference_runner_oof(args, config, split_config, device, plot=False, weight='mean'):

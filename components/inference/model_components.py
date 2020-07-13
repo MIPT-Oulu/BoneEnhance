@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 from glob import glob
 
-from segmentation_models_pytorch import Unet
-from collagen.modelzoo.segmentation import EncoderDecoder
+from BoneEnhance.components.training.models import EnhanceNet
 
 
 class InferenceModel(nn.Module):
@@ -25,7 +24,7 @@ class InferenceModel(nn.Module):
         return res / self.n_folds
 
 
-def load_models(model_path, config, n_gpus=1, unet=True):
+def load_models(model_path, config, n_gpus=1, magnification=4):
     # Load models
     models = glob(model_path + '/*fold_*.pth')
     models.sort()
@@ -33,15 +32,11 @@ def load_models(model_path, config, n_gpus=1, unet=True):
     # List the models
     model_list = []
     for fold in range(len(models)):
-        if unet and n_gpus > 1:
+        if n_gpus > 1:
             model = nn.DataParallel(
-                Unet(config['model']['backbone'], encoder_weights="imagenet", activation='sigmoid'))
-        elif unet:
-            model = Unet(config['model']['backbone'], encoder_weights="imagenet", activation='sigmoid')
-        elif n_gpus > 1:
-            model = nn.DataParallel(EncoderDecoder(**config['model']))
+                EnhanceNet(config['training']['crop_small'], magnification))
         else:
-            model = EncoderDecoder(**config['model'])
+            model = EnhanceNet(config['training']['crop_small'], magnification)
         model.load_state_dict(torch.load(models[fold]))
         model_list.append(model)
 
