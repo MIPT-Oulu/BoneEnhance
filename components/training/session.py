@@ -10,12 +10,14 @@ import dill
 import cv2
 import os
 from pathlib import Path
+from random import uniform
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from collagen.data import DataProvider, ItemLoader
 from collagen.core.utils import auto_detect_device
-from collagen.callbacks import RunningAverageMeter, ModelSaver, ImageMaskVisualizer, SimpleLRScheduler, ScalarMeterLogger
+from collagen.callbacks import RunningAverageMeter, ModelSaver, ImagePairVisualizer, RandomImageVisualizer, \
+    SimpleLRScheduler, ScalarMeterLogger
 from collagen.losses.segmentation import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss
 
 from solt import DataContainer
@@ -74,7 +76,7 @@ def init_experiment():
     return args, config_list, device
 
 
-def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimizer):
+def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimizer, mean, std):
     # Snapshot directory
     current_snapshot_dir = snapshots_dir / snapshot_name
     crop = config.training.crop_small
@@ -86,10 +88,12 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
 
     # Callbacks
     train_cbs = (RunningAverageMeter(prefix="train", name="loss"),
+                 #RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
                  ScalarMeterLogger(writer, comment='training', log_dir=str(log_dir)))
 
     val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
-               #ImageMaskVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
+               #ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
+               RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
                ModelSaver(metric_names='eval/loss',
                           prefix=prefix,
                           save_dir=str(current_snapshot_dir),
@@ -106,17 +110,15 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
 
 def init_loss(config, device='cuda'):
     loss = config.training.loss
-    if loss == 'bce':
-        return BCEWithLogitsLoss2d().to(device)
-    elif loss == 'jaccard':
-        return SoftJaccardLoss(use_log=config.training.log_jaccard).to(device)
-    elif loss == 'mse':
-        return nn.MSELoss().to(device)
-    elif loss == 'combined':
-        return CombinedLoss([BCEWithLogitsLoss2d(),
-                            SoftJaccardLoss(use_log=config.training.log_jaccard)]).to(device)
-    else:
-        raise Exception('No compatible loss selected in experiment_config.yml! Set training->loss accordingly.')
+    available_losses = {
+        'mse': nn.MSELoss(),
+        # Segmentation losses
+        'bce': BCEWithLogitsLoss2d(),
+        'jaccard': SoftJaccardLoss(use_log=config.training.log_jaccard),
+        'combined': CombinedLoss([BCEWithLogitsLoss2d(), SoftJaccardLoss(use_log=config.training.log_jaccard)])
+    }
+
+    return available_losses[loss].to(device)
 
 
 def create_data_provider(args, config, parser, metadata, mean, std):
@@ -130,29 +132,6 @@ def create_data_provider(args, config, parser, metadata, mean, std):
                                                      shuffle=True if stage == "train" else False)
 
     return DataProvider(item_loaders)
-
-
-def parse_multi_label(x, cls, threshold=0.5):
-    out = x[:, cls, :, :].unsqueeze(1).gt(threshold)
-    return torch.cat((1 - out, out), dim=1).squeeze()
-
-
-def parse_binary_label(x, threshold=0.5):
-    out = x.gt(threshold)
-    #return torch.cat((~out, out), dim=1).squeeze().float()
-    return out.squeeze().float()
-
-
-def parse_item_test(root, entry, transform, data_key, target_key):
-    img = cv2.imread(str(entry.fname), 0)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-    dc = DataContainer((img, ), 'I',  transform_settings={0: {'interpolation': 'bilinear'}})
-    img = transform(dc)[0]
-    #img = torch.cat([img, img, img], 0) / 255.
-    img = img.permute(2, 0, 1) / 255.
-
-    return {data_key: img}
 
 
 def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, args=None):
@@ -182,18 +161,20 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, a
 
     # Images are in the format 3xHxW
     # and scaled to 0-1 range
-    img = img.permute(2, 0, 1) / 255.
+    img = img.permute(2, 0, 1)# / 255.
     target = target.permute(2, 0, 1) / 255.
 
     # Debugging
-    if debug:
+    if debug and uniform(0, 1) >= 0.99:
         fig = plt.figure(dpi=300)
         ax1 = fig.add_subplot(121)
-        ax1.imshow(np.asarray(img.permute(1, 2, 0)))
+        im = ax1.imshow(np.asarray(img.permute(1, 2, 0) / 255.), cmap='gray')
+        plt.colorbar(im)
         plt.title('Input')
 
         ax2 = fig.add_subplot(122)
-        ax2.imshow(np.asarray(target.permute(1, 2, 0)))
+        im2 = ax2.imshow(np.asarray(target.permute(1, 2, 0)), cmap='gray')
+        plt.colorbar(im2)
         plt.title('Target')
         plt.show()
 

@@ -159,7 +159,6 @@ def train_test_transforms(conf, mean=None, std=None):
     # Use normalize_channel_wise if mean and std are calculated (training and evaluation)
     if mean is not None and std is not None:
         small_trf.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
-        large_trf.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
 
     # Compose transforms
     train_trf_cmp = [

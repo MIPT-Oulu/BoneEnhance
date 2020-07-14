@@ -12,7 +12,7 @@ strategy:
 training:
   # General
   experiment: 3D
-  calc_meanstd: False
+  calc_meanstd: True
   parse_color: False
   crop_small: [32, 32]
   crop_large: [128, 128]
@@ -20,7 +20,7 @@ training:
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 100
+  epochs: 10
   bs: 24
   # Loss parameters: possible losses are "mse", "bce", "jaccard" and "combined"
   loss: mse

@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
         # Split training folds
         parser_debug = partial(parser, debug=True)  # Display figures
-        splits_metadata = build_splits(args.data_location, args, config, parser,#_debug,
+        splits_metadata = build_splits(args.data_location, args, config, parser_debug,
                                        args.snapshots_dir, config.training.snapshot)
         mean, std = splits_metadata['mean'], splits_metadata['std']
 
@@ -69,7 +69,7 @@ if __name__ == "__main__":
                                    weight_decay=config.training.wd)
             # Callbacks
             train_cbs, val_cbs = init_callbacks(fold, config, args.snapshots_dir,
-                                                config.training.snapshot, model, optimizer)
+                                                config.training.snapshot, model, optimizer, mean=mean, std=std)
 
             # Initialize session
             session = dict()
