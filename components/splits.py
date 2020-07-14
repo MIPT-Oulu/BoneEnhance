@@ -7,13 +7,13 @@ from sklearn import model_selection
 from BoneEnhance.components.transforms.main import estimate_mean_std
 
 
-def build_meta_from_files(base_path, phase='train'):
-    if phase == 'train':
+def build_meta_from_files(base_path, config):
+    if config.training.reduce_data:
+        target_loc = base_path / 'target_reduced'
+        input_loc = base_path / 'input_reduced'
+    else:
         target_loc = base_path / 'target'
         input_loc = base_path / 'input'
-    else:
-        target_loc = base_path / 'target_test'
-        input_loc = base_path / 'input_test'
 
     # List files
     input_images = set(map(lambda x: x.stem, input_loc.glob('**/*[0-9].[pb][nm][gp]')))
@@ -42,7 +42,7 @@ def build_meta_from_files(base_path, phase='train'):
 
 def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     # Metadata
-    metadata = build_meta_from_files(data_dir)
+    metadata = build_meta_from_files(data_dir, config)
     # Group_ID
     metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:-1]), 0)
 

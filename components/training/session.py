@@ -19,10 +19,10 @@ from collagen.core.utils import auto_detect_device
 from collagen.callbacks import RunningAverageMeter, ModelSaver, ImagePairVisualizer, RandomImageVisualizer, \
     SimpleLRScheduler, ScalarMeterLogger
 from collagen.losses.segmentation import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss
-
-from solt import DataContainer
+from collagen.losses.superresolution import PSNRLoss
 
 from BoneEnhance.components.transforms.main import train_test_transforms
+from BoneEnhance.components.training.models import EnhanceNet, EncoderDecoder
 
 
 def init_experiment():
@@ -112,6 +112,8 @@ def init_loss(config, device='cuda'):
     loss = config.training.loss
     available_losses = {
         'mse': nn.MSELoss(),
+        'L1': nn.L1Loss(),
+        'psnr': PSNRLoss(),
         # Segmentation losses
         'bce': BCEWithLogitsLoss2d(),
         'jaccard': SoftJaccardLoss(use_log=config.training.log_jaccard),
@@ -119,6 +121,23 @@ def init_loss(config, device='cuda'):
     }
 
     return available_losses[loss].to(device)
+
+
+def init_model(config, device='cuda', gpus=1):
+    config.model.magnification = config.training.magnification
+    architecture = config.training.architecture
+
+    available_models = {
+        'encoderdecoder': EncoderDecoder(**config['model']),
+        'cnn': EnhanceNet(config.training.crop_small, config.training.magnification)
+    }
+
+    if gpus > 1:
+        model = nn.DataParallel(available_models[architecture])
+    else:
+        model = available_models[architecture]
+
+    return model.to(device)
 
 
 def create_data_provider(args, config, parser, metadata, mean, std):
@@ -161,14 +180,14 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, a
 
     # Images are in the format 3xHxW
     # and scaled to 0-1 range
-    img = img.permute(2, 0, 1)# / 255.
+    img = img.permute(2, 0, 1) / 255.
     target = target.permute(2, 0, 1) / 255.
 
-    # Debugging
+    # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.99:
         fig = plt.figure(dpi=300)
         ax1 = fig.add_subplot(121)
-        im = ax1.imshow(np.asarray(img.permute(1, 2, 0) / 255.), cmap='gray')
+        im = ax1.imshow(np.asarray(img.permute(1, 2, 0)), cmap='gray')
         plt.colorbar(im)
         plt.title('Input')
 

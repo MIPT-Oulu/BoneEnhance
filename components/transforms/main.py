@@ -78,7 +78,7 @@ def train_test_transforms(conf, mean=None, std=None):
     trf = conf['transforms']
     training = conf['training']
     crop_small = tuple(training['crop_small'])
-    crop_large = tuple(training['crop_large'])
+    crop_large = (crop_small[0] * training['magnification'], crop_small[1] * training['magnification'])
     prob = trf['probability']
     # Training transforms
     train_transforms = [slc.SelectiveStream([

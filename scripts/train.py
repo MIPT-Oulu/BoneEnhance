@@ -12,7 +12,7 @@ from collagen.strategies import Strategy
 
 
 from BoneEnhance.components.training.session import create_data_provider, init_experiment, init_callbacks, save_transforms,\
-    init_loss, parse_grayscale
+    init_loss, parse_grayscale, init_model
 
 from BoneEnhance.components.splits import build_splits
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
@@ -57,11 +57,7 @@ if __name__ == "__main__":
             data_provider = create_data_provider(args, config, parser, metadata=splits_metadata[f'fold_{fold}'],
                                                  mean=mean, std=std)
             # Initialize model
-            model = EnhanceNet(config.training.crop_small, args.magnification)
-            if args.gpus > 1:
-                model = nn.DataParallel(model).to(device)
-            else:
-                model = model.to(device)
+            model = init_model(config, device, args.gpus)
 
             # Optimizer
             optimizer = optim.Adam(model.parameters(),

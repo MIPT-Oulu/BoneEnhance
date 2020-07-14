@@ -26,7 +26,7 @@ training:
   epochs: 50
   bs: 24
   # Loss parameters: possible losses are "mse", "bce", "jaccard" and "combined"
-  loss: psnr
+  loss: mse
   log_jaccard: true
   # LR reduction
   use_LR_red: True
