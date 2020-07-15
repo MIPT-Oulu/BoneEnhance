@@ -22,8 +22,9 @@ from collagen.losses.segmentation import CombinedLoss, BCEWithLogitsLoss2d, Soft
 from collagen.losses.superresolution import PSNRLoss
 
 from BoneEnhance.components.transforms.main import train_test_transforms
-from BoneEnhance.components.models.models import EnhanceNet, EncoderDecoder
-from BoneEnhance.components.models.networks import WGAN_VGG
+from BoneEnhance.components.models.enhance import EnhanceNet
+from BoneEnhance.components.models.encoderdecoder import EncoderDecoder
+from BoneEnhance.components.training.loss import PerceptualLoss
 
 
 def init_experiment():
@@ -118,10 +119,11 @@ def init_loss(config, device='cuda'):
         'mse': nn.MSELoss(),
         'L1': nn.L1Loss(),
         'psnr': PSNRLoss(),
+        'perceptual': PerceptualLoss(),
+        'combined': CombinedLoss([PerceptualLoss().to(device), nn.L1Loss().to(device)]),
         # Segmentation losses
         'bce': BCEWithLogitsLoss2d(),
         'jaccard': SoftJaccardLoss(use_log=config.training.log_jaccard),
-        'combined': CombinedLoss([BCEWithLogitsLoss2d(), SoftJaccardLoss(use_log=config.training.log_jaccard)])
     }
 
     return available_losses[loss].to(device)
@@ -134,7 +136,6 @@ def init_model(config, device='cuda', gpus=1):
     available_models = {
         'encoderdecoder': EncoderDecoder(**config['model']),
         'enhance': EnhanceNet(config.training.crop_small, config.training.magnification),
-        'wgan': WGAN_VGG(config.training.crop_small[0])
     }
 
     if gpus > 1:

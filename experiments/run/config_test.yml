@@ -16,17 +16,16 @@ training:
   reduce_data: False
   parse_color: False
   crop_small: [32, 32]
-  architecture: 'wgan'
-  #crop_large: [128, 128]
+  architecture: enhance
   magnification: 4
   # Training
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 50
+  epochs: 100
   bs: 24
   # Loss parameters: possible losses are "mse", "bce", "jaccard" and "combined"
-  loss: mse
+  loss: combined
   log_jaccard: true
   # LR reduction
   use_LR_red: True
