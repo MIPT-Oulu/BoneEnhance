@@ -16,13 +16,14 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from collagen.data import DataProvider, ItemLoader
 from collagen.core.utils import auto_detect_device
-from collagen.callbacks import RunningAverageMeter, ModelSaver, ImagePairVisualizer, RandomImageVisualizer, \
+from collagen.callbacks import RunningAverageMeter, ModelSaver, RandomImageVisualizer, \
     SimpleLRScheduler, ScalarMeterLogger
 from collagen.losses.segmentation import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss
 from collagen.losses.superresolution import PSNRLoss
 
 from BoneEnhance.components.transforms.main import train_test_transforms
-from BoneEnhance.components.training.models import EnhanceNet, EncoderDecoder
+from BoneEnhance.components.models.models import EnhanceNet, EncoderDecoder
+from BoneEnhance.components.models.networks import WGAN_VGG
 
 
 def init_experiment():
@@ -53,8 +54,11 @@ def init_experiment():
                 config = yaml.load(f, Loader=yaml.FullLoader)
                 config_list.append(config)
 
+        loss = config['training']['loss']
+        architecture = config['training']['architecture']
+
         # Snapshot directory
-        snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S')
+        snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{architecture}_{loss}')
         (args.snapshots_dir / snapshot_name).mkdir(exist_ok=True, parents=True)
         config['training']['snapshot'] = snapshot_name
 
@@ -129,7 +133,8 @@ def init_model(config, device='cuda', gpus=1):
 
     available_models = {
         'encoderdecoder': EncoderDecoder(**config['model']),
-        'cnn': EnhanceNet(config.training.crop_small, config.training.magnification)
+        'enhance': EnhanceNet(config.training.crop_small, config.training.magnification),
+        'wgan': WGAN_VGG(config.training.crop_small[0])
     }
 
     if gpus > 1:

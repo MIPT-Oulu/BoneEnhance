@@ -1,5 +1,4 @@
-import numpy as np
-from torch import optim, cuda, nn
+from torch import optim, cuda
 from time import time
 from copy import deepcopy
 import gc
@@ -16,7 +15,6 @@ from BoneEnhance.components.training.session import create_data_provider, init_e
 
 from BoneEnhance.components.splits import build_splits
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
-from BoneEnhance.components.training.models import EnhanceNet
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)

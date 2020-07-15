@@ -22,11 +22,11 @@ training:
   # Training
   wd: 0.0001
   lr: 0.0001
-  n_folds: 2
+  n_folds: 4
   epochs: 50
   bs: 24
   # Loss parameters: possible losses are "mse", "bce", "jaccard" and "combined"
-  loss: mse
+  loss: psnr
   log_jaccard: true
   # LR reduction
   use_LR_red: True

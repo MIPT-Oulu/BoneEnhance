@@ -4,10 +4,10 @@ import torch.nn.functional as F
 from collagen.core import Module
 from collagen.modelzoo.segmentation.decoders._fpn import FPNBlock, SegmentationBlock
 from collagen.modelzoo.modules import ConvBlock
-from collagen.modelzoo.segmentation import backbones, constants, decoders
+from collagen.modelzoo.segmentation import backbones, constants
 
-from BoneEnhance.components.training.model_blocks import *
-from BoneEnhance.components.training.model_initialization import *
+from BoneEnhance.components.models.model_blocks import *
+from BoneEnhance.components.models.model_initialization import *
 
 
 def _make_layers(in_channels, output_channels, layer_type, bn='', activation=None):

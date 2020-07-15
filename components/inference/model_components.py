@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from glob import glob
 
-from BoneEnhance.components.training.models import EnhanceNet
+from BoneEnhance.components.models.models import EnhanceNet
 
 
 class InferenceModel(nn.Module):
