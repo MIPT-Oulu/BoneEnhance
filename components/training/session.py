@@ -15,15 +15,14 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from collagen.data import DataProvider, ItemLoader
+from collagen.data.samplers import GANFakeSampler, GaussianNoiseSampler
 from collagen.core.utils import auto_detect_device
 from collagen.callbacks import RunningAverageMeter, ModelSaver, RandomImageVisualizer, \
     SimpleLRScheduler, ScalarMeterLogger
-from collagen.losses.segmentation import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss
-from collagen.losses.superresolution import PSNRLoss
+from collagen.losses import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss, PSNRLoss, GeneratorLoss
 
-from BoneEnhance.components.transforms.main import train_test_transforms
-from BoneEnhance.components.models.enhance import EnhanceNet
-from BoneEnhance.components.models.encoderdecoder import EncoderDecoder
+from BoneEnhance.components.transforms import train_test_transforms
+from BoneEnhance.components.models import EnhanceNet, EncoderDecoder, WGAN_VGG_generator, WGAN_VGG_discriminator
 from BoneEnhance.components.training.loss import PerceptualLoss
 
 
@@ -34,7 +33,6 @@ def init_experiment():
     parser.add_argument('--workdir', type=Path, default='../../Workdir/')
     parser.add_argument('--experiment', type=Path, default='../experiments/run')
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--magnification', type=int, default=4)
     parser.add_argument('--num_threads', type=int, default=16)
     parser.add_argument('--gpus', type=int, default=2)
     args = parser.parse_args()
@@ -113,14 +111,15 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
     return train_cbs, val_cbs
 
 
-def init_loss(config, device='cuda'):
-    loss = config.training.loss
+def init_loss(loss, config, device='cuda'):
     available_losses = {
         'mse': nn.MSELoss(),
         'L1': nn.L1Loss(),
         'psnr': PSNRLoss(),
         'perceptual': PerceptualLoss(),
         'combined': CombinedLoss([PerceptualLoss().to(device), nn.L1Loss().to(device)]),
+        # GAN
+        'generator': GeneratorLoss(),
         # Segmentation losses
         'bce': BCEWithLogitsLoss2d(),
         'jaccard': SoftJaccardLoss(use_log=config.training.log_jaccard),
@@ -136,6 +135,8 @@ def init_model(config, device='cuda', gpus=1):
     available_models = {
         'encoderdecoder': EncoderDecoder(**config['model']),
         'enhance': EnhanceNet(config.training.crop_small, config.training.magnification),
+        'wgan_g': WGAN_VGG_generator(),
+        'wgan_d': WGAN_VGG_discriminator(config.training.crop_small[0]),
     }
 
     if gpus > 1:
@@ -159,7 +160,26 @@ def create_data_provider(args, config, parser, metadata, mean, std):
     return DataProvider(item_loaders)
 
 
-def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, args=None):
+def create_data_provider_gan(g_network, item_loaders, args, config, parser, metadata, mean, std, device):
+    # Compile ItemLoaders
+    item_loaders['real'] = ItemLoader(meta_data=metadata['train'],
+                                      transform=train_test_transforms(config, mean, std)['train'],
+                                      parse_item_cb=parser,
+                                      batch_size=config.training.bs, num_workers=args.num_threads,
+                                      shuffle=True)
+
+    item_loaders['fake'] = GANFakeSampler(g_network=g_network,
+                                          batch_size=config.training.bs,
+                                          latent_size=config.gan.latent_size)
+
+    item_loaders['noise'] = GaussianNoiseSampler(batch_size=config.training.bs,
+                                                 latent_size=config.gan.latent_size,
+                                                 device=device, n_classes=config.gan.classes)
+
+    return DataProvider(item_loaders)
+
+
+def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, config=None):
     # Read image and target
     img = cv2.imread(str(entry.fname), -1)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -172,8 +192,13 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, a
     target[:, :, 2] = target[:, :, 0]
 
     # Resize target to 4x magnification respect to input
-    if args is not None:
-        resize = (img.shape[1] * args.magnification, img.shape[0] * args.magnification)
+    if config is not None and not config.training.crossmodality:
+        mag = config.training.magnification
+        resize = (target.shape[0] // mag, target.shape[1] // mag)
+        img = cv2.resize(target, resize)
+    elif config is not None:
+        mag = config.training.magnification
+        resize = (img.shape[1] * mag, img.shape[0] * mag)
         target = cv2.resize(target, resize)
 
     # Apply random transforms

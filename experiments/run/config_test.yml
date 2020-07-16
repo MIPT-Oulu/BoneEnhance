@@ -3,29 +3,39 @@ strategy:
   stage_names:
     - train
     - eval
+
   accumulate_grad:
-    SR: False
+    D: False
+    G: False
+
   accumulate_grad_in_iter:
-    SR: False
+    D: False
+    G: False
+
   train_starts_at_epoch:
-    SR: 0
+    D: 0
+    G: 0
+gan:
+  classes: 2
+  latent_size: 64
 training:
   # General
   experiment: 3D
   calc_meanstd: False
   reduce_data: False
   parse_color: False
-  crop_small: [32, 32]
-  architecture: enhance
+  crop_small: [64, 64]
+  architecture: [wgan_g, wgan_d]
   magnification: 4
+  crossmodality: False
   # Training
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
   epochs: 100
-  bs: 24
+  bs: 8
   # Loss parameters: possible losses are "mse", "bce", "jaccard" and "combined"
-  loss: combined
+  loss: [generator, bce]
   log_jaccard: true
   # LR reduction
   use_LR_red: True
@@ -59,17 +69,28 @@ model:
 data_sampling:
   train:
     data_provider:
-      SR:
-        loader_train:
+      D:
+        real:
           cate: ItemLoader
           batches_per_iter: 1
-          data_key: "data"
-          target_key: "target"
+          data_key: data
+          target_key: target
+        fake:
+          cate: FakeSampler
+          batches_per_iter: 1
+          data_key: data
+          target_key: target
+      G:
+        noise:
+          cate: GaussianNoiseSampler
+          batches_per_iter: 1
+          data_key: latent
+          target_key: valid
   eval:
     data_provider:
-      SR:
-        loader_val:
-          cate: ItemLoader
+      G:
+        noise:
+          cate: GaussianNoiseSampler
           batches_per_iter: 1
-          data_key: "data"
-          target_key: "target"
+          data_key: latent
+          target_key: valid
