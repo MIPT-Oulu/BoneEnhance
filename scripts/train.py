@@ -54,14 +54,14 @@ if __name__ == "__main__":
         save_transforms(args.snapshots_dir / config.training.snapshot, config, args, mean, std)
 
         # Training for separate folds
-        for fold in range(config.training.n_folds):
+        for fold in range(1):  # Train only one fold at this point
             print(f'\nTraining fold {fold}')
             # Initialize data provider
             data_provider = create_data_provider(args, config, parser, metadata=splits_metadata[f'fold_{fold}'],
                                                  mean=mean, std=std)
 
             # Initialize model
-            model = init_model(config, device, args.gpus)
+            model = init_model(config, device, args.gpus, args=args)
 
             # Optimizer
             optimizer = optim.Adam(model.parameters(),

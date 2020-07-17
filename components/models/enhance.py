@@ -139,13 +139,13 @@ class EnhanceNet(nn.Module):
         x = self.deconv_layer6(x)
         # x = F.interpolate(x, scale_factor=2)
         x = self.deconv_layer5(x)
-        x = self.relu(x)
+        # x = self.relu(x)
         x = self.deconv_layer4(x)
         x = self.deconv_layer3(x)
         x = self.deconv_layer2(x)
         # x = F.interpolate(x, scale_factor=2)
         x = self.deconv_layer1(x)
-        x = self.relu(x)
+        # x = self.relu(x)
 
         # Output
         out = self.deconv_layer0(x)

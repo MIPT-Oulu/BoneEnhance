@@ -53,32 +53,25 @@ if __name__ == "__main__":
         for fold in range(config.training.n_folds):
             print(f'\nTraining fold {fold}')
 
-
-            config_g = deepcopy(config)
-            config_g.training.architecture = config.training.architecture[0]
-            config_d = deepcopy(config)
-            config_d.training.architecture = config.training.architecture[1]
-
             # Initialize model and optimizer
+            model = init_model(config, device, args.gpus)
 
-            model_d = init_model(config_d, device, args.gpus)
-            optimizer_d = optim.Adam(model_d.parameters(), lr=config.training.lr, weight_decay=config.training.wd)
+            optimizer_d = optim.Adam(model.discriminator.parameters(), lr=config.training.lr, weight_decay=config.training.wd)
             loss_d = BCELoss().to(device)
 
-            model_g = init_model(config_g, device, args.gpus)
-            optimizer_g = optim.Adam(model_g.parameters(), lr=config.training.lr, weight_decay=config.training.wd)
-            loss_g = GeneratorLoss(d_network=model_d, d_loss=loss_d).to(device)
+            optimizer_g = optim.Adam(model.generator.parameters(), lr=config.training.lr, weight_decay=config.training.wd)
+            loss_g = GeneratorLoss(d_network=model.generator, d_loss=loss_d).to(device)
 
             # Initialize data provider
             item_loaders = dict()
-            data_provider = create_data_provider_gan(model_g, item_loaders, args, config, parser,
+            data_provider = create_data_provider_gan(model.generator, item_loaders, args, config, parser,
                                                      metadata=splits_metadata[f'fold_{fold}'],
                                                      mean=mean, std=std, device=device)
 
             # Setting up the callbacks
             log_dir = args.snapshots_dir / config.training.snapshot / f"fold_{fold}_log"
             summary_writer = SummaryWriter(comment='BoneEnhance', log_dir=log_dir, flush_secs=15, max_queue=1)
-            st_callbacks = (SamplingFreezer([model_d, model_g]),
+            st_callbacks = (SamplingFreezer([model.discriminator, model.generator]),
                             ScalarMeterLogger(writer=summary_writer),
                             ImageSamplingVisualizer(generator_sampler=item_loaders['fake'],
                                                     transform=lambda x: (x + 1.0) / 2.0,
@@ -90,16 +83,16 @@ if __name__ == "__main__":
             sessions['G'] = Session(data_provider=data_provider,
                                     train_loader_names=tuple(config.data_sampling.train.data_provider.G.keys()),
                                     val_loader_names=tuple(config.data_sampling.eval.data_provider.G.keys()),
-                                    module=model_g, loss=loss_g, optimizer=optimizer_g,
-                                    train_callbacks=(BatchProcFreezer(modules=model_d),
+                                    module=model.generator, loss=loss_g, optimizer=optimizer_g,
+                                    train_callbacks=(BatchProcFreezer(modules=model.discriminator),
                                                      RunningAverageMeter(prefix="train/G", name="loss")),
                                     val_callbacks=RunningAverageMeter(prefix="eval/G", name="loss"),)
 
             sessions['D'] = Session(data_provider=data_provider,
                                     train_loader_names=tuple(config.data_sampling.train.data_provider.D.keys()),
                                     val_loader_names=None,
-                                    module=model_d, loss=loss_d, optimizer=optimizer_d,
-                                    train_callbacks=(BatchProcFreezer(modules=model_g),
+                                    module=model.discriminator, loss=loss_d, optimizer=optimizer_d,
+                                    train_callbacks=(BatchProcFreezer(modules=model.generator),
                                                      RunningAverageMeter(prefix="train/D", name="loss")))
 
             # Run training

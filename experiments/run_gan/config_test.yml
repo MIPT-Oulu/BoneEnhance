@@ -25,7 +25,7 @@ training:
   reduce_data: False
   parse_color: False
   crop_small: [64, 64]
-  architecture: [wgan_g, wgan_d]
+  architecture: wgan
   magnification: 4
   crossmodality: False
   # Training

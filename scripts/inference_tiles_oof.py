@@ -41,7 +41,7 @@ if __name__ == "__main__":
     # Snapshots to be evaluated
     # µCT models
 
-    snaps = ['dios-erc-gpu_2020_07_10_15_36_20']
+    snaps = ['dios-erc-gpu_2020_07_17_11_32_31_enhance_combined']
 
     snaps = [args.snapshots / snap for snap in snaps]
 
@@ -78,7 +78,7 @@ if __name__ == "__main__":
         # Loop for all images
         for fold in range(len(model_list)):
             # List validation images
-            validation_files = split_config[f'fold_{fold}']['val'].fname.values
+            validation_files = split_config[f'fold_{fold}']['val'].target_fname.values
 
             # Model without validation images
             model = InferenceModel([model_list[fold]]).to(device)
@@ -88,9 +88,16 @@ if __name__ == "__main__":
 
                 img_full = cv2.imread(str(file))
 
+                resize = (img_full.shape[1] // 32, img_full.shape[0] // 32)
+                img_full = cv2.resize(img_full.copy(), resize)
+
                 with torch.no_grad():  # Do not update gradients
-                    prediction = inference(model, args, config, img_full, weight=args.weight)
-                    prediction = cv2.cvtColor(prediction, cv2.COLOR_RGB2GRAY)
+                    prediction = inference(model, args, config, img_full, weight=args.weight,
+                                           #mean=split_config['mean'], std=split_config['std']
+                                           )[:, :, 0]
+                    plt.imshow(prediction)
+                    plt.colorbar()
+                    plt.show()
 
                 prediction = (prediction * 255).astype('uint8')
 

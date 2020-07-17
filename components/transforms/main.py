@@ -83,18 +83,18 @@ def train_test_transforms(conf, mean=None, std=None):
     # Training transforms
     train_transforms = [slc.SelectiveStream([
         slc.Stream([
-            slt.Projection(
-                slc.Stream([
-                    slt.Rotate(angle_range=tuple(trf['rotation']), p=prob),
-                    slt.Scale(range_x=tuple(trf['scale']),
-                                    range_y=tuple(trf['scale']), same=False, p=prob),
+            #slt.Projection(
+            #    slc.Stream([
+            #        slt.Rotate(angle_range=tuple(trf['rotation']), p=prob),
+            #        slt.Scale(range_x=tuple(trf['scale']),
+            #                        range_y=tuple(trf['scale']), same=False, p=prob),
                     #slt.Shear(range_x=tuple(trf['shear']),
                     #                range_y=tuple(trf['shear']), p=prob),
                     #slt.Translate(range_x=trf['translation'], range_y=trf['translation'], p=prob)
-                ]),
-                v_range=tuple(trf['v_range'])),
+            #    ]),
+            #    v_range=tuple(trf['v_range'])),
             # Spatial
-            slt.Flip(p=prob, axis=-1),
+            slt.Flip(axis=-1),
             #slt.Pad(pad_to=crop_size),
             #slt.Crop(crop_mode='c', crop_to=crop_size),
 

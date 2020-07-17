@@ -14,7 +14,8 @@ class PerceptualLoss(nn.Module):
 
     def forward(self, logits, targets):
         """Calculates the perceptual loss based on difference between the VGG19 features."""
-        preds = sigmoid(logits)
+        #preds = sigmoid(logits)
+        preds = logits
 
         pred_feature = self.feature_extractor(preds)
         target_feature = self.feature_extractor(targets)

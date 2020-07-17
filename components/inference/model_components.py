@@ -19,7 +19,7 @@ class InferenceModel(nn.Module):
         res = 0
         for idx in range(self.n_folds):
             fold = self.__dict__['_modules'][f'fold_{idx}']
-            res += fold(x)#.sigmoid()
+            res += fold(x).sigmoid()
 
         return res / self.n_folds
 

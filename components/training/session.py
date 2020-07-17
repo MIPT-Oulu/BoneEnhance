@@ -11,6 +11,7 @@ import cv2
 import os
 from pathlib import Path
 from random import uniform
+from glob import glob
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
@@ -18,11 +19,12 @@ from collagen.data import DataProvider, ItemLoader
 from collagen.data.samplers import GANFakeSampler, GaussianNoiseSampler
 from collagen.core.utils import auto_detect_device
 from collagen.callbacks import RunningAverageMeter, ModelSaver, RandomImageVisualizer, \
-    SimpleLRScheduler, ScalarMeterLogger
+    SimpleLRScheduler, ScalarMeterLogger, ImagePairVisualizer
 from collagen.losses import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss, PSNRLoss, GeneratorLoss
 
 from BoneEnhance.components.transforms import train_test_transforms
-from BoneEnhance.components.models import EnhanceNet, EncoderDecoder, WGAN_VGG_generator, WGAN_VGG_discriminator
+from BoneEnhance.components.models import EnhanceNet, EncoderDecoder, \
+    WGAN_VGG_generator, WGAN_VGG_discriminator, WGAN_VGG
 from BoneEnhance.components.training.loss import PerceptualLoss
 
 
@@ -55,9 +57,10 @@ def init_experiment():
 
         loss = config['training']['loss']
         architecture = config['training']['architecture']
+        lr = config['training']['lr']
 
         # Snapshot directory
-        snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{architecture}_{loss}')
+        snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{architecture}_{loss}_{lr}')
         (args.snapshots_dir / snapshot_name).mkdir(exist_ok=True, parents=True)
         config['training']['snapshot'] = snapshot_name
 
@@ -95,7 +98,7 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
                  ScalarMeterLogger(writer, comment='training', log_dir=str(log_dir)))
 
     val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
-               #ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
+               ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
                RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
                ModelSaver(metric_names='eval/loss',
                           prefix=prefix,
@@ -119,7 +122,6 @@ def init_loss(loss, config, device='cuda'):
         'perceptual': PerceptualLoss(),
         'combined': CombinedLoss([PerceptualLoss().to(device), nn.L1Loss().to(device)]),
         # GAN
-        'generator': GeneratorLoss(),
         # Segmentation losses
         'bce': BCEWithLogitsLoss2d(),
         'jaccard': SoftJaccardLoss(use_log=config.training.log_jaccard),
@@ -128,21 +130,33 @@ def init_loss(loss, config, device='cuda'):
     return available_losses[loss].to(device)
 
 
-def init_model(config, device='cuda', gpus=1):
+def init_model(config, device='cuda', gpus=1, args=None):
     config.model.magnification = config.training.magnification
     architecture = config.training.architecture
 
+    # List available model architectures
     available_models = {
         'encoderdecoder': EncoderDecoder(**config['model']),
         'enhance': EnhanceNet(config.training.crop_small, config.training.magnification),
+        'wgan': WGAN_VGG(input_size=config.training.crop_small[0]),
         'wgan_g': WGAN_VGG_generator(),
         'wgan_d': WGAN_VGG_discriminator(config.training.crop_small[0]),
     }
 
+    # Check for multi-gpu
     if gpus > 1:
         model = nn.DataParallel(available_models[architecture])
     else:
         model = available_models[architecture]
+
+    # Pretrained model from a previous snapshot
+    if config.training.pretrain:
+        # Set up path
+        model_path = args.snapshots_dir / config.training.existing_model
+        model_path = glob(str(model_path) + '/*fold_*.pth')
+        model_path.sort()
+        # Load weights
+        model.load_state_dict(torch.load(model_path[0]))
 
     return model.to(device)
 
@@ -180,11 +194,6 @@ def create_data_provider_gan(g_network, item_loaders, args, config, parser, meta
 
 
 def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, config=None):
-    # Read image and target
-    img = cv2.imread(str(entry.fname), -1)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img[:, :, 1] = img[:, :, 0]
-    img[:, :, 2] = img[:, :, 0]
 
     target = cv2.imread(str(entry.target_fname), -1)
     target = cv2.cvtColor(target, cv2.COLOR_BGR2RGB)
@@ -194,12 +203,24 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     # Resize target to 4x magnification respect to input
     if config is not None and not config.training.crossmodality:
         mag = config.training.magnification
-        resize = (target.shape[0] // mag, target.shape[1] // mag)
-        img = cv2.resize(target, resize)
+        resize_target = (target.shape[1] // 8, target.shape[0] // 8)
+        target = cv2.resize(target.copy(), resize_target)#.transpose(1, 0, 2)
+
+        resize = (target.shape[1] // mag, target.shape[0] // mag)
+        img = cv2.resize(target, resize)#.transpose(1, 0, 2)
     elif config is not None:
+
+        # Read image and target
+        img = cv2.imread(str(entry.fname), -1)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img[:, :, 1] = img[:, :, 0]
+        img[:, :, 2] = img[:, :, 0]
+
         mag = config.training.magnification
         resize = (img.shape[1] * mag, img.shape[0] * mag)
         target = cv2.resize(target, resize)
+    else:
+        raise NotImplementedError
 
     # Apply random transforms
     img, target = transform[0]((img, target))
