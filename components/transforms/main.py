@@ -118,6 +118,8 @@ def train_test_transforms(conf, mean=None, std=None):
 
         ])]
 
+    train_transforms = [slc.SelectiveStream([slt.Rotate90(k=1), slt.Rotate90(k=-1), slt.Rotate90(k=2)])]
+
     # Stream to crop a large and small image from the center
     small_transforms = [slc.Stream([
         slt.Pad(pad_to=crop_small),

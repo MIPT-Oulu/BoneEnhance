@@ -99,7 +99,8 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
 
     val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
                ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
-               RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
+               RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
+                                     sigmoid=False),
                ModelSaver(metric_names='eval/loss',
                           prefix=prefix,
                           save_dir=str(current_snapshot_dir),
@@ -236,16 +237,16 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     target = target.permute(2, 0, 1) / 255.
 
     # Plot a small random portion of image-target pairs during debug
-    if debug and uniform(0, 1) >= 0.99:
+    if debug:# and uniform(0, 1) >= 0.99:
         fig = plt.figure(dpi=300)
         ax1 = fig.add_subplot(121)
         im = ax1.imshow(np.asarray(img.permute(1, 2, 0)), cmap='gray')
-        plt.colorbar(im)
+        plt.colorbar(im, orientation='horizontal')
         plt.title('Input')
 
         ax2 = fig.add_subplot(122)
         im2 = ax2.imshow(np.asarray(target.permute(1, 2, 0)), cmap='gray')
-        plt.colorbar(im2)
+        plt.colorbar(im2, orientation='horizontal')
         plt.title('Target')
         plt.show()
 

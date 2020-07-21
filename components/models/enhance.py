@@ -70,6 +70,7 @@ class EnhanceNet(nn.Module):
         # Feature map sizes
         f = [3, 128, 256, 512, 1024]
         self.__f = f
+        self.__magnification = magnification
 
         # Representation network - convolution layers
         self.conv_layer1 = _make_layers(3, f[0], 'conv3_s1')  # RGB input
@@ -91,16 +92,17 @@ class EnhanceNet(nn.Module):
         self.trans_layer2 = _make_layers(f[4], f[4], 'deconv1_s1', 'relu')
 
         # Generation network - deconvolution layers
-        self.deconv_layer10 = _make_layers(f[4], f[3], 'deconv3_s1', bn='2d', activation='relu')
-        self.deconv_layer8 = _make_layers(f[3], f[3], 'deconv3_s1', bn='2d', activation='relu')
+        self.deconv_layer8 = _make_layers(f[4], f[3], 'deconv3_s1', bn='2d', activation='relu')
         self.deconv_layer7 = _make_layers(f[3], f[3], 'deconv3_s1', bn='2d', activation='relu')
-        self.deconv_layer6 = _make_layers(f[3], f[2], 'deconv3_s1', bn='2d', activation='relu')
-        self.deconv_layer5 = _make_layers(f[2], f[2], 'deconv4_s2', bn='2d', activation='relu')
+        self.deconv_layer6 = _make_layers(f[3], f[3], 'deconv3_s1', bn='2d', activation='relu')
+        self.deconv_layer5 = _make_layers(f[3], f[2], 'deconv3_s1', bn='2d', activation='relu')
+        self.upscale_layer1 = _make_layers(f[2], f[2], 'deconv4_s2', bn='2d', activation='relu')
         self.deconv_layer4 = _make_layers(f[2], f[1], 'deconv3_s1', bn='2d', activation='relu')
         self.deconv_layer3 = _make_layers(f[1], f[1], 'deconv3_s1', bn='2d', activation='relu')
         self.deconv_layer2 = _make_layers(f[1], f[0], 'deconv3_s1', bn='2d', activation='relu')
-        self.deconv_layer1 = _make_layers(f[0], f[0], 'deconv4_s2', bn='2d', activation='relu')
-        self.deconv_layer0 = _make_layers(f[0], f[0], 'deconv3_s1', activation='relu')
+        self.upscale_layer2 = _make_layers(f[0], f[0], 'deconv4_s2', bn='2d', activation='relu')
+        self.deconv_layer1 = _make_layers(f[0], f[0], 'deconv3_s1', activation='relu')
+        self.upscale_layer3 = _make_layers(f[0], f[0], 'deconv4_s2', bn='2d', activation='relu')
         self.output_layer = _make_layers(f[0], 1, 'conv1_s1')
 
         if init_type == 'standard':
@@ -133,22 +135,23 @@ class EnhanceNet(nn.Module):
         x = self.relu(x + x2)
 
         # Generation network
-        x = self.deconv_layer10(x)
         x = self.deconv_layer8(x)
         x = self.deconv_layer7(x)
         x = self.deconv_layer6(x)
-        # x = F.interpolate(x, scale_factor=2)
         x = self.deconv_layer5(x)
-        # x = self.relu(x)
+        # x = F.interpolate(x, scale_factor=2)
+        x = self.upscale_layer1(x)  # Upscale 2x
         x = self.deconv_layer4(x)
         x = self.deconv_layer3(x)
         x = self.deconv_layer2(x)
-        # x = F.interpolate(x, scale_factor=2)
-        x = self.deconv_layer1(x)
-        # x = self.relu(x)
+        if self.__magnification == 4:
+            x = self.upscale_layer2(x)  # Upscale 2x
+        elif self.__magnification == 8:
+            x = self.upscale_layer2(x)  # Upscale 2x
+            x = self.upscale_layer3(x)  # Upscale 2x
 
         # Output
-        out = self.deconv_layer0(x)
+        out = self.deconv_layer1(x)
         out = self.output_layer(out)
         # Duplicate 1-channel image to represent RGB
         out = out.repeat(1, 3, 1, 1)

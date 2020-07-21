@@ -99,8 +99,8 @@ def read_image_gray(path, file):
     """Reads image from given path."""
     # Image
     f = os.path.join(path, file)
-    #image = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
-    image = cv2.imread(f, -1)
+    image = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
+    #image = cv2.imread(f, -1)
     return image
 
 
