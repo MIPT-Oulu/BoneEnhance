@@ -6,7 +6,7 @@ if __name__ == "__main__":
     # Initialize experiment
     args, _, _ = init_experiment()
     base_path = args.data_location
-    images_loc = base_path / 'input_original'
+    images_loc = base_path / 'Test set (KP02)' / 'target'
     #images_loc = base_path / 'input'
 
     # List files

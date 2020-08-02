@@ -58,9 +58,10 @@ def init_experiment():
         loss = config['training']['loss']
         architecture = config['training']['architecture']
         lr = config['training']['lr']
+        mag = config['training']['magnification']
 
         # Snapshot directory
-        snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{architecture}_{loss}_{lr}')
+        snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{architecture}_{loss}_{lr}_mag{mag}')
         (args.snapshots_dir / snapshot_name).mkdir(exist_ok=True, parents=True)
         config['training']['snapshot'] = snapshot_name
 
@@ -204,7 +205,7 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     # Resize target to 4x magnification respect to input
     if config is not None and not config.training.crossmodality:
         mag = config.training.magnification
-        resize_target = (target.shape[1] // 8, target.shape[0] // 8)
+        resize_target = (target.shape[1] // 16, target.shape[0] // 16)
         target = cv2.resize(target.copy(), resize_target)#.transpose(1, 0, 2)
 
         resize = (target.shape[1] // mag, target.shape[0] // mag)
@@ -237,7 +238,7 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     target = target.permute(2, 0, 1) / 255.
 
     # Plot a small random portion of image-target pairs during debug
-    if debug:# and uniform(0, 1) >= 0.99:
+    if debug and uniform(0, 1) >= 0.99:
         fig = plt.figure(dpi=300)
         ax1 = fig.add_subplot(121)
         im = ax1.imshow(np.asarray(img.permute(1, 2, 0)), cmap='gray')

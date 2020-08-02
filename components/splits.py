@@ -21,8 +21,8 @@ def build_meta_from_files(base_path, config):
     res = target_images.intersection(input_images)
 
     #target_images = list(map(lambda x: pathlib.Path(x).with_suffix('.png'), target_images))
-    input_images = list(map(lambda x: pathlib.Path(x.name), input_loc.glob('**/*[0-9].[pb][nm][gp]')))
-    target_images = list(map(lambda x: pathlib.Path(x.name), target_loc.glob('**/*[0-9].[pb][nm][gp]')))
+    input_images = list(map(lambda x: pathlib.Path(x), input_loc.glob('**/*[0-9].[pb][nm][gp]')))
+    target_images = list(map(lambda x: pathlib.Path(x), target_loc.glob('**/*[0-9].[pb][nm][gp]')))
     input_images.sort()
     target_images.sort()
 
@@ -32,8 +32,8 @@ def build_meta_from_files(base_path, config):
 
     # Making dataframe
 
-    [d_frame['fname'].append((input_loc / str(img_name).rsplit('_', 1)[0] / img_name)) for img_name in input_images]
-    [d_frame['target_fname'].append(target_loc / str(img_name).rsplit('_', 1)[0] / img_name) for img_name in target_images]
+    [d_frame['fname'].append((input_loc / img_name.parent / img_name.name)) for img_name in input_images]
+    [d_frame['target_fname'].append(target_loc / img_name.parent / img_name.name) for img_name in target_images]
 
     metadata = pd.DataFrame(data=d_frame)
 

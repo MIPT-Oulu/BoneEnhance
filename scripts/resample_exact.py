@@ -25,12 +25,14 @@ if __name__ == "__main__":
     samples.sort()
     samples_input.sort()
     samples = samples[30:]
+    samples_input = samples_input[30:]
     for i in range(len(samples)):
         print(f'Processing sample: {samples[i]}')
-        #try:
+
         input_path = input_loc / samples_input[i]
         im_path = images_loc / samples[i]
 
+        # (1, 2, 0) = Original dimension
         data_input, _ = load(input_path, axis=(0, 1, 2))  # axis=(1, 2, 0))
         data, _ = load(im_path, axis=(0, 1, 2))  # axis=(1, 2, 0))
 
@@ -38,11 +40,5 @@ if __name__ == "__main__":
 
         for slice in range(data.shape[1]):
             data_resample[:, slice, :] = cv2.resize(data[:, slice, :], (data_input.shape[2], data.shape[0]))
-        #print_orthogonal(data_resampled)
 
         save(str(images_save / samples[i]), samples[i], data_resample[:, :, :], dtype='.bmp')
-
-
-        #except ValueError:
-        #    print(f'Error in sample {sample}')
-        #    continue

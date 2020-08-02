@@ -137,10 +137,12 @@ class EnhanceNet(nn.Module):
         # Generation network
         x = self.deconv_layer8(x)
         x = self.deconv_layer7(x)
-        x = self.deconv_layer6(x)
+        x2 = self.deconv_layer6(x)
+        x = self.relu(x + x2)
         x = self.deconv_layer5(x)
         # x = F.interpolate(x, scale_factor=2)
-        x = self.upscale_layer1(x)  # Upscale 2x
+        if self.__magnification > 1:
+            x = self.upscale_layer1(x)  # Upscale 2x
         x = self.deconv_layer4(x)
         x = self.deconv_layer3(x)
         x = self.deconv_layer2(x)
@@ -151,8 +153,9 @@ class EnhanceNet(nn.Module):
             x = self.upscale_layer3(x)  # Upscale 2x
 
         # Output
-        out = self.deconv_layer1(x)
-        out = self.output_layer(out)
+        x = self.deconv_layer1(x)
+        x = self.output_layer(x)
+
         # Duplicate 1-channel image to represent RGB
-        out = out.repeat(1, 3, 1, 1)
-        return out
+        x = x.repeat(1, 3, 1, 1)
+        return x

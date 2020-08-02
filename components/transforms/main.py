@@ -94,15 +94,16 @@ def train_test_transforms(conf, mean=None, std=None):
             #    ]),
             #    v_range=tuple(trf['v_range'])),
             # Spatial
-            slt.Flip(axis=-1),
+            slt.Flip(axis=-1, p=prob),
+            slc.SelectiveStream([slt.Rotate90(k=1, p=prob), slt.Rotate90(k=-1, p=prob), slt.Rotate90(k=2, p=prob)]),
             #slt.Pad(pad_to=crop_size),
             #slt.Crop(crop_mode='c', crop_to=crop_size),
 
             # Intensity
             # Brightness/contrast
-            #slc.SelectiveStream([
-            #    slt.Brightness(brightness=tuple(trf['brightness']), p=prob),
-            #    slt.Contrast(contrast=trf['contrast'], p=prob)]),
+            slc.SelectiveStream([
+                slt.Brightness(brightness_range=tuple(trf['brightness']), p=prob),
+                slt.Contrast(contrast_range=trf['contrast'], p=prob)]),
             # Noise
             #slc.SelectiveStream([
             #    slt.SaltAndPepper(p=prob, gain=trf['gain_sp']),
@@ -118,7 +119,7 @@ def train_test_transforms(conf, mean=None, std=None):
 
         ])]
 
-    train_transforms = [slc.SelectiveStream([slt.Rotate90(k=1), slt.Rotate90(k=-1), slt.Rotate90(k=2)])]
+    #train_transforms = []
 
     # Stream to crop a large and small image from the center
     small_transforms = [slc.Stream([
