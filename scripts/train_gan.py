@@ -15,10 +15,11 @@ from collagen.losses import GeneratorLoss
 from torch.nn import BCELoss
 
 
-from BoneEnhance.components.training.session import create_data_provider_gan, init_experiment, \
-    save_transforms, parse_grayscale, init_model
+from BoneEnhance.components.training.session import init_experiment, save_transforms, parse_grayscale
 from BoneEnhance.components.splits import build_splits
+from BoneEnhance.components.training.gan import create_data_provider_gan, init_model_gan, DiscriminatorLoss
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
+from BoneEnhance.components.models.wgan import WGAN_VGG
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
@@ -29,7 +30,7 @@ if __name__ == "__main__":
     start = time()
 
     # Initialize experiment
-    args_base, config_list, device = init_experiment()
+    args_base, config_list, device = init_experiment(experiments='../experiments/run_gan')
 
     for experiment in range(len(config_list)):
         # Current experiment
@@ -54,24 +55,25 @@ if __name__ == "__main__":
             print(f'\nTraining fold {fold}')
 
             # Initialize model and optimizer
-            model = init_model(config, device, args.gpus)
+            model_g, model_d = init_model_gan(config, device, args.gpus)
 
-            optimizer_d = optim.Adam(model.discriminator.parameters(), lr=config.training.lr, weight_decay=config.training.wd)
-            loss_d = BCELoss().to(device)
+            optimizer_d = optim.Adam(model_d.parameters(), lr=config.training.lr, weight_decay=config.training.wd)
+            #loss_d = BCELoss().to(device)
+            loss_d = DiscriminatorLoss(input_size=config.training.crop_small[0]).to(device)
 
-            optimizer_g = optim.Adam(model.generator.parameters(), lr=config.training.lr, weight_decay=config.training.wd)
-            loss_g = GeneratorLoss(d_network=model.generator, d_loss=loss_d).to(device)
+            optimizer_g = optim.Adam(model_g.parameters(), lr=config.training.lr, weight_decay=config.training.wd)
+            loss_g = GeneratorLoss(d_network=model_g, d_loss=loss_d).to(device)
 
             # Initialize data provider
             item_loaders = dict()
-            data_provider = create_data_provider_gan(model.generator, item_loaders, args, config, parser,
+            data_provider = create_data_provider_gan(model_g, item_loaders, args, config, parser,
                                                      metadata=splits_metadata[f'fold_{fold}'],
                                                      mean=mean, std=std, device=device)
 
             # Setting up the callbacks
             log_dir = args.snapshots_dir / config.training.snapshot / f"fold_{fold}_log"
             summary_writer = SummaryWriter(comment='BoneEnhance', log_dir=log_dir, flush_secs=15, max_queue=1)
-            st_callbacks = (SamplingFreezer([model.discriminator, model.generator]),
+            st_callbacks = (SamplingFreezer([model_d, model_g]),
                             ScalarMeterLogger(writer=summary_writer),
                             ImageSamplingVisualizer(generator_sampler=item_loaders['fake'],
                                                     transform=lambda x: (x + 1.0) / 2.0,
@@ -83,16 +85,16 @@ if __name__ == "__main__":
             sessions['G'] = Session(data_provider=data_provider,
                                     train_loader_names=tuple(config.data_sampling.train.data_provider.G.keys()),
                                     val_loader_names=tuple(config.data_sampling.eval.data_provider.G.keys()),
-                                    module=model.generator, loss=loss_g, optimizer=optimizer_g,
-                                    train_callbacks=(BatchProcFreezer(modules=model.discriminator),
+                                    module=model_g, loss=loss_g, optimizer=optimizer_g,
+                                    train_callbacks=(BatchProcFreezer(modules=model_d),
                                                      RunningAverageMeter(prefix="train/G", name="loss")),
                                     val_callbacks=RunningAverageMeter(prefix="eval/G", name="loss"),)
 
             sessions['D'] = Session(data_provider=data_provider,
                                     train_loader_names=tuple(config.data_sampling.train.data_provider.D.keys()),
                                     val_loader_names=None,
-                                    module=model.discriminator, loss=loss_d, optimizer=optimizer_d,
-                                    train_callbacks=(BatchProcFreezer(modules=model.generator),
+                                    module=model_d, loss=loss_d, optimizer=optimizer_d,
+                                    train_callbacks=(BatchProcFreezer(modules=model_g),
                                                      RunningAverageMeter(prefix="train/D", name="loss")))
 
             # Run training

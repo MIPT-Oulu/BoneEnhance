@@ -9,11 +9,11 @@ from torchvision.models import vgg19
 class WGAN_VGG_generator(nn.Module):
     def __init__(self):
         super(WGAN_VGG_generator, self).__init__()
-        layers = [nn.Conv2d(1, 32, 3, 1, 1), nn.ReLU()]
-        for i in range(2, 8):
+        layers = [nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1), nn.ReLU()]
+        for _ in range(6):
             layers.append(nn.Conv2d(32, 32, 3, 1, 1))
             layers.append(nn.ReLU())
-        layers.extend([nn.Conv2d(32, 1, 3, 1, 1), nn.ReLU()])
+        layers.extend([nn.Conv2d(32, 3, 3, 1, 1), nn.ReLU()])
         self.net = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -37,7 +37,7 @@ class WGAN_VGG_discriminator(nn.Module):
             return layers
 
         layers = []
-        ch_stride_set = [(1, 64, 1), (64, 64, 2), (64, 128, 1), (128, 128, 2), (128, 256, 1), (256, 256, 2)]
+        ch_stride_set = [(3, 64, 1), (64, 64, 2), (64, 128, 1), (128, 128, 2), (128, 256, 1), (256, 256, 2)]
         for ch_in, ch_out, stride in ch_stride_set:
             add_block(layers, ch_in, ch_out, stride)
 

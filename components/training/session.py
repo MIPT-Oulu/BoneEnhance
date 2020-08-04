@@ -16,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from collagen.data import DataProvider, ItemLoader
-from collagen.data.samplers import GANFakeSampler, GaussianNoiseSampler
+from collagen.data.samplers import GaussianNoiseSampler
 from collagen.core.utils import auto_detect_device
 from collagen.callbacks import RunningAverageMeter, ModelSaver, RandomImageVisualizer, \
     SimpleLRScheduler, ScalarMeterLogger, ImagePairVisualizer
@@ -26,14 +26,15 @@ from BoneEnhance.components.transforms import train_test_transforms
 from BoneEnhance.components.models import EnhanceNet, EncoderDecoder, \
     WGAN_VGG_generator, WGAN_VGG_discriminator, WGAN_VGG
 from BoneEnhance.components.training.loss import PerceptualLoss
+from BoneEnhance.components.training.gan import GANFakeImageSampler
 
 
-def init_experiment():
+def init_experiment(experiments='../experiments/run'):
     # Input arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_location', type=Path, default='../../Data')
     parser.add_argument('--workdir', type=Path, default='../../Workdir/')
-    parser.add_argument('--experiment', type=Path, default='../experiments/run')
+    parser.add_argument('--experiment', type=Path, default=experiments)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--num_threads', type=int, default=16)
     parser.add_argument('--gpus', type=int, default=2)
@@ -122,7 +123,13 @@ def init_loss(loss, config, device='cuda'):
         'L1': nn.L1Loss(),
         'psnr': PSNRLoss(),
         'perceptual': PerceptualLoss(),
+        'perceptual_layers': PerceptualLoss(criterion=nn.MSELoss(),
+                                            compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3']),
         'combined': CombinedLoss([PerceptualLoss().to(device), nn.L1Loss().to(device)]),
+        'combined_layers': CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
+                                                        compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'])
+                                        .to(device),
+                                        nn.MSELoss().to(device)]),
         # GAN
         # Segmentation losses
         'bce': BCEWithLogitsLoss2d(),
@@ -172,25 +179,6 @@ def create_data_provider(args, config, parser, metadata, mean, std):
                                                      parse_item_cb=parser,
                                                      batch_size=config.training.bs, num_workers=args.num_threads,
                                                      shuffle=True if stage == "train" else False)
-
-    return DataProvider(item_loaders)
-
-
-def create_data_provider_gan(g_network, item_loaders, args, config, parser, metadata, mean, std, device):
-    # Compile ItemLoaders
-    item_loaders['real'] = ItemLoader(meta_data=metadata['train'],
-                                      transform=train_test_transforms(config, mean, std)['train'],
-                                      parse_item_cb=parser,
-                                      batch_size=config.training.bs, num_workers=args.num_threads,
-                                      shuffle=True)
-
-    item_loaders['fake'] = GANFakeSampler(g_network=g_network,
-                                          batch_size=config.training.bs,
-                                          latent_size=config.gan.latent_size)
-
-    item_loaders['noise'] = GaussianNoiseSampler(batch_size=config.training.bs,
-                                                 latent_size=config.gan.latent_size,
-                                                 device=device, n_classes=config.gan.classes)
 
     return DataProvider(item_loaders)
 

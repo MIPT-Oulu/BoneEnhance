@@ -6,7 +6,7 @@ import gc
 import os
 import cv2
 
-from skimage import measure
+#from skimage import measure
 from time import time
 from copy import deepcopy
 from tqdm import tqdm

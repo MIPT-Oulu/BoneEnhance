@@ -3,6 +3,29 @@ from BoneEnhance.components.models.model_initialization import *
 from torch.nn import functional as F
 
 
+class ResidualBlock(nn.Module):
+    """
+        Originally introduced in (Microsoft Research Asia, He et al.): https://arxiv.org/abs/1512.03385
+        Based on implementation from https://github.com/gordicaleksa/pytorch-nst-feedforward
+    """
+
+    def __init__(self, channels):
+        super(ResidualBlock, self).__init__()
+        stride_size = 1
+        self.conv1 = conv3x3(channels, channels, stride=stride_size)
+        self.in1 = nn.InstanceNorm2d(channels, affine=True)
+        self.conv2 = conv3x3(channels, channels, stride=stride_size)
+        self.in2 = nn.InstanceNorm2d(channels, affine=True)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        residual = x
+        out = self.relu(self.in1(self.conv1(x)))
+        out = self.in2(self.conv2(out))
+        out = self.relu(out + residual)
+        return out
+
+
 def _make_layers(in_channels, output_channels, layer_type, bn='', activation=None):
     layers = []
 
@@ -57,7 +80,7 @@ def _make_layers(in_channels, output_channels, layer_type, bn='', activation=Non
 class EnhanceNet(nn.Module):
     """Inspired by ReconNet https://doi.org/10.1038/s41551-019-0466-4"""
 
-    def __init__(self, input_shape, magnification, gain=0.02, init_type='standard'):
+    def __init__(self, input_shape, magnification, gain=0.02, init_type='standard', residual=True, upscale_input=True):
         """
 
         :param input_shape: Size of the input image
@@ -69,8 +92,9 @@ class EnhanceNet(nn.Module):
 
         # Feature map sizes
         f = [3, 128, 256, 512, 1024]
-        self.__f = f
         self.__magnification = magnification
+        self.residual = residual
+        self.upscale_input = upscale_input
 
         # Representation network - convolution layers
         self.conv_layer1 = _make_layers(3, f[0], 'conv3_s1')  # RGB input
@@ -90,6 +114,12 @@ class EnhanceNet(nn.Module):
         # Transform module
         self.trans_layer1 = _make_layers(f[4], f[4], 'conv1_s1', 'relu')
         self.trans_layer2 = _make_layers(f[4], f[4], 'deconv1_s1', 'relu')
+
+        # Residual blocks
+        self.res1 = ResidualBlock(f[4])
+        self.res2 = ResidualBlock(f[4])
+        self.res3 = ResidualBlock(f[4])
+        self.res4 = ResidualBlock(f[4])
 
         # Generation network - deconvolution layers
         self.deconv_layer8 = _make_layers(f[4], f[3], 'deconv3_s1', bn='2d', activation='relu')
@@ -111,6 +141,11 @@ class EnhanceNet(nn.Module):
             init_weights(self, gain=gain, init_type=init_type)
 
     def forward(self, x):
+
+        if self.upscale_input:
+            x = F.interpolate(x, scale_factor=self.__magnification)
+            self.__magnification = 1
+
         # Representation network
         x = self.conv_layer1(x)
         x2 = self.conv_layer2(x)
@@ -129,16 +164,21 @@ class EnhanceNet(nn.Module):
         x = self.relu(x + x2)
 
         # Transform module
-        x = self.trans_layer1(x)
-        # x = x.view(-1, self.__f[4], 16, 16)
-        x = self.trans_layer2(x)
-        x = self.relu(x + x2)
+        if self.residual:
+            x = self.res1(x)
+            x = self.res2(x)
+            x = self.res3(x)
+            x = self.res4(x)
+        else:
+            x = self.trans_layer1(x)
+            x = self.trans_layer2(x)
+            x = self.relu(x + x2)
 
         # Generation network
         x = self.deconv_layer8(x)
         x = self.deconv_layer7(x)
-        x2 = self.deconv_layer6(x)
-        x = self.relu(x + x2)
+        x = self.deconv_layer6(x)
+        #x = self.relu(x + x2)
         x = self.deconv_layer5(x)
         # x = F.interpolate(x, scale_factor=2)
         if self.__magnification > 1:

@@ -5,7 +5,7 @@ import os
 import cv2
 from tqdm import tqdm
 from joblib import Parallel, delayed
-from skimage import measure
+#from skimage import measure
 
 
 def load_images(path, n_jobs=12, rgb=False, uCT=False):
