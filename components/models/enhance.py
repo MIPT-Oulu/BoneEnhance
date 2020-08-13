@@ -80,7 +80,7 @@ def _make_layers(in_channels, output_channels, layer_type, bn='', activation=Non
 class EnhanceNet(nn.Module):
     """Inspired by ReconNet https://doi.org/10.1038/s41551-019-0466-4"""
 
-    def __init__(self, input_shape, magnification, gain=0.02, init_type='standard', residual=True, upscale_input=True):
+    def __init__(self, input_shape, magnification, gain=0.02, init_type='standard', residual=False, upscale_input=False):
         """
 
         :param input_shape: Size of the input image
@@ -95,6 +95,7 @@ class EnhanceNet(nn.Module):
         self.__magnification = magnification
         self.residual = residual
         self.upscale_input = upscale_input
+        self.upscale_factor = magnification
 
         # Representation network - convolution layers
         self.conv_layer1 = _make_layers(3, f[0], 'conv3_s1')  # RGB input
@@ -143,7 +144,7 @@ class EnhanceNet(nn.Module):
     def forward(self, x):
 
         if self.upscale_input:
-            x = F.interpolate(x, scale_factor=self.__magnification)
+            x = F.interpolate(x, scale_factor=self.upscale_factor)
             self.__magnification = 1
 
         # Representation network
@@ -172,7 +173,7 @@ class EnhanceNet(nn.Module):
         else:
             x = self.trans_layer1(x)
             x = self.trans_layer2(x)
-            x = self.relu(x + x2)
+            #x = self.relu(x + x2)
 
         # Generation network
         x = self.deconv_layer8(x)

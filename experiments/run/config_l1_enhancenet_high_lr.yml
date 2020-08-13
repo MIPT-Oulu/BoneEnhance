@@ -12,7 +12,7 @@ strategy:
 training:
   # General
   experiment: 3D
-  calc_meanstd: True
+  calc_meanstd: False
   reduce_data: False
   parse_color: False
   crop_small: [32, 32]
@@ -26,9 +26,9 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 100
-  bs: 24
+  bs: 64
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: combined_layers
+  loss: L1
   log_jaccard: true
   # LR reduction
   use_LR_red: True
@@ -71,7 +71,7 @@ data_sampling:
   eval:
     data_provider:
       SR:
-        loader_val:
+        loader_eval:
           cate: ItemLoader
           batches_per_iter: 1
           data_key: "data"

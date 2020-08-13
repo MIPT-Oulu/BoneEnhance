@@ -173,7 +173,7 @@ def init_model(config, device='cuda', gpus=1, args=None):
 def create_data_provider(args, config, parser, metadata, mean, std):
     # Compile ItemLoaders
     item_loaders = dict()
-    for stage in ['train', 'val']:
+    for stage in ['train', 'eval']:
         item_loaders[f'loader_{stage}'] = ItemLoader(meta_data=metadata[stage],
                                                      transform=train_test_transforms(config, mean, std)[stage],
                                                      parse_item_cb=parser,

@@ -1,12 +1,20 @@
 import torch
 import torch.nn as nn
+import pandas as pd
 from torch import Tensor
+from torch.utils.data.dataloader import default_collate
+from torch.utils.tensorboard import SummaryWriter
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+
 from collagen.data import DataProvider, ItemLoader
 from collagen.data.samplers import GaussianNoiseSampler
 from collagen.core import Module
+from collagen.callbacks import RunningAverageMeter, ImagePairVisualizer, SimpleLRScheduler, \
+    RandomImageVisualizer, ModelSaver
 
 from BoneEnhance.components.transforms import train_test_transforms
-from BoneEnhance.components.models import WGAN_VGG_generator, WGAN_VGG_discriminator
+from BoneEnhance.components.models import WGAN_VGG_generator, WGAN_VGG_discriminator, EnhanceNet, Vgg16, Discriminator
+from BoneEnhance.components.utilities.callbacks import ScalarMeterLogger
 
 
 class GANFakeImageSampler(ItemLoader):
@@ -34,14 +42,24 @@ class GANFakeImageSampler(ItemLoader):
 
 
 def init_model_gan(config, device='cuda', gpus=1):
-    model_g = WGAN_VGG_generator()
-    model_d = WGAN_VGG_discriminator(config.training.crop_small[0])
+    # Image size
+    crop = (3, config.training.crop_small[0], config.training.crop_small[1])
+
+    # Networks
+    #model_g = WGAN_VGG_generator()
+    model_g = EnhanceNet(config.training.crop_small, config.training.magnification)
+    #model_d = WGAN_VGG_discriminator(config.training.crop_small[0])
+    model_d = Discriminator(crop)
+    model_f = Vgg16()
+    # Feature extractor does not need to be updated
+    model_f.eval()
 
     if gpus > 1:
         model_g = nn.DataParallel(model_g)
         model_d = nn.DataParallel(model_d)
+        model_f = nn.DataParallel(model_f)
 
-    return model_g.to(device), model_d.to(device)
+    return model_g.to(device), model_d.to(device), model_f.to(device)
 
 
 def create_data_provider_gan(g_network, item_loaders, args, config, parser, metadata, mean, std, device):
@@ -63,14 +81,55 @@ def create_data_provider_gan(g_network, item_loaders, args, config, parser, meta
     return DataProvider(item_loaders)
 
 
+def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimizer, mean, std):
+    # Snapshot directory
+    current_snapshot_dir = snapshots_dir / snapshot_name
+    crop = config.training.crop_small
+    log_dir = current_snapshot_dir / f"fold_{fold_id}_log"
+
+    # Tensorboard
+    writer = SummaryWriter(comment='BoneEnhance', log_dir=log_dir, flush_secs=15, max_queue=1)
+    prefix = f"{crop[0]}x{crop[1]}_fold_{fold_id}"
+
+    # Callbacks
+    train_cbs = (RunningAverageMeter(prefix="train", name="loss"),
+                 #RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
+                 ScalarMeterLogger(writer, comment='training', log_dir=str(log_dir)))
+
+    val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
+               ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
+               RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
+                                     sigmoid=False),
+               ModelSaver(metric_names='eval/loss',
+                          prefix=prefix + '_G',
+                          save_dir=str(current_snapshot_dir),
+                          conditions='min', model=model[0]),
+               ModelSaver(metric_names='eval/loss',
+                          prefix=prefix + '_D',
+                          save_dir=str(current_snapshot_dir),
+                          conditions='min', model=model[1]),
+               # Reduce LR on plateau
+               SimpleLRScheduler('eval/loss', ReduceLROnPlateau(optimizer[0],
+                                                                patience=int(config.training.patience),
+                                                                factor=float(config.training.factor),
+                                                                eps=float(config.training.eps))),
+               SimpleLRScheduler('eval/loss', ReduceLROnPlateau(optimizer[1],
+                                                                patience=int(config.training.patience),
+                                                                factor=float(config.training.factor),
+                                                                eps=float(config.training.eps))),
+               ScalarMeterLogger(writer=writer, comment='validation', log_dir=log_dir))
+
+    return train_cbs, val_cbs
+
+
 class DiscriminatorLoss(Module):
     """
 
     """
-    def __init__(self, input_size):
+    def __init__(self, config):
         super(DiscriminatorLoss, self).__init__()
-        self.generator = WGAN_VGG_generator()
-        self.discriminator = WGAN_VGG_discriminator(input_size)
+        self.generator = EnhanceNet(config.training.crop_small, config.training.magnification)
+        self.discriminator = WGAN_VGG_discriminator(config.training.crop_small[0])
 
     def forward(self, img: Tensor, target: Tensor, gp=False, return_gp=False):
         fake = self.generator(img)
@@ -84,3 +143,33 @@ class DiscriminatorLoss(Module):
             gp_loss = None
             loss = d_loss
         return (loss, gp_loss) if return_gp else loss
+
+
+class FeatureMatchingSampler(ItemLoader):
+    def __init__(self, model: nn.Module, latent_size: int, data_key: str = "data",
+                 meta_data: pd.DataFrame or None = None,
+                 parse_item_cb: callable or None = None, name='fm',
+                 root: str or None = None, batch_size: int = 1, num_workers: int = 0, shuffle: bool = False,
+                 pin_memory: bool = False, collate_fn: callable = default_collate, transform: callable or None = None,
+                 sampler: torch.utils.data.sampler.Sampler or None = None, batch_sampler=None,
+                 drop_last: bool = False, timeout: int = 0):
+        super().__init__(meta_data=meta_data, parse_item_cb=parse_item_cb, root=root, batch_size=batch_size,
+                         num_workers=num_workers, shuffle=shuffle, pin_memory=pin_memory, collate_fn=collate_fn,
+                         transform=transform, sampler=sampler, batch_sampler=batch_sampler, drop_last=drop_last,
+                         timeout=timeout)
+        self.__model: nn.Module = model
+        self.__latent_size: int = latent_size
+        self.__data_key = data_key
+        self.__name = name
+
+    def sample(self, k=1):
+        samples = []
+        real_imgs_list = super().sample(k)
+        for i in range(k):
+            real_imgs = real_imgs_list[i][self.__data_key]
+            features = self.__model.get_features(real_imgs)
+            noise = torch.randn(self.batch_size, self.__latent_size)
+            noise_on_device = noise.to(next(self.__model.parameters()).device)
+            samples.append({'name': self.__name, 'real_features': features.detach(), 'real_data': real_imgs,
+                            'latent': noise_on_device})
+        return samples

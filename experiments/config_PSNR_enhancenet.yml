@@ -69,7 +69,7 @@ data_sampling:
   eval:
     data_provider:
       SR:
-        loader_val:
+        loader_eval:
           cate: ItemLoader
           batches_per_iter: 1
           data_key: "data"

@@ -176,8 +176,8 @@ def train_test_transforms(conf, mean=None, std=None):
         Compose(large_trf, return_torch=False)
     ]
 
-    return {'train': train_trf_cmp, 'val': val_trf_cmp,
-            'train_list': random_trf, 'val_list': val_trf}
+    return {'train': train_trf_cmp, 'eval': val_trf_cmp,
+            'train_list': random_trf, 'eval_list': val_trf}
 
 
 def estimate_mean_std(config, metadata, parse_item_cb, num_threads=8, bs=16):

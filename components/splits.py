@@ -72,7 +72,7 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     for fold in range(config['training']['n_folds']):
         train_idx, val_idx = next(iterator)
         splits_metadata[f'fold_{fold}'] = {'train': metadata.iloc[train_idx],
-                                           'val': metadata.iloc[val_idx]}
+                                           'eval': metadata.iloc[val_idx]}
 
     # Add mean and std to metadata
     splits_metadata['mean'] = mean

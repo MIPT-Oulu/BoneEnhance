@@ -17,7 +17,11 @@ strategy:
     G: 0
 gan:
   classes: 2
-  latent_size: 64
+  latent_size: 16
+  warmup_batches: 10
+  sample_interval: 500
+  lambda_adv: 0.005  # Adversarial loss weight
+  lambda_pixel: 0.01  # Pixel loss weight
 training:
   # General
   experiment: 3D
@@ -33,7 +37,7 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 100
-  bs: 8
+  bs: 10
   # Loss parameters: possible losses are "mse", "bce", "jaccard" and "combined"
   loss: [generator, bce]
   log_jaccard: true

@@ -17,6 +17,7 @@ class PerceptualLoss(nn.Module):
             self.feature_extractor = WGAN_VGG_FeatureExtractor()
         else:
             self.feature_extractor = Vgg16()
+            self.feature_extractor.eval()
         self.p_criterion = criterion
         self.compare_layer = compare_layer
 
