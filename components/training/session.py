@@ -16,17 +16,15 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from collagen.data import DataProvider, ItemLoader
-from collagen.data.samplers import GaussianNoiseSampler
 from collagen.core.utils import auto_detect_device
 from collagen.callbacks import RunningAverageMeter, ModelSaver, RandomImageVisualizer, \
     SimpleLRScheduler, ScalarMeterLogger, ImagePairVisualizer
-from collagen.losses import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss, PSNRLoss, GeneratorLoss
+from collagen.losses import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss, PSNRLoss
 
 from BoneEnhance.components.transforms import train_test_transforms
 from BoneEnhance.components.models import EnhanceNet, EncoderDecoder, \
     WGAN_VGG_generator, WGAN_VGG_discriminator, WGAN_VGG
 from BoneEnhance.components.training.loss import PerceptualLoss
-from BoneEnhance.components.training.gan import GANFakeImageSampler
 
 
 def init_experiment(experiments='../experiments/run'):

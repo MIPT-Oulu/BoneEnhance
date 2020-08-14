@@ -41,7 +41,7 @@ if __name__ == "__main__":
     # Snapshots to be evaluated
     # µCT models
 
-    snaps = ['dios-erc-gpu_2020_07_17_11_32_31_enhance_combined']
+    snaps = ['dios-erc-gpu_2020_08_13_13_19_53_enhance_L1_0.0001_mag4']
 
     snaps = [args.snapshots / snap for snap in snaps]
 
@@ -78,7 +78,7 @@ if __name__ == "__main__":
         # Loop for all images
         for fold in range(len(model_list)):
             # List validation images
-            validation_files = split_config[f'fold_{fold}']['val'].target_fname.values
+            validation_files = split_config[f'fold_{fold}']['eval'].target_fname.values
 
             # Model without validation images
             model = InferenceModel([model_list[fold]]).to(device)
@@ -93,13 +93,14 @@ if __name__ == "__main__":
 
                 with torch.no_grad():  # Do not update gradients
                     prediction = inference(model, args, config, img_full, weight=args.weight,
-                                           #mean=split_config['mean'], std=split_config['std']
+                                           mean=split_config['mean'], std=split_config['std']
                                            )[:, :, 0]
-                    plt.imshow(prediction)
-                    plt.colorbar()
-                    plt.show()
+                    if args.plot:
+                        plt.imshow(prediction)
+                        plt.colorbar()
+                        plt.show()
 
-                prediction = (prediction * 255).astype('uint8')
+                prediction = prediction.astype('uint8')
 
                 # When saving 3D stacks, file structure should be preserved
                 (save_dir / file.parent.stem).mkdir(exist_ok=True)

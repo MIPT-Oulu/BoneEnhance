@@ -17,9 +17,9 @@ training:
   parse_color: False
   crop_small: [32, 32]
   architecture: enhance
-  crossmodality: False
-  pretrain: False
-  existing_model: dios-erc-gpu_2020_07_24_08_06_02_enhance_combined_0.0001_mag4
+  crossmodality: True
+  pretrain: True
+  existing_model: dios-erc-gpu_2020_08_13_15_44_23_enhance_combined_0.0001_mag4
   magnification: 4
   # Training
   wd: 0.0001
@@ -28,7 +28,7 @@ training:
   epochs: 100
   bs: 64
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: L1
+  loss: combined
   log_jaccard: true
   # LR reduction
   use_LR_red: True

@@ -1,24 +1,20 @@
-from torch import optim, cuda, save, cat
+from torch import optim, cuda
 from time import time
 from copy import deepcopy
-from torch.nn.functional import interpolate
-import gc
 from omegaconf import OmegaConf
 import cv2
 from functools import partial
 from tqdm import tqdm
-from torch.utils.tensorboard import SummaryWriter
 import numpy as np
-from torchvision.utils import save_image, make_grid
 from torch.autograd import Variable
 
-from torch.nn import BCELoss, BCEWithLogitsLoss, L1Loss
+from torch.nn import BCEWithLogitsLoss, L1Loss
 
 
 from BoneEnhance.components.training.session import init_experiment, save_transforms, parse_grayscale, \
     create_data_provider
 from BoneEnhance.components.splits import build_splits
-from BoneEnhance.components.training.gan import init_model_gan, DiscriminatorLoss, init_callbacks
+from BoneEnhance.components.gan.main import init_model_gan, init_callbacks
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
 
 

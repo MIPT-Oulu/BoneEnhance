@@ -12,14 +12,11 @@ from collagen.strategies import Strategy
 from collagen.callbacks import SamplingFreezer, ScalarMeterLogger, ImageSamplingVisualizer, RunningAverageMeter, \
     BatchProcFreezer
 from collagen.losses import GeneratorLoss
-from torch.nn import BCELoss
-
 
 from BoneEnhance.components.training.session import init_experiment, save_transforms, parse_grayscale
 from BoneEnhance.components.splits import build_splits
-from BoneEnhance.components.training.gan import create_data_provider_gan, init_model_gan, DiscriminatorLoss
+from BoneEnhance.components.gan.main import create_data_provider_gan, init_model_gan, DiscriminatorLoss
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
-from BoneEnhance.components.models.wgan import WGAN_VGG
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
