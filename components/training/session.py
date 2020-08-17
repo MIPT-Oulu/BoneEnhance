@@ -127,7 +127,7 @@ def init_loss(loss, config, device='cuda'):
         'combined_layers': CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
                                                         compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'])
                                         .to(device),
-                                        nn.MSELoss().to(device)]),
+                                        nn.L1Loss().to(device)]),
         # GAN
         # Segmentation losses
         'bce': BCEWithLogitsLoss2d(),

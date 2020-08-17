@@ -36,6 +36,7 @@ class PerceptualLoss(nn.Module):
                 loss = 0
                 for l in layer:
                     loss += self.p_criterion(pred_feature[l], target_feature[l])
+                loss /= len(layer)
             else:
                 loss = self.p_criterion(pred_feature[layer], target_feature[layer])
         return loss

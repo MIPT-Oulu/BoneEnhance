@@ -125,15 +125,15 @@ class EnhanceNet(nn.Module):
         # Generation network - deconvolution layers
         self.deconv_layer8 = _make_layers(f[4], f[3], 'deconv3_s1', bn='2d', activation='relu')
         self.deconv_layer7 = _make_layers(f[3], f[3], 'deconv3_s1', bn='2d', activation='relu')
+        self.upscale_layer1 = _make_layers(f[3], f[3], 'deconv4_s2', bn='2d', activation='relu')
         self.deconv_layer6 = _make_layers(f[3], f[3], 'deconv3_s1', bn='2d', activation='relu')
         self.deconv_layer5 = _make_layers(f[3], f[2], 'deconv3_s1', bn='2d', activation='relu')
-        self.upscale_layer1 = _make_layers(f[2], f[2], 'deconv4_s2', bn='2d', activation='relu')
+        self.upscale_layer2 = _make_layers(f[2], f[2], 'deconv4_s2', bn='2d', activation='relu')
         self.deconv_layer4 = _make_layers(f[2], f[1], 'deconv3_s1', bn='2d', activation='relu')
         self.deconv_layer3 = _make_layers(f[1], f[1], 'deconv3_s1', bn='2d', activation='relu')
+        self.upscale_layer3 = _make_layers(f[1], f[1], 'deconv4_s2', bn='2d', activation='relu')
         self.deconv_layer2 = _make_layers(f[1], f[0], 'deconv3_s1', bn='2d', activation='relu')
-        self.upscale_layer2 = _make_layers(f[0], f[0], 'deconv4_s2', bn='2d', activation='relu')
         self.deconv_layer1 = _make_layers(f[0], f[0], 'deconv3_s1', activation='relu')
-        self.upscale_layer3 = _make_layers(f[0], f[0], 'deconv4_s2', bn='2d', activation='relu')
         self.output_layer = _make_layers(f[0], 1, 'conv1_s1')
 
         if init_type == 'standard':
@@ -178,20 +178,22 @@ class EnhanceNet(nn.Module):
         # Generation network
         x = self.deconv_layer8(x)
         x = self.deconv_layer7(x)
+        # Upscale 2x
+        if self.__magnification > 1:
+            x = self.upscale_layer1(x)
         x = self.deconv_layer6(x)
         #x = self.relu(x + x2)
         x = self.deconv_layer5(x)
-        # x = F.interpolate(x, scale_factor=2)
-        if self.__magnification > 1:
-            x = self.upscale_layer1(x)  # Upscale 2x
+        # Upscale 2x
+        if self.__magnification == 4:
+            x = self.upscale_layer2(x)
         x = self.deconv_layer4(x)
         x = self.deconv_layer3(x)
+        # Upscale 2x
+        if self.__magnification == 8:
+            x = self.upscale_layer2(x)  # Upscale 2x
+            x = self.upscale_layer3(x)
         x = self.deconv_layer2(x)
-        if self.__magnification == 4:
-            x = self.upscale_layer2(x)  # Upscale 2x
-        elif self.__magnification == 8:
-            x = self.upscale_layer2(x)  # Upscale 2x
-            x = self.upscale_layer3(x)  # Upscale 2x
 
         # Output
         x = self.deconv_layer1(x)

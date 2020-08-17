@@ -8,13 +8,13 @@ from tqdm import tqdm
 import numpy as np
 from torch.autograd import Variable
 
-from torch.nn import BCEWithLogitsLoss, L1Loss
+from torch.nn import BCEWithLogitsLoss, L1Loss, BCELoss
 
 
 from BoneEnhance.components.training.session import init_experiment, save_transforms, parse_grayscale, \
-    create_data_provider
+    create_data_provider, init_loss
 from BoneEnhance.components.splits import build_splits
-from BoneEnhance.components.gan.main import init_model_gan, init_callbacks
+from BoneEnhance.components.gan import init_model_gan, init_callbacks, Trainer
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
 
 
@@ -86,7 +86,7 @@ if __name__ == "__main__":
             criterion_content = L1Loss().to(device)
             criterion_pixel = L1Loss().to(device)
 
-            Tensor = cuda.FloatTensor
+            loss_g = init_loss('combined_layers', config, device=device)
 
             # Initialize data provider
             dataloader = create_data_provider(args, config, parser, metadata=splits_metadata[f'fold_{fold}'],
@@ -94,8 +94,19 @@ if __name__ == "__main__":
 
             callbacks = init_callbacks(fold, config, args.snapshots_dir, config.training.snapshot,
                                        (generator, discriminator), (optimizer_g, optimizer_d), mean, std)
+            callbacks = {'train': callbacks[0], 'eval': callbacks[1]}
 
+            trainer = Trainer(
+                model=[generator, discriminator],
+                loaders=dataloader,
+                criterion=[loss_g, criterion_GAN],
+                opt=[optimizer_g, optimizer_g],
+                device=device,
+                callbacks=callbacks
+            )
+            trainer.run(num_epochs=config.training.epochs)
 
+            """
             # Training loop
             pbar = tqdm(range(config.training.epochs))
             for epoch, _ in enumerate(pbar):
@@ -218,7 +229,7 @@ if __name__ == "__main__":
                         _call_callbacks_by_name(callbacks=cb, cb_func_name='on_batch_end', epoch=epoch, stage=stage,
                                                 n_epochs=config.training.epochs, batch_i=i, n_batches=n_batches,
                                                 progress_bar=pbar)
-                        """
+                        
                         log_dir = args.snapshots_dir / config.training.snapshot / f"fold_{fold}_log"
                         log_dir.mkdir(exist_ok=True)
                         if batches_done % config.gan.sample_interval == 0:
@@ -233,10 +244,10 @@ if __name__ == "__main__":
                             # Save model checkpoints
                             save(generator.state_dict(), str(model_dir) + "generator_%d.pth" % epoch)
                             save(discriminator.state_dict(), str(model_dir) + "discriminator_%d.pth" % epoch)
-                        """
+                        
                     _call_callbacks_by_name(callbacks=cb, cb_func_name='on_epoch_end', epoch=epoch, stage=stage,
                                             n_epochs=config.training.epochs, n_batches=n_batches)
-
+        """
         dur = time() - start_exp
         print(f'Model {experiment + 1} trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
 
