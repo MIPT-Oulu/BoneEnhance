@@ -9,22 +9,25 @@ class Trainer:
     """
     The class that runs training and evaluation of the model.
     """
-    def __init__(self, model, loaders, criterion, opt, callbacks, device='cpu'):
+    def __init__(self, model, loaders, criterion, opt, callbacks, config, device='cpu'):
+
+        # Models
         self.device = device
-        self.model = model
-        # Move model to selected device
-        self.model_g = self.model[0].to(self.device)
-        self.model_d = self.model[1].to(self.device)
+        self.model_g = model[0].to(self.device)
+        self.model_d = model[1].to(self.device)
         # Data
         self.loaders = loaders
-
-        self.loss_g = criterion[0].to(self.device)
-        self.loss_d = criterion[1].to(self.device)
+        # Loss
+        self.loss_content = criterion[0].to(self.device)
+        self.loss_gan = criterion[1].to(self.device)
+        # Optimizers
         self.optimizer_g = opt[0]
         self.optimizer_d = opt[1]
+        # Callbacks
         self.callbacks = callbacks
-        #self.tb = logger
+        # Parameters
         self.num_epochs = None
+        self.adv_weight = config.gan.lambda_adv
         self.progress_bar = None
 
     def run(self, num_epochs=1):
@@ -101,8 +104,14 @@ class Trainer:
         # Generate a high resolution image from low resolution input
         gen_hr = self.model_g(imgs_lr)
 
+        # Adversarial loss (How well the discriminator is fooled, predicting ones)
+        loss_adversarial = self.loss_gan(self.model_d(gen_hr), valid)
+
+        # Content loss (quality of the output relative to ground truth)
+        loss_content = self.loss_content(gen_hr, imgs_hr)
+
         # Generator loss
-        loss_g = self.loss_g(gen_hr, imgs_hr)
+        loss_g = loss_content + self.adv_weight * loss_adversarial
         if stage == 'train':
             loss_g.backward()
             self.optimizer_g.step()
@@ -116,9 +125,9 @@ class Trainer:
         pred_real = self.model_d(imgs_hr)
         pred_fake = self.model_d(gen_hr.detach())  # Detach is important to only update the discriminator
 
-        # Adversarial loss for real and fake images (relativistic average GAN)
-        loss_real = self.loss_d(pred_real - pred_fake.mean(0, keepdim=True), valid)
-        loss_fake = self.loss_d(pred_fake - pred_real.mean(0, keepdim=True), fake)
+        # Discriminator loss for real and fake images
+        loss_real = self.loss_gan(pred_real, valid)
+        loss_fake = self.loss_gan(pred_fake, fake)
 
         # Total loss
         loss_d = loss_real + loss_fake

@@ -4,7 +4,7 @@ from copy import deepcopy
 from omegaconf import OmegaConf
 import cv2
 from functools import partial
-from torch.nn import BCEWithLogitsLoss, L1Loss, BCELoss
+from torch.nn import BCEWithLogitsLoss, L1Loss, BCELoss, MSELoss
 
 from BoneEnhance.components.training.session import init_experiment, save_transforms, parse_grayscale, \
     create_data_provider, init_loss
@@ -14,27 +14,6 @@ from BoneEnhance.components.inference.pipeline_components import inference_runne
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
-
-
-def _call_callbacks_by_name(cb_func_name, **kwargs):
-    """
-    _call_callbacks_by_name is a private function to be called inside the class. This function traverses all the
-    sessions to check if they have the callback function to be called. If the callback is found it is called.
-    Afterwards, it searches the self.__callback, a private variable holding manually provided callbacks, if the
-    provided callback is found here, it is also called.
-
-    Parameters
-    ----------
-    cb_func_name: str
-        name of the call_back_function to be called
-    kwargs: list or tuple
-        argument for the callback function
-    """
-
-    for cb in callbacks:
-        if hasattr(cb, cb_func_name):
-            getattr(cb, cb_func_name)(strategy='', **kwargs)
-
 
 if __name__ == "__main__":
     # Timing
@@ -58,6 +37,11 @@ if __name__ == "__main__":
                                        args.snapshots_dir, config.training.snapshot)
         mean, std = splits_metadata['mean'], splits_metadata['std']
 
+        # Loss
+        criterion_GAN = MSELoss().to(device)
+        criterion_content = init_loss(config.training.loss, config, device=device)
+        criterion_pixel = L1Loss().to(device)
+
         # Save transforms list
         save_transforms(args.snapshots_dir / config.training.snapshot, config, args, mean, std)
 
@@ -65,26 +49,18 @@ if __name__ == "__main__":
         for fold in range(config.training.n_folds):
             print(f'\nTraining fold {fold}')
 
-            # Initialize model and optimizer
+            # Initialize model
             generator, discriminator, feature_extractor = init_model_gan(config, device, args.gpus)
 
+            # Optimizers
             optimizer_d = optim.Adam(discriminator.parameters(), lr=config.training.lr, weight_decay=config.training.wd)
             optimizer_g = optim.Adam(generator.parameters(), lr=config.training.lr, weight_decay=config.training.wd)
 
-            #loss_d = DiscriminatorLoss(config).to(device)
-            #loss_d = BCELoss().to(device)
-            #loss_g = GeneratorLoss(d_network=generator, d_loss=loss_d).to(device)
-
-            criterion_GAN = BCEWithLogitsLoss().to(device)
-            criterion_content = L1Loss().to(device)
-            criterion_pixel = L1Loss().to(device)
-
-            loss_g = init_loss('combined_layers', config, device=device)
-
             # Initialize data provider
             dataloader = create_data_provider(args, config, parser, metadata=splits_metadata[f'fold_{fold}'],
-                                                 mean=mean, std=std)
+                                              mean=mean, std=std)
 
+            # Combine callbacks into dictionary
             callbacks = init_callbacks(fold, config, args.snapshots_dir, config.training.snapshot,
                                        (generator, discriminator), (optimizer_g, optimizer_d), mean, std)
             callbacks = {'train': callbacks[0], 'eval': callbacks[1]}
@@ -92,9 +68,10 @@ if __name__ == "__main__":
             trainer = Trainer(
                 model=[generator, discriminator],
                 loaders=dataloader,
-                criterion=[loss_g, criterion_GAN],
-                opt=[optimizer_g, optimizer_g],
+                criterion=[criterion_content, criterion_GAN],
+                opt=[optimizer_g, optimizer_d],
                 device=device,
+                config=config,
                 callbacks=callbacks
             )
             trainer.run(num_epochs=config.training.epochs)

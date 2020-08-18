@@ -16,8 +16,10 @@ training:
   reduce_data: False
   parse_color: False
   crop_small: [32, 32]
-  architecture: enhance
   crossmodality: False
+  # Model
+  architecture: enhance
+  activation: leakyrelu
   pretrain: False
   existing_model: dios-erc-gpu_2020_08_13_15_44_23_enhance_combined_0.0001_mag4
   magnification: 4

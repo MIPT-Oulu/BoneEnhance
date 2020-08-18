@@ -114,12 +114,18 @@ class Discriminator(nn.Module):
             return layers
 
         layers = []
+        # Create blocks with increasing feature map size
         in_filters = in_channels
         for i, out_filters in enumerate([64, 128, 256, 512, 1024, 2048]):
             layers.extend(discriminator_block(in_filters, out_filters, first_block=(i == 0)))
             in_filters = out_filters
 
+        # Dropout layer
+        layers.append(nn.Dropout(p=0.4))
+        # Classification layer
         layers.append(nn.Conv2d(out_filters, 1, kernel_size=3, stride=1, padding=1))
+        # Sigmoid activation
+        layers.append(nn.Sigmoid())
 
         self.model = nn.Sequential(*layers)
 

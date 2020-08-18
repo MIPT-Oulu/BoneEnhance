@@ -144,7 +144,8 @@ def init_model(config, device='cuda', gpus=1, args=None):
     # List available model architectures
     available_models = {
         'encoderdecoder': EncoderDecoder(**config['model']),
-        'enhance': EnhanceNet(config.training.crop_small, config.training.magnification),
+        'enhance': EnhanceNet(config.training.crop_small, config.training.magnification,
+                              activation=config.training.activation),
         'wgan': WGAN_VGG(input_size=config.training.crop_small[0]),
         'wgan_g': WGAN_VGG_generator(),
         'wgan_d': WGAN_VGG_discriminator(config.training.crop_small[0]),

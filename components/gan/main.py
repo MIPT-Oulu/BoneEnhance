@@ -47,7 +47,8 @@ def init_model_gan(config, device='cuda', gpus=1):
 
     # Networks
     #model_g = WGAN_VGG_generator()
-    model_g = EnhanceNet(config.training.crop_small, config.training.magnification)
+    model_g = EnhanceNet(config.training.crop_small, config.training.magnification,
+                         activation=config.training.activation)
     #model_d = WGAN_VGG_discriminator(config.training.crop_small[0])
     model_d = Discriminator(crop)
     model_f = Vgg16()
