@@ -9,12 +9,12 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from collagen.data import DataProvider, ItemLoader
 from collagen.data.samplers import GaussianNoiseSampler
 from collagen.core import Module
-from collagen.callbacks import RunningAverageMeter, ImagePairVisualizer, SimpleLRScheduler, \
+from collagen.callbacks import ImagePairVisualizer, SimpleLRScheduler, \
     RandomImageVisualizer, ModelSaver
 
 from BoneEnhance.components.transforms import train_test_transforms
 from BoneEnhance.components.models import WGAN_VGG_generator, WGAN_VGG_discriminator, EnhanceNet, Vgg16, Discriminator
-from BoneEnhance.components.utilities.callbacks import ScalarMeterLogger
+from BoneEnhance.components.utilities.callbacks import ScalarMeterLogger, RunningAverageMeter
 
 
 class GANFakeImageSampler(ItemLoader):
@@ -92,12 +92,14 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
     prefix = f"{crop[0]}x{crop[1]}_fold_{fold_id}"
 
     # Callbacks
-    train_cbs = (RunningAverageMeter(prefix="train", name="loss"),
+    train_cbs = (RunningAverageMeter(prefix="train", name="G_loss"),
+                 RunningAverageMeter(prefix="train", name="D_loss"),
                  #RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
                  ScalarMeterLogger(writer, comment='training', log_dir=str(log_dir)))
 
-    val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
-               ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
+    val_cbs = (RunningAverageMeter(prefix="eval", name="G_loss"),
+               RunningAverageMeter(prefix="eval", name="D_loss"),
+               ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std, scale=None),
                RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
                                      sigmoid=False),
                ModelSaver(metric_names='eval/loss',

@@ -1,23 +1,16 @@
-from torch import optim, cuda
+from torch import optim
 from time import time
 from copy import deepcopy
 from omegaconf import OmegaConf
 import cv2
 from functools import partial
-from tqdm import tqdm
-import numpy as np
-from torch.autograd import Variable
-
 from torch.nn import BCEWithLogitsLoss, L1Loss, BCELoss
-
 
 from BoneEnhance.components.training.session import init_experiment, save_transforms, parse_grayscale, \
     create_data_provider, init_loss
 from BoneEnhance.components.splits import build_splits
 from BoneEnhance.components.gan import init_model_gan, init_callbacks, Trainer
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
-
-
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
@@ -106,148 +99,6 @@ if __name__ == "__main__":
             )
             trainer.run(num_epochs=config.training.epochs)
 
-            """
-            # Training loop
-            pbar = tqdm(range(config.training.epochs))
-            for epoch, _ in enumerate(pbar):
-                dataloader.set_epoch(epoch)
-                state = dataloader.state_dict()
-
-                for stage, cb in zip(['train', 'eval'], callbacks):
-                    n_batches = state[f'loader_{stage}']['total']
-
-                    _call_callbacks_by_name(callbacks=cb, cb_func_name='on_epoch_begin', epoch=epoch, stage=stage,
-                                             n_epochs=config.training.epochs)
-
-                    for i in range(n_batches):
-
-                        _call_callbacks_by_name(callbacks=cb, cb_func_name='on_batch_begin', epoch=epoch, stage=stage,
-                                                n_epochs=config.training.epochs, batch_i=i, n_batches=n_batches,
-                                                progress_bar=pbar)
-
-                        imgs = dataloader.sample(**{f'loader_{stage}': 1})[0][0]
-                        batches_done = epoch * state[f'loader_{stage}']['total'] + i
-
-                        # Configure model input
-                        imgs_lr = Variable(imgs['data']).to(device)
-                        imgs_hr = Variable(imgs['target']).to(device)
-
-                        # Adversarial ground truths
-                        valid = Variable(Tensor(np.ones((imgs_lr.size(0), *discriminator.module.output_shape))),
-                                         requires_grad=False)
-                        fake = Variable(Tensor(np.zeros((imgs_lr.size(0), *discriminator.module.output_shape))),
-                                        requires_grad=False)
-
-                        # ------------------
-                        #  Train Generators
-                        # ------------------
-
-                        optimizer_g.zero_grad()
-
-                        # Generate a high resolution image from low resolution input
-                        gen_hr = generator(imgs_lr)
-
-                        # Measure pixel-wise loss against ground truth
-                        loss_pixel = criterion_pixel(gen_hr, imgs_hr)
-
-                        if batches_done < config.gan.warmup_batches:
-                            # Warm-up (pixel-wise loss only)
-                            loss_pixel.backward()
-                            optimizer_g.step()
-                            pbar.set_description(
-                                "[Epoch %d/%d] [Batch %d/%d] [G pixel: %f]"
-                                % (epoch, config.training.epochs, i, n_batches, loss_pixel.item())
-                            )
-
-                            _call_callbacks_by_name(callbacks=cb, cb_func_name='on_batch_end', epoch=epoch, stage=stage,
-                                                    n_epochs=config.training.epochs, batch_i=i, n_batches=n_batches,
-                                                    progress_bar=pbar)
-                            continue
-
-                        # Extract validity predictions from discriminator
-                        pred_real = discriminator(imgs_hr).detach()
-                        pred_fake = discriminator(gen_hr)
-
-                        # Adversarial loss (relativistic average GAN)
-                        loss_GAN = criterion_GAN(pred_fake - pred_real.mean(0, keepdim=True), valid)
-
-                        # Content loss
-                        gen_features = feature_extractor(gen_hr)
-                        real_features = feature_extractor(imgs_hr)#.detach()
-                        if isinstance(gen_features, dict):
-                            loss_content = 0
-                            for l in gen_features.keys():
-                                loss_content += criterion_content(gen_features[l], real_features[l])
-                        else:
-                            loss_content = criterion_content(gen_features, real_features)
-
-                        # Total generator loss
-                        lambda_adv, lambda_pix = config.gan.lambda_adv, config.gan.lambda_pixel
-                        loss_g = loss_content + lambda_adv * loss_GAN + lambda_pix * loss_pixel
-
-                        loss_g.backward()
-                        optimizer_g.step()
-
-                        # ---------------------
-                        #  Train Discriminator
-                        # ---------------------
-
-                        optimizer_d.zero_grad()
-
-                        pred_real = discriminator(imgs_hr)
-                        pred_fake = discriminator(gen_hr.detach())
-
-                        # Adversarial loss for real and fake images (relativistic average GAN)
-                        loss_real = criterion_GAN(pred_real - pred_fake.mean(0, keepdim=True), valid)
-                        loss_fake = criterion_GAN(pred_fake - pred_real.mean(0, keepdim=True), fake)
-
-                        # Total loss
-                        loss_d = (loss_real + loss_fake) / 2
-
-                        loss_d.backward()
-                        optimizer_d.step()
-
-                        # --------------
-                        #  Log Progress
-                        # --------------
-
-                        pbar.set_description(
-                            "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, content: %f, adv: %f, pixel: %f]"
-                            % (
-                                epoch,
-                                config.training.epochs,
-                                i,
-                                n_batches,
-                                loss_d.item(),
-                                loss_g.item(),
-                                loss_content.item(),
-                                loss_GAN.item(),
-                                loss_pixel.item(),
-                            )
-                        )
-
-                        _call_callbacks_by_name(callbacks=cb, cb_func_name='on_batch_end', epoch=epoch, stage=stage,
-                                                n_epochs=config.training.epochs, batch_i=i, n_batches=n_batches,
-                                                progress_bar=pbar)
-                        
-                        log_dir = args.snapshots_dir / config.training.snapshot / f"fold_{fold}_log"
-                        log_dir.mkdir(exist_ok=True)
-                        if batches_done % config.gan.sample_interval == 0:
-                            # Save image grid with upsampled inputs and ESRGAN outputs
-                            imgs_lr = interpolate(imgs_lr, scale_factor=4)
-                            img_grid = cat((imgs_lr, gen_hr, imgs_hr), -1)
-                            save_image(img_grid, str(log_dir) + "/%d.png" % batches_done, nrow=1, normalize=False)
-
-                        model_dir = args.snapshots_dir / config.training.snapshot / 'saved_models'
-                        model_dir.mkdir(exist_ok=True)
-                        if batches_done % config.gan.sample_interval == 0:
-                            # Save model checkpoints
-                            save(generator.state_dict(), str(model_dir) + "generator_%d.pth" % epoch)
-                            save(discriminator.state_dict(), str(model_dir) + "discriminator_%d.pth" % epoch)
-                        
-                    _call_callbacks_by_name(callbacks=cb, cb_func_name='on_epoch_end', epoch=epoch, stage=stage,
-                                            n_epochs=config.training.epochs, n_batches=n_batches)
-        """
         dur = time() - start_exp
         print(f'Model {experiment + 1} trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
 
