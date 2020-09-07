@@ -98,7 +98,7 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
                  ScalarMeterLogger(writer, comment='training', log_dir=str(log_dir)))
 
     val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
-               ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
+               ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std, scale=(0, 1)),
                RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
                                      sigmoid=False),
                ModelSaver(metric_names='eval/loss',
@@ -145,7 +145,9 @@ def init_model(config, device='cuda', gpus=1, args=None):
     available_models = {
         'encoderdecoder': EncoderDecoder(**config['model']),
         'enhance': EnhanceNet(config.training.crop_small, config.training.magnification,
-                              activation=config.training.activation),
+                              activation=config.training.activation,
+                              add_residual=config.training.add_residual,
+                              upscale_input=config.training.upscale_input),
         'wgan': WGAN_VGG(input_size=config.training.crop_small[0]),
         'wgan_g': WGAN_VGG_generator(),
         'wgan_d': WGAN_VGG_discriminator(config.training.crop_small[0]),
@@ -193,10 +195,10 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     if config is not None and not config.training.crossmodality:
         mag = config.training.magnification
         resize_target = (target.shape[1] // 16, target.shape[0] // 16)
-        target = cv2.resize(target.copy(), resize_target)#.transpose(1, 0, 2)
+        target = cv2.resize(target.copy(), resize_target)  # .transpose(1, 0, 2)
 
         resize = (target.shape[1] // mag, target.shape[0] // mag)
-        img = cv2.resize(target, resize)#.transpose(1, 0, 2)
+        img = cv2.resize(target, resize)  # .transpose(1, 0, 2)
     elif config is not None:
 
         # Read image and target

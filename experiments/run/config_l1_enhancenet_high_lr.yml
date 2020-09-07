@@ -19,13 +19,15 @@ training:
   crossmodality: False
   # Model
   architecture: enhance
+  upscale_input: False
+  add_residual: False
   activation: leakyrelu
   pretrain: False
   existing_model: dios-erc-gpu_2020_08_13_15_44_23_enhance_combined_0.0001_mag4
   magnification: 4
   # Training
   wd: 0.0001
-  lr: 0.0001
+  lr: 0.0005
   n_folds: 4
   epochs: 100
   bs: 48

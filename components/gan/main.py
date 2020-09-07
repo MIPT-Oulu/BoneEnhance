@@ -46,10 +46,10 @@ def init_model_gan(config, device='cuda', gpus=1):
     crop = (3, config.training.crop_small[0], config.training.crop_small[1])
 
     # Networks
-    #model_g = WGAN_VGG_generator()
+    # model_g = WGAN_VGG_generator()
     model_g = EnhanceNet(config.training.crop_small, config.training.magnification,
-                         activation=config.training.activation)
-    #model_d = WGAN_VGG_discriminator(config.training.crop_small[0])
+                         activation=config.training.activation, upscale_input=config.training.upscale_input)
+    # model_d = WGAN_VGG_discriminator(config.training.crop_small[0])
     model_d = Discriminator(crop)
     model_f = Vgg16()
     # Feature extractor does not need to be updated
@@ -72,8 +72,8 @@ def create_data_provider_gan(g_network, item_loaders, args, config, parser, meta
                                       shuffle=True)
 
     item_loaders['fake'] = GANFakeImageSampler(g_network=g_network,
-                                          batch_size=config.training.bs,
-                                          image_size=config.training.crop_small)
+                                               batch_size=config.training.bs,
+                                               image_size=config.training.crop_small)
 
     item_loaders['noise'] = GaussianNoiseSampler(batch_size=config.training.bs,
                                                  latent_size=config.gan.latent_size,
@@ -100,17 +100,9 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
 
     val_cbs = (RunningAverageMeter(prefix="eval", name="G_loss"),
                RunningAverageMeter(prefix="eval", name="D_loss"),
-               ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std, scale=None),
-               RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
-                                     sigmoid=False),
-               ModelSaver(metric_names='eval/loss',
-                          prefix=prefix + '_G',
-                          save_dir=str(current_snapshot_dir),
-                          conditions='min', model=model[0]),
-               ModelSaver(metric_names='eval/loss',
-                          prefix=prefix + '_D',
-                          save_dir=str(current_snapshot_dir),
-                          conditions='min', model=model[1]),
+               ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std, scale=(0, 1)),
+               #RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
+               #                      sigmoid=False),
                # Reduce LR on plateau
                SimpleLRScheduler('eval/loss', ReduceLROnPlateau(optimizer[0],
                                                                 patience=int(config.training.patience),

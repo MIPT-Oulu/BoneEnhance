@@ -41,6 +41,11 @@ if __name__ == "__main__":
         criterion_GAN = MSELoss().to(device)
         criterion_content = init_loss(config.training.loss, config, device=device)
         criterion_pixel = L1Loss().to(device)
+        loss = {
+            'content': criterion_content,
+            'pixel': criterion_pixel,
+            'adversarial': criterion_GAN
+        }
 
         # Save transforms list
         save_transforms(args.snapshots_dir / config.training.snapshot, config, args, mean, std)
@@ -64,15 +69,21 @@ if __name__ == "__main__":
             callbacks = init_callbacks(fold, config, args.snapshots_dir, config.training.snapshot,
                                        (generator, discriminator), (optimizer_g, optimizer_d), mean, std)
             callbacks = {'train': callbacks[0], 'eval': callbacks[1]}
+            current_snapshot_dir = args.snapshots_dir / config.training.snapshot
 
+            # Set up model training
             trainer = Trainer(
                 model=[generator, discriminator],
                 loaders=dataloader,
-                criterion=[criterion_content, criterion_GAN],
+                criterion=loss,
                 opt=[optimizer_g, optimizer_d],
                 device=device,
                 config=config,
-                callbacks=callbacks
+                callbacks=callbacks,
+                snapshot=current_snapshot_dir,
+                prefix=f'fold_{fold}',
+                mean=mean,
+                std=std
             )
             trainer.run(num_epochs=config.training.epochs)
 

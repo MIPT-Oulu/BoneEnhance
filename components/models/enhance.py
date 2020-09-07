@@ -1,6 +1,7 @@
 from BoneEnhance.components.models.model_blocks import *
 from BoneEnhance.components.models.model_initialization import *
 from torch.nn import functional as F
+from warnings import warn
 
 
 class ResidualBlock(nn.Module):
@@ -80,8 +81,8 @@ def _make_layers(in_channels, output_channels, layer_type, bn='', activation=Non
 class EnhanceNet(nn.Module):
     """Inspired by ReconNet https://doi.org/10.1038/s41551-019-0466-4"""
 
-    def __init__(self, input_shape, magnification, gain=0.02, init_type='standard', residual=False, upscale_input=False,
-                 activation='relu'):
+    def __init__(self, input_shape, magnification, gain=0.02, init_type='standard', residual_block=False,
+                 upscale_input=False, add_residual=False, activation='relu'):
         """
 
         :param input_shape: Size of the input image
@@ -91,10 +92,14 @@ class EnhanceNet(nn.Module):
         """
         super(EnhanceNet, self).__init__()
 
+        if add_residual and not upscale_input:
+            warn('Wanring : residual adding is not used without upscaling the input to target size!')
+
         # Feature map sizes
         f = [3, 128, 256, 512, 1024]
         self.__magnification = magnification
-        self.residual = residual
+        self.residual_block = residual_block
+        self.add_residual = add_residual
         self.upscale_input = upscale_input
         self.upscale_factor = magnification
 
@@ -144,9 +149,13 @@ class EnhanceNet(nn.Module):
 
     def forward(self, x):
 
+        # Upscale the input image to match target
         if self.upscale_input:
             x = F.interpolate(x, scale_factor=self.upscale_factor)
             self.__magnification = 1
+        # Save the original image
+        if self.add_residual and self.upscale_input:
+            input_im = x.detach().clone()
 
         # Representation network
         x = self.conv_layer1(x)
@@ -166,7 +175,7 @@ class EnhanceNet(nn.Module):
         x = self.relu(x + x2)
 
         # Transform module
-        if self.residual:
+        if self.residual_block:
             x = self.res1(x)
             x = self.res2(x)
             x = self.res3(x)
@@ -198,8 +207,16 @@ class EnhanceNet(nn.Module):
 
         # Output
         x = self.deconv_layer1(x)
-        x = self.output_layer(x).tanh()
+        x = self.output_layer(x)
 
         # Duplicate 1-channel image to represent RGB
         x = x.repeat(1, 3, 1, 1)
+
+        # Add residual image to the original LR image
+        if self.upscale_input and self.add_residual:
+            x = input_im + x.tanh()
+        # Activation (tanh allows negative values)
+        else:
+            x = x.sigmoid()
+
         return x

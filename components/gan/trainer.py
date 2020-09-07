@@ -1,7 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 from tqdm import tqdm
 from torch.autograd import Variable
+from datetime import datetime
 import torch
 
 
@@ -9,26 +11,32 @@ class Trainer:
     """
     The class that runs training and evaluation of the model.
     """
-    def __init__(self, model, loaders, criterion, opt, callbacks, config, device='cpu'):
+    def __init__(self, model, loaders, criterion, opt, callbacks, config, mean, std, snapshot, prefix='', device='cpu'):
 
         # Models
         self.device = device
         self.model_g = model[0].to(self.device)
         self.model_d = model[1].to(self.device)
+        self.model_g_path = None
+        self.model_d_path = None
         # Data
         self.loaders = loaders
         # Loss
-        self.loss_content = criterion[0].to(self.device)
-        self.loss_gan = criterion[1].to(self.device)
+        self.loss_content = criterion['content'].to(self.device)
+        self.loss_gan = criterion['adversarial'].to(self.device)
         # Optimizers
         self.optimizer_g = opt[0]
         self.optimizer_d = opt[1]
         # Callbacks
         self.callbacks = callbacks
+        self.snapshot = snapshot
+        self.prefix = prefix
         # Parameters
         self.num_epochs = None
         self.adv_weight = config.gan.lambda_adv
         self.progress_bar = None
+        self.mean = mean
+        self.std = std
 
     def run(self, num_epochs=1):
         best_loss = np.inf
@@ -43,6 +51,13 @@ class Trainer:
             # Validation split
             log_val = self.run_epoch(stage='eval', epoch=epoch)
             losses_val.append(log_val)
+
+            # Save the model with best validation generator loss
+            if losses_val[-1][0] < best_loss:
+                # Update the best model metric
+                best_loss = losses_val[-1][0]
+                # Save the models
+                self.save_model(epoch, losses_val[-1])
 
         # Plot resulting LR curve
         self.plot_lr_curve([losses_train, losses_val])
@@ -155,11 +170,14 @@ class Trainer:
         loss_list = {'G_loss': loss_g, 'D_loss': loss_d}
         # Batch end callbacks
         self._call_callbacks_by_name(callbacks=self.callbacks[stage], cb_func_name='on_minibatch_end', epoch=epoch,
-                                     s=stage, stage=stage, n_epochs=self.num_epochs, batch_i=batch_i, batches_count=n_batches,
-                                     progress_bar=self.progress_bar, loss_list=loss_list, loss=loss_g,
+                                     s=stage, stage=stage, n_epochs=self.num_epochs, batch_i=batch_i, loss=loss_g,
+                                     batches_count=n_batches, progress_bar=self.progress_bar, loss_list=loss_list,
                                      input=imgs_lr.detach().cpu(), output=gen_hr.cpu(), target=imgs_hr.detach().cpu())
 
-        return loss_g.detach().cpu().numpy(), loss_d.detach().cpu().numpy()
+        loss_g = loss_g.detach().cpu().numpy()
+        loss_d = loss_d.detach().cpu().numpy()
+        torch.cuda.empty_cache()
+        return loss_g, loss_d
 
     def _call_callbacks_by_name(self, cb_func_name, s, **kwargs):
         """
@@ -197,6 +215,24 @@ class Trainer:
                 cbs += cb
 
         return cbs
+
+    def save_model(self, epoch, losses, keep_best=True):
+        date_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Delete previous models
+        if keep_best and self.model_g_path is not None:
+            os.remove(self.model_g_path)
+            os.remove(self.model_d_path)
+
+        # Generator
+        model_g = "_".join([self.prefix, "{0:04d}".format(epoch), date_time, 'Generator', str(losses[0])]) + ".pth"
+        self.model_g_path = os.path.join(self.snapshot, model_g)
+        torch.save(self.model_g.state_dict(), self.model_g_path)
+
+        # Discriminator
+        model_d = "_".join([self.prefix, "{0:04d}".format(epoch), date_time, 'Discriminator', str(losses[1])]) + ".pth"
+        self.model_d_path = os.path.join(self.snapshot, model_d)
+        torch.save(self.model_d.state_dict(), self.model_d_path)
 
     @staticmethod
     def plot_lr_curve(loss_lists):

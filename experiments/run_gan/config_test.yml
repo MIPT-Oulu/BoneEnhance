@@ -28,19 +28,20 @@ training:
   calc_meanstd: False
   reduce_data: False
   parse_color: False
-  crop_small: [64, 64]
-  crossmodality: False
+  crop_small: [32, 32]
+  crossmodality: True
   # Model
   architecture: enhance
   activation: leakyrelu
-  pretrain: False
-  existing_model: dios-erc-gpu_2020_08_13_15_44_23_enhance_combined_0.0001_mag4
+  upscale_input: True
+  pretrain: True
+  existing_model: dios-erc-gpu_2020_08_19_12_02_50_gan_enhance_combined_0.0001_mag4
   magnification: 4
   # Training
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 20
+  epochs: 30
   bs: 4
   # Loss parameters: possible losses are "mse", "bce", "jaccard" and "combined"
   loss: combined

@@ -1,4 +1,4 @@
-from torch import nn, sigmoid
+from torch import nn
 from BoneEnhance.components.models.wgan import WGAN_VGG_FeatureExtractor
 from BoneEnhance.components.models.perceptual import Vgg16
 
@@ -20,8 +20,17 @@ class PerceptualLoss(nn.Module):
             self.feature_extractor.eval()
         self.p_criterion = criterion
         self.compare_layer = compare_layer
+        self.imagenet_mean = (0.485, 0.456, 0.406)
+        self.imagenet_std = (0.229, 0.224, 0.225)
 
     def forward(self, logits, targets):
+
+        # Scale to imagenet mean and std
+        for channel in range(len(self.imagenet_mean)):
+            logits[:, channel, :, :] -= self.imagenet_mean[channel]
+            targets[:, channel, :, :] -= self.imagenet_mean[channel]
+            logits[:, channel, :, :] /= self.imagenet_std[channel]
+            targets[:, channel, :, :] /= self.imagenet_std[channel]
 
         if self.compare_layer is None:
             pred_feature = self.feature_extractor(logits)
