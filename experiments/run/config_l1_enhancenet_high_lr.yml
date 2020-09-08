@@ -18,16 +18,17 @@ training:
   crop_small: [32, 32]
   crossmodality: False
   # Model
-  architecture: enhance
+  architecture: convnet
   upscale_input: False
   add_residual: False
-  activation: leakyrelu
+  activation: relu
   pretrain: False
   existing_model: dios-erc-gpu_2020_08_13_15_44_23_enhance_combined_0.0001_mag4
   magnification: 4
+  n_blocks: 18
   # Training
   wd: 0.0001
-  lr: 0.0005
+  lr: 0.0001
   n_folds: 4
   epochs: 100
   bs: 48

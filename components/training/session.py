@@ -23,7 +23,7 @@ from collagen.losses import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss, 
 
 from BoneEnhance.components.transforms import train_test_transforms
 from BoneEnhance.components.models import EnhanceNet, EncoderDecoder, \
-    WGAN_VGG_generator, WGAN_VGG_discriminator, WGAN_VGG
+    WGAN_VGG_generator, WGAN_VGG_discriminator, WGAN_VGG, ConvNet
 from BoneEnhance.components.training.loss import PerceptualLoss
 
 
@@ -98,7 +98,7 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
                  ScalarMeterLogger(writer, comment='training', log_dir=str(log_dir)))
 
     val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
-               ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std, scale=(0, 1)),
+               ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std, scale=None),#(0, 1)),
                RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
                                      sigmoid=False),
                ModelSaver(metric_names='eval/loss',
@@ -115,19 +115,22 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
     return train_cbs, val_cbs
 
 
-def init_loss(loss, config, device='cuda'):
+def init_loss(loss, config, device='cuda', mean=None, std=None):
     available_losses = {
         'mse': nn.MSELoss(),
         'L1': nn.L1Loss(),
         'psnr': PSNRLoss(),
         'perceptual': PerceptualLoss(),
         'perceptual_layers': PerceptualLoss(criterion=nn.MSELoss(),
-                                            compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3']),
-        'combined': CombinedLoss([PerceptualLoss().to(device), nn.L1Loss().to(device)]),
+                                            compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],
+                                            mean=mean, std=std),
+        'combined': CombinedLoss([PerceptualLoss().to(device), nn.L1Loss().to(device)], weights=[0.8, 0.2]),
         'combined_layers': CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
-                                                        compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'])
+                                                        compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],
+                                                        mean=mean, std=std)
                                         .to(device),
-                                        nn.L1Loss().to(device)]),
+                                        nn.L1Loss().to(device)],
+                                        weights=[0.8, 0.2]),
         # GAN
         # Segmentation losses
         'bce': BCEWithLogitsLoss2d(),
@@ -148,6 +151,10 @@ def init_model(config, device='cuda', gpus=1, args=None):
                               activation=config.training.activation,
                               add_residual=config.training.add_residual,
                               upscale_input=config.training.upscale_input),
+        'convnet': ConvNet(config.training.magnification,
+                           activation=config.training.activation,
+                           upscale_input=config.training.upscale_input,
+                           n_blocks=config.training.n_blocks),
         'wgan': WGAN_VGG(input_size=config.training.crop_small[0]),
         'wgan_g': WGAN_VGG_generator(),
         'wgan_d': WGAN_VGG_discriminator(config.training.crop_small[0]),
@@ -183,6 +190,11 @@ def create_data_provider(args, config, parser, metadata, mean, std):
 
     return DataProvider(item_loaders)
 
+
+# TODO: parse 3D, h5py files one per sample
+# 16x16x16 crops for the input data
+# 8x8x8 patches randomly inside the 16x16x16
+# 32x32x32 with 4x magnification
 
 def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, config=None):
 
