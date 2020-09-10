@@ -27,16 +27,16 @@ class ConvNet(nn.Module):
         ]
         mid_block = [
             nn.Conv2d(f_maps[1], f_maps[1], kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(f_maps[1]),
+            #nn.BatchNorm2d(f_maps[1]),
             self.activation
         ]
         upscale_block = [
             nn.ConvTranspose2d(f_maps[1], f_maps[1], kernel_size=4, stride=2, padding=1, output_padding=0, bias=False),
             #nn.Upsample(scale_factor=2, mode='nearest'),
-            nn.BatchNorm2d(f_maps[1]),
+            #nn.BatchNorm2d(f_maps[1]),
             self.activation,
             nn.Conv2d(f_maps[1], f_maps[1], kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(f_maps[1]),
+            #nn.BatchNorm2d(f_maps[1]),
             self.activation
         ]
         final_block = [
@@ -55,7 +55,6 @@ class ConvNet(nn.Module):
 
         # Compile
         self.net = nn.Sequential(*layers)
-        print(self.net)
 
     def forward(self, x):
         # Upscale to target size

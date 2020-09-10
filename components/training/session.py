@@ -14,6 +14,8 @@ from random import uniform
 from glob import glob
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from scipy.signal import decimate
+from scipy.ndimage import zoom
 
 from collagen.data import DataProvider, ItemLoader
 from collagen.core.utils import auto_detect_device
@@ -60,7 +62,8 @@ def init_experiment(experiments='../experiments/run'):
         mag = config['training']['magnification']
 
         # Snapshot directory
-        snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{architecture}_{loss}_{lr}_mag{mag}')
+        #snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{architecture}_{loss}_{lr}_mag{mag}')
+        snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{config_path[:-4]}')
         (args.snapshots_dir / snapshot_name).mkdir(exist_ok=True, parents=True)
         config['training']['snapshot'] = snapshot_name
 
@@ -123,11 +126,17 @@ def init_loss(loss, config, device='cuda', mean=None, std=None):
         'perceptual': PerceptualLoss(),
         'perceptual_layers': PerceptualLoss(criterion=nn.MSELoss(),
                                             compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],
-                                            mean=mean, std=std),
+                                            mean=mean, std=std,
+                                            imagenet_normalize=config.training.imagenet_normalize_loss,
+                                            unnormalize=config.training.unnormalize_loss,
+                                            gram=config.training.gram),
         'combined': CombinedLoss([PerceptualLoss().to(device), nn.L1Loss().to(device)], weights=[0.8, 0.2]),
         'combined_layers': CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
                                                         compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],
-                                                        mean=mean, std=std)
+                                                        mean=mean, std=std,
+                                                        imagenet_normalize=config.training.imagenet_normalize_loss,
+                                                        unnormalize=config.training.unnormalize_loss,
+                                                        gram=config.training.gram)
                                         .to(device),
                                         nn.L1Loss().to(device)],
                                         weights=[0.8, 0.2]),
@@ -160,11 +169,16 @@ def init_model(config, device='cuda', gpus=1, args=None):
         'wgan_d': WGAN_VGG_discriminator(config.training.crop_small[0]),
     }
 
+
     # Check for multi-gpu
     if gpus > 1:
         model = nn.DataParallel(available_models[architecture])
     else:
         model = available_models[architecture]
+
+    # Save the model architecture
+    with open(args.snapshots_dir / config.training.snapshot / 'architecture.yml', 'w') as f:
+        print(model, file=f)
 
     # Pretrained model from a previous snapshot
     if config.training.pretrain:
@@ -206,11 +220,16 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     # Resize target to 4x magnification respect to input
     if config is not None and not config.training.crossmodality:
         mag = config.training.magnification
+
+        # Antialiasing
+        #target = cv2.GaussianBlur(target, ksize=)
+        #target = zoom(target, zoom=1/16)
+
         resize_target = (target.shape[1] // 16, target.shape[0] // 16)
-        target = cv2.resize(target.copy(), resize_target)  # .transpose(1, 0, 2)
+        target = cv2.resize(target.copy(), resize_target, interpolation=cv2.INTER_LANCZOS4)  # .transpose(1, 0, 2)
 
         resize = (target.shape[1] // mag, target.shape[0] // mag)
-        img = cv2.resize(target, resize)  # .transpose(1, 0, 2)
+        img = cv2.resize(target, resize, interpolation=cv2.INTER_LANCZOS4)  # .transpose(1, 0, 2)
     elif config is not None:
 
         # Read image and target

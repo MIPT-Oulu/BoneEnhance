@@ -35,9 +35,6 @@ if __name__ == "__main__":
         args = deepcopy(args_base)  # Copy args so that they can be updated
         config = OmegaConf.create(config_list[experiment])
 
-        # Check for gan architecture
-        gan = True if type(config.training.architecture) == 'list' else False
-
         # Update arguments according to the configuration file
         parser = partial(parse_grayscale, config=config)
 
@@ -54,7 +51,8 @@ if __name__ == "__main__":
         save_transforms(args.snapshots_dir / config.training.snapshot, config, args, mean, std)
 
         # Training for separate folds
-        for fold in range(config.training.n_folds):
+        #for fold in range(config.training.n_folds):
+        for fold in range(1):
             print(f'\nTraining fold {fold}')
             # Initialize data provider
             data_provider = create_data_provider(args, config, parser, metadata=splits_metadata[f'fold_{fold}'],
