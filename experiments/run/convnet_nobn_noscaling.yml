@@ -12,17 +12,17 @@ strategy:
 training:
   # General
   experiment: 3D
-  calc_meanstd: True
+  calc_meanstd: False
   reduce_data: False
   parse_color: False
   crop_small: [16, 16]
   crossmodality: False
   # Model
-  architecture: enhance
+  architecture: convnet
   upscale_input: False
   add_residual: False
-  activation: relu
-  normalization: bn
+  activation: leakyrelu
+  normalization: None
   pretrain: False
   existing_model: dios-erc-gpu_2020_08_13_15_44_23_enhance_combined_0.0001_mag4
   magnification: 4
@@ -32,12 +32,12 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 100
-  bs: 48
+  bs: 24
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: combined_layers
   log_jaccard: True
-  unnormalize_loss: True
-  imagenet_normalize_loss: True
+  unnormalize_loss: False
+  imagenet_normalize_loss: False
   gram: True  # Calculate Gram matrix on Perceptual loss
   # LR reduction
   use_LR_red: True

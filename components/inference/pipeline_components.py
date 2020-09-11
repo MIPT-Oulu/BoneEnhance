@@ -25,7 +25,7 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     Calculates inference on one image.
     """
 
-    mag = args.magnification
+    mag = config.training.magnification
     input_x = config['training']['crop_small'][0]
     input_y = config['training']['crop_small'][1]
     x, y, ch = img_full.shape
@@ -93,7 +93,7 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     torch.cuda.empty_cache()
     gc.collect()
 
-    return merged_pred.squeeze()
+    return merged_pred.squeeze()[:, :, 0]
 
 
 def inference_runner_oof(args, config, split_config, device, plot=False, weight='mean'):

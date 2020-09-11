@@ -18,7 +18,7 @@ training:
   crop_small: [16, 16]
   crossmodality: False
   # Model
-  architecture: enhance
+  architecture: convnet
   upscale_input: False
   add_residual: False
   activation: relu
@@ -26,17 +26,17 @@ training:
   pretrain: False
   existing_model: dios-erc-gpu_2020_08_13_15_44_23_enhance_combined_0.0001_mag4
   magnification: 4
-  n_blocks: 15
+  n_blocks: 10
   # Training
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
   epochs: 100
-  bs: 48
+  bs: 64
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: combined_layers
   log_jaccard: True
-  unnormalize_loss: True
+  unnormalize_loss: False
   imagenet_normalize_loss: True
   gram: True  # Calculate Gram matrix on Perceptual loss
   # LR reduction

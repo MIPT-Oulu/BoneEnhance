@@ -6,7 +6,7 @@ from BoneEnhance.components.models import make_layers
 
 
 class ConvNet(nn.Module):
-    def __init__(self, magnification, n_blocks=18, upscale_input=False, activation='relu'):
+    def __init__(self, magnification, n_blocks=18, upscale_input=False, activation='relu', normalization=None):
         super(ConvNet, self).__init__()
 
         # Variables
@@ -25,20 +25,32 @@ class ConvNet(nn.Module):
             nn.Conv2d(f_maps[0], f_maps[1], kernel_size=3, stride=1, padding=1, bias=False),
             self.activation
         ]
-        mid_block = [
-            nn.Conv2d(f_maps[1], f_maps[1], kernel_size=3, stride=1, padding=1, bias=False),
-            #nn.BatchNorm2d(f_maps[1]),
-            self.activation
-        ]
-        upscale_block = [
-            nn.ConvTranspose2d(f_maps[1], f_maps[1], kernel_size=4, stride=2, padding=1, output_padding=0, bias=False),
-            #nn.Upsample(scale_factor=2, mode='nearest'),
-            #nn.BatchNorm2d(f_maps[1]),
-            self.activation,
-            nn.Conv2d(f_maps[1], f_maps[1], kernel_size=3, stride=1, padding=1, bias=False),
-            #nn.BatchNorm2d(f_maps[1]),
-            self.activation
-        ]
+        if normalization == 'bn':
+            mid_block = [
+                nn.Conv2d(f_maps[1], f_maps[1], kernel_size=3, stride=1, padding=1, bias=False),
+                nn.BatchNorm2d(f_maps[1]),
+                self.activation
+            ]
+            upscale_block = [
+                nn.ConvTranspose2d(f_maps[1], f_maps[1], kernel_size=4, stride=2, padding=1, output_padding=0,
+                                   bias=False),
+                nn.BatchNorm2d(f_maps[1]),
+                self.activation,
+                nn.Conv2d(f_maps[1], f_maps[1], kernel_size=3, stride=1, padding=1, bias=False),
+                nn.BatchNorm2d(f_maps[1]),
+                self.activation
+            ]
+        else:
+            mid_block = [
+                nn.Conv2d(f_maps[1], f_maps[1], kernel_size=3, stride=1, padding=1, bias=False),
+                self.activation
+            ]
+            upscale_block = [
+                nn.ConvTranspose2d(f_maps[1], f_maps[1], kernel_size=4, stride=2, padding=1, output_padding=0, bias=False),
+                self.activation,
+                nn.Conv2d(f_maps[1], f_maps[1], kernel_size=3, stride=1, padding=1, bias=False),
+                self.activation
+            ]
         final_block = [
             nn.Conv2d(f_maps[1], f_maps[2], kernel_size=3, stride=1, padding=1, bias=False),
         ]
