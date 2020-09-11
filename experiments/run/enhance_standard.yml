@@ -15,7 +15,7 @@ training:
   calc_meanstd: True
   reduce_data: False
   parse_color: False
-  crop_small: [32, 32]
+  crop_small: [16, 16]
   crossmodality: False
   # Model
   architecture: enhance
@@ -31,7 +31,7 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 100
-  bs: 64
+  bs: 48
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: combined_layers
   log_jaccard: True

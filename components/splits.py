@@ -2,9 +2,11 @@ import pandas as pd
 import pathlib
 import torch
 import dill
+from collagen import ItemLoader
 from sklearn import model_selection
+from tqdm import tqdm
 
-from BoneEnhance.components.transforms.main import estimate_mean_std
+from BoneEnhance.components.transforms import train_test_transforms
 
 
 def build_meta_from_files(base_path, config):
@@ -84,3 +86,27 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     return splits_metadata
 
 
+def estimate_mean_std(config, metadata, parse_item_cb, num_threads=8, bs=16):
+    mean_std_loader = ItemLoader(meta_data=metadata,
+                                 transform=train_test_transforms(config)['train'],
+                                 parse_item_cb=parse_item_cb,
+                                 batch_size=bs, num_workers=num_threads,
+                                 shuffle=False)
+
+    mean = None
+    std = None
+    for i in tqdm(range(len(mean_std_loader)), desc='Calculating mean and standard deviation'):
+        for batch in mean_std_loader.sample():
+            if mean is None:
+                mean = torch.zeros(batch['data'].size(1))
+                std = torch.zeros(batch['data'].size(1))
+            # for channel in range(batch['data'].size(1)):
+            #     mean[channel] += batch['data'][:, channel, :, :].mean().item()
+            #     std[channel] += batch['data'][:, channel, :, :].std().item()
+            mean += batch['data'].mean().item()
+            std += batch['data'].std().item()
+
+    mean /= len(mean_std_loader)
+    std /= len(mean_std_loader)
+
+    return mean, std

@@ -1,14 +1,13 @@
 import torch
 import numpy as np
 from functools import partial
-from tqdm import tqdm
 
 from solt import DataContainer
 import solt.transforms as slt
 import solt.core as slc
+from BoneEnhance.components.transforms.custom_transforms import Crop, Pad
 
 from collagen.data.utils import ApplyTransform, Compose
-from collagen.data import ItemLoader
 
 
 def normalize_channel_wise(tensor: torch.Tensor, mean: torch.Tensor, std: torch.Tensor) -> torch.Tensor:
@@ -96,8 +95,8 @@ def train_test_transforms(conf, mean=None, std=None):
             # Spatial
             slt.Flip(axis=-1, p=prob),
             slc.SelectiveStream([slt.Rotate90(k=1, p=prob), slt.Rotate90(k=-1, p=prob), slt.Rotate90(k=2, p=prob)]),
-            #slt.Pad(pad_to=crop_size),
-            #slt.Crop(crop_mode='c', crop_to=crop_size),
+            Crop(training['magnification'], crop_mode='r', crop_to=[crop_small, crop_large]),
+            Pad(pad_to=[crop_small, crop_large]),
 
             # Intensity
             # Brightness/contrast
@@ -115,7 +114,10 @@ def train_test_transforms(conf, mean=None, std=None):
             ]),
 
         # Empty stream
-        slc.Stream()
+        slc.Stream([
+            Crop(training['magnification'], crop_mode='r', crop_to=[crop_small, crop_large]),
+            Pad(pad_to=[crop_small, crop_large]),
+        ])
 
         ])]
 
@@ -124,24 +126,31 @@ def train_test_transforms(conf, mean=None, std=None):
     # Stream to crop a large and small image from the center
     small_transforms = [slc.Stream([
         slt.Pad(pad_to=crop_small),
-        slt.Crop(crop_mode='c', crop_to=crop_small)])]
+        #slt.Crop(crop_mode='c', crop_to=crop_small)
+        ])]
 
     large_transforms = [slc.Stream([
         slt.Pad(pad_to=crop_large),
-        slt.Crop(crop_mode='c', crop_to=crop_large)])]
+        #slt.Crop(crop_mode='c', crop_to=crop_large)
+        ])]
 
     # Training transforms
     random_trf = [
         wrap_solt_double,
         slc.Stream(train_transforms),
-        unwrap_solt
+        unwrap_solt,
+        ApplyTransform(numpy2tens, (0, 1, 2))
     ]
 
     # Validation transforms
     val_trf = [
         wrap_solt_double,
-        slc.Stream(),
-        unwrap_solt
+        slc.Stream([
+            Pad(pad_to=[crop_small, crop_large]),
+            Crop(training['magnification'], crop_mode='r', crop_to=[crop_small, crop_large])
+        ]),
+        unwrap_solt,
+        ApplyTransform(numpy2tens, (0, 1, 2))
     ]
 
     # Separate transforms for small and large image (crop and pad)
@@ -161,46 +170,23 @@ def train_test_transforms(conf, mean=None, std=None):
 
     # Use normalize_channel_wise if mean and std are calculated (training and evaluation)
     if mean is not None and std is not None:
-        small_trf.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
+        random_trf.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
+        val_trf.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
 
     # Compose transforms
     train_trf_cmp = [
         Compose(random_trf, return_torch=False),
-        Compose(small_trf, return_torch=False),
-        Compose(large_trf, return_torch=False)
+        #Compose(small_trf, return_torch=False),
+        #Compose(large_trf, return_torch=False)
     ]
 
     val_trf_cmp = [
         Compose(val_trf, return_torch=False),
-        Compose(small_trf, return_torch=False),
-        Compose(large_trf, return_torch=False)
+        #Compose(small_trf, return_torch=False),
+        #Compose(large_trf, return_torch=False)
     ]
 
     return {'train': train_trf_cmp, 'eval': val_trf_cmp,
             'train_list': random_trf, 'eval_list': val_trf}
 
 
-def estimate_mean_std(config, metadata, parse_item_cb, num_threads=8, bs=16):
-    mean_std_loader = ItemLoader(meta_data=metadata,
-                                 transform=train_test_transforms(config)['train'],
-                                 parse_item_cb=parse_item_cb,
-                                 batch_size=bs, num_workers=num_threads,
-                                 shuffle=False)
-
-    mean = None
-    std = None
-    for i in tqdm(range(len(mean_std_loader)), desc='Calculating mean and standard deviation'):
-        for batch in mean_std_loader.sample():
-            if mean is None:
-                mean = torch.zeros(batch['data'].size(1))
-                std = torch.zeros(batch['data'].size(1))
-            # for channel in range(batch['data'].size(1)):
-            #     mean[channel] += batch['data'][:, channel, :, :].mean().item()
-            #     std[channel] += batch['data'][:, channel, :, :].std().item()
-            mean += batch['data'].mean().item()
-            std += batch['data'].std().item()
-
-    mean /= len(mean_std_loader)
-    std /= len(mean_std_loader)
-
-    return mean, std

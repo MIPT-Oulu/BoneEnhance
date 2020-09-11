@@ -101,7 +101,8 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
                  ScalarMeterLogger(writer, comment='training', log_dir=str(log_dir)))
 
     val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
-               ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std, scale=None),#(0, 1)),
+               ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std, scale=None,
+                                   plot_interp=True),#(0, 1)),
                RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
                                      sigmoid=False),
                ModelSaver(metric_names='eval/loss',
@@ -248,9 +249,9 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     img, target = transform[0]((img, target))
 
     # Small crop for input
-    img = transform[1](img)[0]
+#    img = transform[1](img)[0]
     # Large crop for target
-    target = transform[2](target)[0]
+#    target = transform[2](target)[0]
 
     # Images are in the format 3xHxW
     # and scaled to 0-1 range
@@ -270,6 +271,9 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
         plt.colorbar(im2, orientation='horizontal')
         plt.title('Target')
         plt.show()
+
+    if list(img.shape) != [3, 16, 16] or list(target.shape) != [3, 64, 64]:
+        pass
 
     return {data_key: img, target_key: target}
 
