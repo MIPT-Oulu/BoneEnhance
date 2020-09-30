@@ -12,7 +12,7 @@ class PerceptualLoss(nn.Module):
     """
 
     def __init__(self, criterion=nn.L1Loss(), compare_layer=None, mean=None, std=None, imagenet_normalize=True,
-                 unnormalize=True, gram=True):
+                 gram=True):
         super(PerceptualLoss, self).__init__()
         if compare_layer is None:
             self.feature_extractor = WGAN_VGG_FeatureExtractor()
@@ -24,7 +24,6 @@ class PerceptualLoss(nn.Module):
         self.imagenet_normalize = imagenet_normalize
         self.imagenet_mean = (0.485, 0.456, 0.406)
         self.imagenet_std = (0.229, 0.224, 0.225)
-        self.unnormalize = unnormalize
         self.mean = mean
         self.std = std
         self.calculate_gram = gram
@@ -33,14 +32,6 @@ class PerceptualLoss(nn.Module):
 
         #logits = logits.detach().clone()
         #targets = targets.detach().clone()
-
-        # TODO: Unnormalize
-        if self.unnormalize and self.mean is not None and self.std is not None:
-            for channel in range(len(self.imagenet_mean)):
-                logits[:, channel, :, :] += self.mean[channel]
-                targets[:, channel, :, :] += self.mean[channel]
-                logits[:, channel, :, :] *= self.std[channel]
-                targets[:, channel, :, :] *= self.std[channel]
 
         # Scale to imagenet mean and std
         if self.imagenet_normalize:
@@ -59,6 +50,9 @@ class PerceptualLoss(nn.Module):
             # Obtain features from different layers
             pred_feature = self.feature_extractor(logits)
             target_feature = self.feature_extractor(targets)
+            # Only 2 first layers
+            #pred_feature = {key: pred_feature[key] for key in pred_feature.keys() & {'relu1_2', 'relu2_2'}}
+            #target_feature = {key: target_feature[key] for key in target_feature.keys() & {'relu1_2', 'relu2_2'}}
 
             # Calculate gram matrices
             if self.calculate_gram:

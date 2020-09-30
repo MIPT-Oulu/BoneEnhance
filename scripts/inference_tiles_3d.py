@@ -26,14 +26,14 @@ if __name__ == "__main__":
     start = time()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='../../Data/input_original')
+    parser.add_argument('--dataset_root', type=Path, default='../../Data/target_original')
     parser.add_argument('--save_dir', type=Path, default='../../Data/predictions_3D')
     parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
     parser.add_argument('--bs', type=int, default=12)
     parser.add_argument('--plot', type=bool, default=False)
     parser.add_argument('--weight', type=str, choices=['pyramid', 'mean'], default='mean')
     parser.add_argument('--completed', type=int, default=0)
-    parser.add_argument('--avg_planes', type=bool, default=True)
+    parser.add_argument('--avg_planes', type=bool, default=False)
     parser.add_argument('--snapshot', type=Path,
                         default='../../Workdir/snapshots/dios-erc-gpu_2020_09_11_12_22_28_enhance_standard')
     parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')

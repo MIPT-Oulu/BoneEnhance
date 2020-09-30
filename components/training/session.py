@@ -25,7 +25,7 @@ from collagen.losses import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss, 
 
 from BoneEnhance.components.transforms import train_test_transforms
 from BoneEnhance.components.models import EnhanceNet, EncoderDecoder, \
-    WGAN_VGG_generator, WGAN_VGG_discriminator, WGAN_VGG, ConvNet
+    WGAN_VGG_generator, WGAN_VGG_discriminator, WGAN_VGG, ConvNet, PerceptualNet
 from BoneEnhance.components.training.loss import PerceptualLoss
 
 
@@ -126,17 +126,15 @@ def init_loss(loss, config, device='cuda', mean=None, std=None):
         'psnr': PSNRLoss(),
         'perceptual': PerceptualLoss(),
         'perceptual_layers': PerceptualLoss(criterion=nn.MSELoss(),
-                                            compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],
+                                            compare_layer=['relu1_2', 'relu2_2'],
                                             mean=mean, std=std,
                                             imagenet_normalize=config.training.imagenet_normalize_loss,
-                                            unnormalize=config.training.unnormalize_loss,
                                             gram=config.training.gram),
         'combined': CombinedLoss([PerceptualLoss().to(device), nn.L1Loss().to(device)], weights=[0.8, 0.2]),
         'combined_layers': CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
-                                                        compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],
+                                                        compare_layer=['relu1_2', 'relu2_2'],
                                                         mean=mean, std=std,
                                                         imagenet_normalize=config.training.imagenet_normalize_loss,
-                                                        unnormalize=config.training.unnormalize_loss,
                                                         gram=config.training.gram)
                                         .to(device),
                                         nn.L1Loss().to(device)],
@@ -166,6 +164,9 @@ def init_model(config, device='cuda', gpus=1, args=None):
                            upscale_input=config.training.upscale_input,
                            n_blocks=config.training.n_blocks,
                            normalization=config.training.normalization),
+        'perceptualnet': PerceptualNet(config.training.magnification,
+                                       resize_convolution=config.training.upscale_input,
+                                       norm=config.training.normalization),
         'wgan': WGAN_VGG(input_size=config.training.crop_small[0]),
         'wgan_g': WGAN_VGG_generator(),
         'wgan_d': WGAN_VGG_discriminator(config.training.crop_small[0]),
@@ -219,14 +220,17 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     target[:, :, 1] = target[:, :, 0]
     target[:, :, 2] = target[:, :, 0]
 
+    # Magnification
+    mag = config.training.magnification
+
     # Resize target to 4x magnification respect to input
     if config is not None and not config.training.crossmodality:
-        mag = config.training.magnification
 
         # Antialiasing
         #target = cv2.GaussianBlur(target, ksize=)
         #target = zoom(target, zoom=1/16)
 
+        # Resize target to a relevant size (from the 3.2µm resolution to 51.2µm
         resize_target = (target.shape[1] // 16, target.shape[0] // 16)
         target = cv2.resize(target.copy(), resize_target, interpolation=cv2.INTER_LANCZOS4)  # .transpose(1, 0, 2)
 
@@ -240,9 +244,8 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
         img[:, :, 1] = img[:, :, 0]
         img[:, :, 2] = img[:, :, 0]
 
-        mag = config.training.magnification
         resize = (img.shape[1] * mag, img.shape[0] * mag)
-        target = cv2.resize(target, resize)
+        target = cv2.resize(target, resize, interpolation=cv2.INTER_LANCZOS4)
     else:
         raise NotImplementedError
 

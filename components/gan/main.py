@@ -13,12 +13,13 @@ from collagen.callbacks import ImagePairVisualizer, SimpleLRScheduler, \
     RandomImageVisualizer, ModelSaver
 
 from BoneEnhance.components.transforms import train_test_transforms
-from BoneEnhance.components.models import WGAN_VGG_generator, WGAN_VGG_discriminator, EnhanceNet, Vgg16, Discriminator
+from BoneEnhance.components.models import WGAN_VGG_generator, WGAN_VGG_discriminator, EnhanceNet, Vgg16, \
+    Discriminator, ConvNet
 from BoneEnhance.components.utilities.callbacks import ScalarMeterLogger, RunningAverageMeter
 
 
 class GANFakeImageSampler(ItemLoader):
-    def __init__(self, g_network, batch_size, image_size, name='ganfake'):
+    def __init__(self, g_network, batch_size, image_size, name='ganfake') -> object:
         super().__init__(meta_data=None, parse_item_cb=None, name=name)
         self.batch_size = batch_size
         self.__image_size = image_size
@@ -49,6 +50,11 @@ def init_model_gan(config, device='cuda', gpus=1):
     # model_g = WGAN_VGG_generator()
     model_g = EnhanceNet(config.training.crop_small, config.training.magnification,
                          activation=config.training.activation, upscale_input=config.training.upscale_input)
+    ConvNet(config.training.magnification,
+            activation=config.training.activation,
+            upscale_input=config.training.upscale_input,
+            n_blocks=config.training.n_blocks,
+            normalization=config.training.normalization)
     # model_d = WGAN_VGG_discriminator(config.training.crop_small[0])
     model_d = Discriminator(crop)
     model_f = Vgg16()
@@ -71,13 +77,24 @@ def create_data_provider_gan(g_network, item_loaders, args, config, parser, meta
                                       batch_size=config.training.bs, num_workers=args.num_threads,
                                       shuffle=True)
 
-    item_loaders['fake'] = GANFakeImageSampler(g_network=g_network,
-                                               batch_size=config.training.bs,
-                                               image_size=config.training.crop_small)
+    #item_loaders['fake'] = GANFakeImageSampler(g_network=g_network,
+    #                                           batch_size=config.training.bs,
+    #                                           image_size=config.training.crop_small)
+    item_loaders['fake'] = ItemLoader(meta_data=metadata['train'],
+                                      transform=train_test_transforms(config, mean, std)['train'],
+                                      parse_item_cb=parser,
+                                      batch_size=config.training.bs, num_workers=args.num_threads,
+                                      shuffle=True)
 
-    item_loaders['noise'] = GaussianNoiseSampler(batch_size=config.training.bs,
-                                                 latent_size=config.gan.latent_size,
-                                                 device=device, n_classes=config.gan.classes)
+    item_loaders['noise'] = ItemLoader(meta_data=metadata['train'],
+                                       transform=train_test_transforms(config, mean, std)['train'],
+                                       parse_item_cb=parser,
+                                       batch_size=config.training.bs, num_workers=args.num_threads,
+                                       shuffle=True)
+
+    #item_loaders['noise'] = GaussianNoiseSampler(batch_size=config.training.bs,
+    #                                             latent_size=config.gan.latent_size,
+    #                                             device=device, n_classes=config.gan.classes)
 
     return DataProvider(item_loaders)
 

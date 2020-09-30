@@ -125,6 +125,7 @@ class Trainer:
         # Content loss (quality of the output relative to ground truth)
         loss_content = self.loss_content(gen_hr, imgs_hr)
 
+        # TODO per-image total variation
         # Generator loss
         loss_g = loss_content + self.adv_weight * loss_adversarial
         if stage == 'train':

@@ -64,6 +64,8 @@ def make_layers(in_channels, output_channels, layer_type, bn='', activation=None
     elif bn == '3d':
         layers.append(nn.BatchNorm3d(output_channels))
 
+     # TODO: Instance normalization
+
     # Activation
     if activation == 'relu':
         layers.append(nn.ReLU(inplace=True))

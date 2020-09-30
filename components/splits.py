@@ -10,9 +10,10 @@ from BoneEnhance.components.transforms import train_test_transforms
 
 
 def build_meta_from_files(base_path, config):
-    if config.training.reduce_data:
-        target_loc = base_path / 'target_reduced'
-        input_loc = base_path / 'input_reduced'
+    if config.training.suffix is not None:
+        suffix = config.training.suffix
+        target_loc = base_path / f'target{suffix}'
+        input_loc = base_path / f'input{suffix}'
     else:
         target_loc = base_path / 'target'
         input_loc = base_path / 'input'

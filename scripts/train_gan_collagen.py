@@ -52,7 +52,7 @@ if __name__ == "__main__":
             print(f'\nTraining fold {fold}')
 
             # Initialize model and optimizer
-            model_g, model_d = init_model_gan(config, device, args.gpus)
+            model_g, model_d, model_f = init_model_gan(config, device, args.gpus)
 
             optimizer_d = optim.Adam(model_d.parameters(), lr=config.training.lr, weight_decay=config.training.wd)
             #loss_d = BCELoss().to(device)

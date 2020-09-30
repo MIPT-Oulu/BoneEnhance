@@ -15,13 +15,14 @@ training:
   calc_meanstd: True
   reduce_data: False
   parse_color: False
-  crop_small: [32, 32]
+  crop_small: [16, 16]
   crossmodality: False
   # Model
   architecture: convnet
   upscale_input: False
   add_residual: False
   activation: relu
+  normalization: bn
   pretrain: False
   existing_model: dios-erc-gpu_2020_08_13_15_44_23_enhance_combined_0.0001_mag4
   magnification: 4

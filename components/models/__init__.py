@@ -4,3 +4,4 @@ from .wgan import *
 from .perceptual import *
 from .esrgan import *
 from .convnet import *
+from .perceptual_net import *

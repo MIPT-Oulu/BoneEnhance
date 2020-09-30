@@ -31,12 +31,13 @@ training:
   crop_small: [32, 32]
   crossmodality: True
   # Model
-  architecture: enhance
+  architecture: convnet
   activation: leakyrelu
   upscale_input: True
   pretrain: True
   existing_model: dios-erc-gpu_2020_08_19_12_02_50_gan_enhance_combined_0.0001_mag4
   magnification: 4
+  n_blocks: 15
   # Training
   wd: 0.0001
   lr: 0.0001
