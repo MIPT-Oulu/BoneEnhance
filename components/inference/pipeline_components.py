@@ -34,11 +34,13 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     # Cut large image into overlapping tiles
     tiler = ImageSlicer(img_full.shape, tile_size=(input_x, input_y),
                         tile_step=(input_x // 2, input_y // 2), weight=weight)
+                        #tile_step=(input_x, input_y), weight=weight)
 
     x_tile = np.min((input_x * mag, x_out))
     y_tile = np.min((input_y * mag, y_out))
     tiler_out = ImageSlicer((x_out, y_out, ch), tile_size=(x_tile, y_tile),
                             tile_step=(x_tile // 2, y_tile // 2), weight=weight)
+                            #tile_step=(x_tile, y_tile), weight=weight)
 
     # HCW -> CHW. Optionally, do normalization here
     tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]

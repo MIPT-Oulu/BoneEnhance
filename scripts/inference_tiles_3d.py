@@ -15,7 +15,7 @@ from scipy.ndimage import zoom
 from omegaconf import OmegaConf
 
 from BoneEnhance.components.utilities import load, save, print_orthogonal, render_volume
-from BoneEnhance.components.inference import InferenceModel, inference, largest_object
+from BoneEnhance.components.inference import InferenceModel, inference, largest_object, load_models
 from BoneEnhance.components.models import ConvNet, EnhanceNet
 
 cv2.ocl.setUseOpenCL(False)
@@ -25,9 +25,13 @@ cv2.setNumThreads(0)
 if __name__ == "__main__":
     start = time()
 
+    snap = 'dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit'
+    #snap = 'dios-erc-gpu_2020_09_30_14_14_42_perceptualnet_noscaling_3x3_cm_curated_trainloss'
+
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_root', type=Path, default='../../Data/target_original')
-    parser.add_argument('--save_dir', type=Path, default='../../Data/predictions_3D')
+    parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D/{snap}')
     parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
     parser.add_argument('--bs', type=int, default=12)
     parser.add_argument('--plot', type=bool, default=False)
@@ -35,7 +39,7 @@ if __name__ == "__main__":
     parser.add_argument('--completed', type=int, default=0)
     parser.add_argument('--avg_planes', type=bool, default=False)
     parser.add_argument('--snapshot', type=Path,
-                        default='../../Workdir/snapshots/dios-erc-gpu_2020_09_11_12_22_28_enhance_standard')
+                        default=f'../../Workdir/snapshots/{snap}')
     parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
     args = parser.parse_args()
     #subdir = 'NN_prediction'  # 'NN_prediction'
@@ -68,32 +72,7 @@ if __name__ == "__main__":
     mean, std = tmp['mean'], tmp['std']
 
     # List the models
-    model_list = []
-    for fold in range(len(models)):
-        if config.training.architecture == 'enhance' and args_experiment.gpus > 1:
-            model = nn.DataParallel(EnhanceNet(config.training.crop_small, mag,
-                              activation=config.training.activation,
-                              add_residual=config.training.add_residual,
-                              upscale_input=config.training.upscale_input))
-        elif config.training.architecture == 'enhance':
-            model = EnhanceNet(config.training.crop_small, mag,
-                              activation=config.training.activation,
-                              add_residual=config.training.add_residual,
-                              upscale_input=config.training.upscale_input)
-        elif args_experiment.gpus > 1:
-            model = nn.DataParallel(ConvNet(mag,
-                           activation=config.training.activation,
-                           upscale_input=config.training.upscale_input,
-                           n_blocks=config.training.n_blocks,
-                           normalization=config.training.normalization))
-        else:
-            model = ConvNet(mag,
-                           activation=config.training.activation,
-                           upscale_input=config.training.upscale_input,
-                           n_blocks=config.training.n_blocks,
-                           normalization=config.training.normalization)
-        model.load_state_dict(torch.load(models[fold]))
-        model_list.append(model)
+    model_list = load_models(str(args.snapshot), config, n_gpus=args_experiment.gpus)
 
     model = InferenceModel(model_list).to(device)
     model.eval()
@@ -116,6 +95,11 @@ if __name__ == "__main__":
         # Load image stacks
         data_xy, files = load(str(args.dataset_root / sample), rgb=True, axis=(1, 2, 0))
         x, y, z, ch = data_xy.shape
+
+        print_orthogonal(data_xy[:, :, :, 0], invert=True, res=0.2, title='Input', cbar=True,
+                         savepath=str(args.save_dir / 'visualizations' / (sample + '_input.png')),
+                         scale_factor=1000)
+
         data_xz = np.transpose(data_xy, (0, 2, 1, 3))  # X-Z-Y-Ch
         data_yz = np.transpose(data_xy, (1, 2, 0, 3))  # Y-Z-X-Ch
 
@@ -153,20 +137,22 @@ if __name__ == "__main__":
         # Free memory
         del out_xz, out_yz
 
+        # Scale the dynamic range
+        mask_avg -= np.min(mask_avg)
+        mask_avg /= np.max(mask_avg)
+
         mask_avg = (mask_avg * 255).astype('uint8')
 
         # Save predicted full mask
-        save(str(args.save_dir / sample), files, mask_avg, dtype=args.dtype)
+        save(str(args.save_dir / sample), sample, mask_avg, dtype=args.dtype)
         """
         render_volume(data_yz[:, :, :, 0] * mask_final,
                       savepath=str(args.save_dir / 'visualizations' / (sample + '_render' + args.dtype)),
                       white=True, use_outline=False)
         """
-        print_orthogonal(data_xy[:, :, :, 0], invert=True, res=0.2, title='Input', cbar=True,
-                         savepath=str(args.save_dir / 'visualizations' / (sample + '_input.png')),
-                         scale_factor=1000)
+
         print_orthogonal(mask_avg, invert=True, res=0.2/4, title='Output', cbar=True,
-                         savepath=str(args.save_dir / 'visualizations' / (sample + '_input.png')),
+                         savepath=str(args.save_dir / 'visualizations' / (sample + '_prediction.png')),
                          scale_factor=1000)
 
     dur = time() - start

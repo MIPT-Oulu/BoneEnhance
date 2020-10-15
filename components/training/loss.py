@@ -1,6 +1,8 @@
+import matplotlib.pyplot as plt
 from torch import nn
 from BoneEnhance.components.models.wgan import WGAN_VGG_FeatureExtractor
 from BoneEnhance.components.models.perceptual import Vgg16
+from random import uniform
 
 
 class PerceptualLoss(nn.Module):
@@ -18,7 +20,7 @@ class PerceptualLoss(nn.Module):
             self.feature_extractor = WGAN_VGG_FeatureExtractor()
         else:
             self.feature_extractor = Vgg16()
-            self.feature_extractor.eval()
+            self.feature_extractor.train()#.eval()
         self.p_criterion = criterion
         self.compare_layer = compare_layer
         self.imagenet_normalize = imagenet_normalize
@@ -53,6 +55,30 @@ class PerceptualLoss(nn.Module):
             # Only 2 first layers
             #pred_feature = {key: pred_feature[key] for key in pred_feature.keys() & {'relu1_2', 'relu2_2'}}
             #target_feature = {key: target_feature[key] for key in target_feature.keys() & {'relu1_2', 'relu2_2'}}
+
+            # Plot feature maps
+            if uniform(0,1) > 0.98:
+                for i in range(1):
+                    fig, axs = plt.subplots(2, 5)
+                    f_map = 24
+
+                    # Plot input
+                    axs[0, 0].imshow(logits.detach().cpu()[i, 0, :, :], cmap='gray')
+                    axs[0, 0].set_title('Prediction')
+
+                    axs[1, 0].imshow(targets.detach().cpu()[i, 0, :, :], cmap='gray')
+                    axs[1, 0].set_title('Target')
+
+                    # Plot activations
+                    for key, j in zip(pred_feature.keys(), range(1, 5)):
+                        axs[0, j].imshow(pred_feature[key].detach().cpu()[i, f_map, :, :],
+                                         cmap='gray')
+                        axs[0, j].set_title(key)
+
+                        axs[1, j].imshow(target_feature[key].detach().cpu()[i, f_map, :, :],
+                                         cmap='gray')
+                        axs[1, j].set_title(key)
+                    fig.show()
 
             # Calculate gram matrices
             if self.calculate_gram:

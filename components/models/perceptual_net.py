@@ -36,7 +36,7 @@ class ResidualBlock(nn.Module):
 class PerceptualNet(nn.Module):
     """
     Super resolution network used in 'Perceptual Losses for Real-Time Style Transfer and Super-Resolution'
-    by Johson et al, https://arxiv.org/abs/1603.08155
+    by Johnson et al, https://arxiv.org/abs/1603.08155
     """
     def __init__(self, magnification, activation='relu', resize_convolution=False, norm='bn'):
         super(PerceptualNet, self).__init__()

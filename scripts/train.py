@@ -14,7 +14,7 @@ from collagen.callbacks import SamplingFreezer, ScalarMeterLogger, ImageSampling
 
 
 from BoneEnhance.components.training.session import create_data_provider, init_experiment, init_callbacks, \
-    save_transforms, init_loss, parse_grayscale, init_model
+    save_transforms, init_loss, parse_grayscale, init_model, parse_3d
 from BoneEnhance.components.splits import build_splits
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
 
@@ -36,7 +36,10 @@ if __name__ == "__main__":
         config = OmegaConf.create(config_list[experiment])
 
         # Update arguments according to the configuration file
-        parser = partial(parse_grayscale, config=config)
+        if len(config.training.crop_small) == 3:
+            parser = partial(parse_3d, config=config)
+        else:
+            parser = partial(parse_grayscale, config=config)
 
         # Split training folds
         parser_debug = partial(parser, debug=True)  # Display figures

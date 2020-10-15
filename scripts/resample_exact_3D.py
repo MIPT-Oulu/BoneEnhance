@@ -4,6 +4,8 @@ import numpy as np
 from pathlib import Path
 from BoneEnhance.components.training.session import init_experiment
 from BoneEnhance.components.utilities.main import load, save, print_orthogonal
+from skimage.transform import resize
+import h5py
 from scipy.ndimage import zoom
 from PIL import Image
 
@@ -16,19 +18,22 @@ if __name__ == "__main__":
     input_loc = Path('/media/santeri/data/BoneEnhance/Data/input_original')
 
     images_save = Path(f'/media/santeri/data/BoneEnhance/Data/target_mag{mag}')
+    input_save = Path(f'/media/santeri/data/BoneEnhance/Data/input_mag{mag}')
     images_save.mkdir(exist_ok=True)
+    input_save.mkdir(exist_ok=True)
 
     # List samples
     samples = os.listdir(images_loc)
     samples = [name for name in samples if os.path.isdir(os.path.join(images_loc, name))]
     samples_input = os.listdir(input_loc)
     samples_input = [name for name in samples_input if os.path.isdir(os.path.join(input_loc, name))]
+    # Check for consistency
     assert len(samples) == len(samples_input)
 
     samples.sort()
     samples_input.sort()
-    #samples = samples[30:]
-    #samples_input = samples_input[30:]
+    #samples = samples[22:]
+    samples_input = samples_input[:]
     for i in range(len(samples)):
         print(f'Processing sample: {samples[i]}')
 
@@ -46,6 +51,20 @@ if __name__ == "__main__":
                   data.shape[1] * mag // data_input.shape[1],
                   data.shape[2] * mag // data_input.shape[2])
 
-        data_resample = zoom(data, (1 / factor[0], 1 / factor[1], 1 / factor[2]), order=0)
+        factor = (data_input.shape[0] * mag,
+                  data_input.shape[1] * mag,
+                  data_input.shape[2] * mag)
+        print(factor)
 
-        save(str(images_save / samples[i]), samples[i], data_resample[:, :, :], dtype='.bmp')
+        # Gaussian blur antialiasing and preserve 8-bit range
+        data = resize(data, factor, order=0, anti_aliasing=True, preserve_range=True)
+
+        # Save target to hdf5
+        fname = str(images_save / f'{samples[i]}.h5')
+        with h5py.File(fname, 'w') as f:
+            f.create_dataset('data', data=data)
+
+        # Save input to hdf5
+        fname = str(input_save / f'{samples_input[i]}.h5')
+        with h5py.File(fname, 'w') as f:
+            f.create_dataset('data', data=data_input)

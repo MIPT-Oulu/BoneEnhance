@@ -10,6 +10,10 @@ from BoneEnhance.components.transforms import train_test_transforms
 
 
 def build_meta_from_files(base_path, config):
+    # Dataframe for the metadata
+    metadata = {'fname': [], 'target_fname': []}
+
+    # Data path
     if config.training.suffix is not None:
         suffix = config.training.suffix
         target_loc = base_path / f'target{suffix}'
@@ -18,29 +22,39 @@ def build_meta_from_files(base_path, config):
         target_loc = base_path / 'target'
         input_loc = base_path / 'input'
 
-    # List files
-    input_images = set(map(lambda x: x.stem, input_loc.glob('**/*[0-9].[pb][nm][gp]')))
-    target_images = set(map(lambda x: x.stem, target_loc.glob('**/*[0-9].[pb][nm][gp]')))
-    res = target_images.intersection(input_images)
+    # 3D metadata
+    if len(config.training.crop_small) == 3:
+        input_stacks = list(map(lambda x: pathlib.Path(x), input_loc.glob('*.h5')))
+        target_stacks = list(map(lambda x: pathlib.Path(x), target_loc.glob('*.h5')))
+        input_stacks.sort()
+        target_stacks.sort()
 
-    #target_images = list(map(lambda x: pathlib.Path(x).with_suffix('.png'), target_images))
+        input_stacks = input_stacks[:len(target_stacks)]  # TODO remove
+        # Check for data consistency
+        # assert len(input_stacks), len(target_stacks)
+
+        # Dataframe
+        [metadata['fname'].append((input_loc / img_name.name)) for img_name in input_stacks]
+        [metadata['target_fname'].append(target_loc / img_name.name) for img_name in target_stacks]
+
+        return pd.DataFrame(data=metadata)
+
+    # 2D metadata
+
+    # List files
     input_images = list(map(lambda x: pathlib.Path(x), input_loc.glob('**/*[0-9].[pb][nm][gp]')))
     target_images = list(map(lambda x: pathlib.Path(x), target_loc.glob('**/*[0-9].[pb][nm][gp]')))
     input_images.sort()
     target_images.sort()
 
-    assert len(res), len(target_images)
+    # Check for data consistency
+    assert len(input_images), len(target_images)
 
-    d_frame = {'fname': [], 'target_fname': []}
+    # Creating the dataframe
+    [metadata['fname'].append((input_loc / img_name.parent / img_name.name)) for img_name in input_images]
+    [metadata['target_fname'].append(target_loc / img_name.parent / img_name.name) for img_name in target_images]
 
-    # Making dataframe
-
-    [d_frame['fname'].append((input_loc / img_name.parent / img_name.name)) for img_name in input_images]
-    [d_frame['target_fname'].append(target_loc / img_name.parent / img_name.name) for img_name in target_images]
-
-    metadata = pd.DataFrame(data=d_frame)
-
-    return metadata
+    return pd.DataFrame(data=metadata)
 
 
 def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):

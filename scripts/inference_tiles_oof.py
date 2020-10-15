@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import gc
 import matplotlib.pyplot as plt
+from omegaconf import OmegaConf
 from torch.utils.data import DataLoader
 from pathlib import Path
 from time import time
@@ -41,7 +42,10 @@ if __name__ == "__main__":
     # Snapshots to be evaluated
     # µCT models
 
-    snaps = ['dios-erc-gpu_2020_08_13_13_19_53_enhance_L1_0.0001_mag4']
+    snaps = ['dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit']
+    #snaps = ['dios-erc-gpu_2020_10_12_12_50_52_perceptualnet_newsplit_cm_bg']
+
+
 
     snaps = [args.snapshots / snap for snap in snaps]
 
@@ -50,18 +54,22 @@ if __name__ == "__main__":
     for snap in snaps:
         start = time()
 
-        save_dir = args.save_dir / str(snap.stem + '_oof')
-        save_dir.mkdir(exist_ok=True)
-
         # Load snapshot configuration
         with open(snap / 'config.yml', 'r') as f:
             config = yaml.load(f, Loader=yaml.Loader)
+            config = OmegaConf.create(config)
 
         with open(snap / 'args.dill', 'rb') as f:
             args_experiment = dill.load(f)
 
         with open(snap / 'split_config.dill', 'rb') as f:
             split_config = dill.load(f)
+
+        save_dir = args.save_dir / str(snap.stem + '_oof')
+        save_dir.mkdir(exist_ok=True)
+        if not config.training.crossmodality:
+            save_dir_ds = args.save_dir / str(snap.stem + '_downscale_oof')
+            save_dir_ds.mkdir(exist_ok=True)
 
         device = auto_detect_device()
 
@@ -94,17 +102,24 @@ if __name__ == "__main__":
                 with torch.no_grad():  # Do not update gradients
                     prediction = inference(model, args, config, img_full, weight=args.weight,
                                            mean=split_config['mean'], std=split_config['std']
-                                           )[:, :, 0]
+                                           )#[:, :, 0]
                     if args.plot:
                         plt.imshow(prediction)
                         plt.colorbar()
                         plt.show()
 
-                prediction = prediction.astype('uint8')
+                # Scale the dynamic range
+                prediction -= np.min(prediction)
+                prediction /= np.max(prediction)
+
+                prediction = (prediction * 255).astype('uint8')
 
                 # When saving 3D stacks, file structure should be preserved
                 (save_dir / file.parent.stem).mkdir(exist_ok=True)
                 cv2.imwrite(str(save_dir / file.parent.stem / file.stem) + '.bmp', prediction)
+                if not config.training.crossmodality:
+                    (save_dir_ds / file.parent.stem).mkdir(exist_ok=True)
+                    cv2.imwrite(str(save_dir_ds / file.parent.stem / file.stem) + '.bmp', img_full)
 
                 # Free memory
                 torch.cuda.empty_cache()

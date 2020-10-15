@@ -95,8 +95,8 @@ def train_test_transforms(conf, mean=None, std=None):
             # Spatial
             slt.Flip(axis=-1, p=prob),
             slc.SelectiveStream([slt.Rotate90(k=1, p=prob), slt.Rotate90(k=-1, p=prob), slt.Rotate90(k=2, p=prob)]),
-            Crop(training['magnification'], crop_mode='r', crop_to=[crop_small, crop_large]),
-            Pad(pad_to=[crop_small, crop_large]),
+            Crop(training['magnification'], crop_mode='r', crop_to=(crop_small, crop_large)),
+            Pad(pad_to=(crop_small, crop_large)),
 
             # Intensity
             # Brightness/contrast
@@ -104,19 +104,19 @@ def train_test_transforms(conf, mean=None, std=None):
                 slt.Brightness(brightness_range=tuple(trf['brightness']), p=prob),
                 slt.Contrast(contrast_range=trf['contrast'], p=prob)]),
             # Noise
-            #slc.SelectiveStream([
-            #    slt.SaltAndPepper(p=prob, gain=trf['gain_sp']),
-            #    slt.Noise(p=prob, gain=trf['gain_gn']),
-            #    slc.SelectiveStream([
-            #        slt.Blur(p=prob, blur_type='g', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma'])),
-            #       slt.Blur(p=prob, blur_type='m', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma']))])])
+            slc.SelectiveStream([
+                #slt.SaltAndPepper(p=prob, gain_range=trf['gain_sp']),
+                #slt.Noise(p=prob, gain_range=trf['gain_gn']),
+                slc.SelectiveStream([
+                    slt.Blur(p=prob, blur_type='g', k_size=(3, 5), gaussian_sigma=tuple(trf['sigma'])),
+                    slt.Blur(p=prob, blur_type='m', k_size=(3, 5), gaussian_sigma=tuple(trf['sigma']))])])
 
             ]),
 
         # Empty stream
         slc.Stream([
-            Crop(training['magnification'], crop_mode='r', crop_to=[crop_small, crop_large]),
-            Pad(pad_to=[crop_small, crop_large]),
+            Crop(training['magnification'], crop_mode='r', crop_to=(crop_small, crop_large)),
+            Pad(pad_to=(crop_small, crop_large)),
         ])
 
         ])]

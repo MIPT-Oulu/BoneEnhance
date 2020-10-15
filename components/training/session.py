@@ -9,11 +9,13 @@ import torch.nn as nn
 import dill
 import cv2
 import os
+import h5py
 from pathlib import Path
 from random import uniform
 from glob import glob
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from skimage.transform import resize
 from scipy.signal import decimate
 from scipy.ndimage import zoom
 
@@ -126,13 +128,13 @@ def init_loss(loss, config, device='cuda', mean=None, std=None):
         'psnr': PSNRLoss(),
         'perceptual': PerceptualLoss(),
         'perceptual_layers': PerceptualLoss(criterion=nn.MSELoss(),
-                                            compare_layer=['relu1_2', 'relu2_2'],
+                                            compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],  #['relu1_2', 'relu2_2'],
                                             mean=mean, std=std,
                                             imagenet_normalize=config.training.imagenet_normalize_loss,
                                             gram=config.training.gram),
         'combined': CombinedLoss([PerceptualLoss().to(device), nn.L1Loss().to(device)], weights=[0.8, 0.2]),
         'combined_layers': CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
-                                                        compare_layer=['relu1_2', 'relu2_2'],
+                                                        compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],  #['relu1_2', 'relu2_2'],
                                                         mean=mean, std=std,
                                                         imagenet_normalize=config.training.imagenet_normalize_loss,
                                                         gram=config.training.gram)
@@ -252,18 +254,13 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     # Apply random transforms
     img, target = transform[0]((img, target))
 
-    # Small crop for input
-#    img = transform[1](img)[0]
-    # Large crop for target
-#    target = transform[2](target)[0]
-
     # Images are in the format 3xHxW
     # and scaled to 0-1 range
     img = img.permute(2, 0, 1) / 255.
     target = target.permute(2, 0, 1) / 255.
 
     # Plot a small random portion of image-target pairs during debug
-    if debug and uniform(0, 1) >= 0.99:
+    if debug and uniform(0, 1) >= 0.97:
         fig = plt.figure(dpi=300)
         ax1 = fig.add_subplot(121)
         im = ax1.imshow(np.asarray(img.permute(1, 2, 0)), cmap='gray')
@@ -276,8 +273,59 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
         plt.title('Target')
         plt.show()
 
-    if list(img.shape) != [3, 16, 16] or list(target.shape) != [3, 64, 64]:
-        pass
+    return {data_key: img, target_key: target}
+
+
+def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=None):
+
+    # Load target with hdf5
+    with h5py.File(entry.target_fname, 'r') as f:
+        target = f['data'][:]
+
+    # Magnification
+    mag = config.training.magnification
+
+    # Resize target to 4x magnification respect to input
+    if config is not None and not config.training.crossmodality:
+
+        # Resize target with the given magnification to provide the input image
+        factor = (target.shape[0] // mag, target.shape[1] // mag, target.shape[2] // mag)
+        img = resize(target, factor, order=0, anti_aliasing=True, preserve_range=True)
+
+    elif config is not None:
+
+        # Load input with hdf5
+        with h5py.File(entry.fname, 'r') as f:
+            img = f['data'][:]
+
+        # Resize the target to match input in case of a mismatch
+        factor = (img.shape[0] * mag, img.shape[1] * mag, img.shape[2] * mag)
+        if target.shape != factor:
+            target = resize(target, factor, order=0, anti_aliasing=True, preserve_range=True)
+    else:
+        raise NotImplementedError
+
+    # Apply random transforms
+    img, target = transform[0]((img, target))
+
+    # Images are in the format 3xHxWxD
+    # and scaled to 0-1 range
+    img = img.permute(2, 0, 1) / 255.
+    target = target.permute(2, 0, 1) / 255.
+
+    # Plot a small random portion of image-target pairs during debug
+    if debug and uniform(0, 1) >= 0.97:
+        fig = plt.figure(dpi=300)
+        ax1 = fig.add_subplot(121)
+        im = ax1.imshow(np.asarray(img.permute(1, 2, 0)), cmap='gray')
+        plt.colorbar(im, orientation='horizontal')
+        plt.title('Input')
+
+        ax2 = fig.add_subplot(122)
+        im2 = ax2.imshow(np.asarray(target.permute(1, 2, 0)), cmap='gray')
+        plt.colorbar(im2, orientation='horizontal')
+        plt.title('Target')
+        plt.show()
 
     return {data_key: img, target_key: target}
 

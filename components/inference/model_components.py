@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from glob import glob
 
-from BoneEnhance.components.models.enhance import EnhanceNet
+from BoneEnhance.components.models import EnhanceNet, ConvNet, PerceptualNet
 
 
 class InferenceModel(nn.Module):
@@ -29,14 +29,29 @@ def load_models(model_path, config, n_gpus=1, magnification=4):
     models = glob(model_path + '/*fold_*.pth')
     models.sort()
 
+    available_models = {
+        'enhance': EnhanceNet(config.training.crop_small, config.training.magnification,
+                              activation=config.training.activation,
+                              add_residual=config.training.add_residual,
+                              upscale_input=config.training.upscale_input),
+        'convnet': ConvNet(config.training.magnification,
+                           activation=config.training.activation,
+                           upscale_input=config.training.upscale_input,
+                           n_blocks=config.training.n_blocks,
+                           normalization=config.training.normalization),
+        'perceptualnet': PerceptualNet(config.training.magnification,
+                                       resize_convolution=config.training.upscale_input,
+                                       norm=config.training.normalization),
+    }
+
     # List the models
     model_list = []
     for fold in range(len(models)):
         if n_gpus > 1:
             model = nn.DataParallel(
-                EnhanceNet(config['training']['crop_small'], magnification))
+                available_models[config.training.architecture])
         else:
-            model = EnhanceNet(config['training']['crop_small'], magnification)
+            model = available_models[config.training.architecture]
         model.load_state_dict(torch.load(models[fold]))
         model_list.append(model)
 

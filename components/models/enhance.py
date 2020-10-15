@@ -64,8 +64,6 @@ def make_layers(in_channels, output_channels, layer_type, bn='', activation=None
     elif bn == '3d':
         layers.append(nn.BatchNorm3d(output_channels))
 
-     # TODO: Instance normalization
-
     # Activation
     if activation == 'relu':
         layers.append(nn.ReLU(inplace=True))
@@ -79,7 +77,6 @@ def make_layers(in_channels, output_channels, layer_type, bn='', activation=None
 
     return nn.Sequential(*layers)
 
-# TODO model from Perceptual loss
 
 class EnhanceNet(nn.Module):
     """Inspired by ReconNet https://doi.org/10.1038/s41551-019-0466-4"""
