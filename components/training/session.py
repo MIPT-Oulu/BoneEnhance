@@ -29,6 +29,7 @@ from BoneEnhance.components.transforms import train_test_transforms
 from BoneEnhance.components.models import EnhanceNet, EncoderDecoder, \
     WGAN_VGG_generator, WGAN_VGG_discriminator, WGAN_VGG, ConvNet, PerceptualNet
 from BoneEnhance.components.training.loss import PerceptualLoss
+from BoneEnhance.components.utilities import print_orthogonal
 
 
 def init_experiment(experiments='../experiments/run'):
@@ -168,7 +169,8 @@ def init_model(config, device='cuda', gpus=1, args=None):
                            normalization=config.training.normalization),
         'perceptualnet': PerceptualNet(config.training.magnification,
                                        resize_convolution=config.training.upscale_input,
-                                       norm=config.training.normalization),
+                                       norm=config.training.normalization,
+                                       vol=len(config.training.crop_small) == 3),
         'wgan': WGAN_VGG(input_size=config.training.crop_small[0]),
         'wgan_g': WGAN_VGG_generator(),
         'wgan_d': WGAN_VGG_discriminator(config.training.crop_small[0]),
@@ -252,18 +254,18 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
         raise NotImplementedError
 
     # Apply random transforms
-    img, target = transform[0]((img, target))
+    img, target = transform((img, target))
 
     # Images are in the format 3xHxW
     # and scaled to 0-1 range
-    img = img.permute(2, 0, 1) / 255.
+    img = img.permute(2, 0, 1)# / 255.
     target = target.permute(2, 0, 1) / 255.
 
     # Plot a small random portion of image-target pairs during debug
-    if debug and uniform(0, 1) >= 0.97:
+    if debug and uniform(0, 1) >= 0.99:
         fig = plt.figure(dpi=300)
         ax1 = fig.add_subplot(121)
-        im = ax1.imshow(np.asarray(img.permute(1, 2, 0)), cmap='gray')
+        im = ax1.imshow(np.asarray(img.permute(1, 2, 0) / 255.), cmap='gray')
         plt.colorbar(im, orientation='horizontal')
         plt.title('Input')
 
@@ -305,27 +307,22 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
     else:
         raise NotImplementedError
 
+    # Channel dimension
+    img = np.expand_dims(img, -1)
+    target = np.expand_dims(target, -1)
+
     # Apply random transforms
-    img, target = transform[0]((img, target))
+    img, target = transform((img, target))
 
     # Images are in the format 3xHxWxD
     # and scaled to 0-1 range
-    img = img.permute(2, 0, 1) / 255.
-    target = target.permute(2, 0, 1) / 255.
+    target /= 255.
 
     # Plot a small random portion of image-target pairs during debug
-    if debug and uniform(0, 1) >= 0.97:
-        fig = plt.figure(dpi=300)
-        ax1 = fig.add_subplot(121)
-        im = ax1.imshow(np.asarray(img.permute(1, 2, 0)), cmap='gray')
-        plt.colorbar(im, orientation='horizontal')
-        plt.title('Input')
+    if debug and uniform(0, 1) >= 0.99:
+        print_orthogonal(img.detach().numpy(), title='Input')
 
-        ax2 = fig.add_subplot(122)
-        im2 = ax2.imshow(np.asarray(target.permute(1, 2, 0)), cmap='gray')
-        plt.colorbar(im2, orientation='horizontal')
-        plt.title('Target')
-        plt.show()
+        print_orthogonal(target.detach().numpy(), title='Target')
 
     return {data_key: img, target_key: target}
 

@@ -95,7 +95,6 @@ class Crop(BaseTransform):
             return img_mask[sel]
         else:
             raise Exception('Image size mismatch')
-            return img_mask
 
     def _apply_img(self, img: np.ndarray, settings: dict):
         return self.__crop_img_or_mask(img)

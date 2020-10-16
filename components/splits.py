@@ -29,9 +29,8 @@ def build_meta_from_files(base_path, config):
         input_stacks.sort()
         target_stacks.sort()
 
-        input_stacks = input_stacks[:len(target_stacks)]  # TODO remove
         # Check for data consistency
-        # assert len(input_stacks), len(target_stacks)
+        assert len(input_stacks), len(target_stacks)
 
         # Dataframe
         [metadata['fname'].append((input_loc / img_name.name)) for img_name in input_stacks]
@@ -110,7 +109,7 @@ def estimate_mean_std(config, metadata, parse_item_cb, num_threads=8, bs=16):
 
     mean = None
     std = None
-    for i in tqdm(range(len(mean_std_loader)), desc='Calculating mean and standard deviation'):
+    for _ in tqdm(range(len(mean_std_loader)), desc='Calculating mean and standard deviation'):
         for batch in mean_std_loader.sample():
             if mean is None:
                 mean = torch.zeros(batch['data'].size(1))

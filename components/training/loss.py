@@ -14,7 +14,7 @@ class PerceptualLoss(nn.Module):
     """
 
     def __init__(self, criterion=nn.L1Loss(), compare_layer=None, mean=None, std=None, imagenet_normalize=True,
-                 gram=True):
+                 gram=True, plot=False):
         super(PerceptualLoss, self).__init__()
         if compare_layer is None:
             self.feature_extractor = WGAN_VGG_FeatureExtractor()
@@ -29,6 +29,7 @@ class PerceptualLoss(nn.Module):
         self.mean = mean
         self.std = std
         self.calculate_gram = gram
+        self.plot = plot
 
     def forward(self, logits, targets):
 
@@ -57,7 +58,7 @@ class PerceptualLoss(nn.Module):
             #target_feature = {key: target_feature[key] for key in target_feature.keys() & {'relu1_2', 'relu2_2'}}
 
             # Plot feature maps
-            if uniform(0,1) > 0.98:
+            if self.plot and uniform(0, 1) >= 0.99:
                 for i in range(1):
                     fig, axs = plt.subplots(2, 5)
                     f_map = 24
