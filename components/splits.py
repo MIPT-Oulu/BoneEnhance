@@ -64,7 +64,11 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
 
     # Mean and std
     crop = config['training']['crop_small']
-    mean_std_path = snapshots_dir / f"mean_std_{crop[0]}x{crop[1]}.pth"
+    if config['training']['crossmodality']:
+        cm = 'cm'
+    else:
+        cm = 'ds'
+    mean_std_path = snapshots_dir / f"mean_std_{crop}_{cm}.pth"
     if mean_std_path.is_file() and not config['training']['calc_meanstd']:  # Load
         print('==> Loading mean and std from cache')
         tmp = torch.load(mean_std_path)

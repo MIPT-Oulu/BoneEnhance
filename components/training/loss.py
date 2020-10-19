@@ -14,13 +14,13 @@ class PerceptualLoss(nn.Module):
     """
 
     def __init__(self, criterion=nn.L1Loss(), compare_layer=None, mean=None, std=None, imagenet_normalize=True,
-                 gram=True, plot=False):
+                 gram=True, plot=False, vol=False):
         super(PerceptualLoss, self).__init__()
         if compare_layer is None:
             self.feature_extractor = WGAN_VGG_FeatureExtractor()
         else:
-            self.feature_extractor = Vgg16()
-            self.feature_extractor.train()#.eval()
+            self.feature_extractor = Vgg16(vol=vol)
+            self.feature_extractor.eval()  # or train?
         self.p_criterion = criterion
         self.compare_layer = compare_layer
         self.imagenet_normalize = imagenet_normalize
@@ -30,6 +30,7 @@ class PerceptualLoss(nn.Module):
         self.std = std
         self.calculate_gram = gram
         self.plot = plot
+        self.vol = vol
 
     def forward(self, logits, targets):
 
@@ -84,8 +85,12 @@ class PerceptualLoss(nn.Module):
             # Calculate gram matrices
             if self.calculate_gram:
                 for key in pred_feature:
-                    pred_feature[key] = self.gram(pred_feature[key])
-                    target_feature[key] = self.gram(target_feature[key])
+                    if self.vol:
+                        pred_feature[key] = self.gram_3d(pred_feature[key])
+                        target_feature[key] = self.gram_3d(target_feature[key])
+                    else:
+                        pred_feature[key] = self.gram(pred_feature[key])
+                        target_feature[key] = self.gram(target_feature[key])
 
             # TODO: Compare 3D activations
 
@@ -110,4 +115,12 @@ class PerceptualLoss(nn.Module):
         f = x.view(bs, ch, w * h)
         f_T = f.transpose(1, 2)
         G = f.bmm(f_T) / (ch * h * w)
+        return G
+
+    @staticmethod
+    def gram_3d(x):
+        (bs, ch, d, h, w) = x.size()
+        f = x.view(bs, ch, d * w * h)
+        f_T = f.transpose(1, 2)
+        G = f.bmm(f_T) / (ch * d * h * w)
         return G

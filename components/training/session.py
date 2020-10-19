@@ -100,14 +100,9 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
 
     # Callbacks
     train_cbs = (RunningAverageMeter(prefix="train", name="loss"),
-                 #RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std),
                  ScalarMeterLogger(writer, comment='training', log_dir=str(log_dir)))
 
     val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
-               ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std, scale=None,
-                                   plot_interp=True),#(0, 1)),
-               RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
-                                     sigmoid=False),
                ModelSaver(metric_names='eval/loss',
                           prefix=prefix,
                           save_dir=str(current_snapshot_dir),
@@ -119,26 +114,36 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
                                                                 eps=float(config.training.eps))),
                ScalarMeterLogger(writer=writer, comment='validation', log_dir=log_dir))
 
+    if len(config.training.crop_small) == 2:
+        val_cbs += (ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
+                                        scale=None,
+                                        plot_interp=True),#(0, 1)),
+                    RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
+                                          sigmoid=False))
+
     return train_cbs, val_cbs
 
 
 def init_loss(loss, config, device='cuda', mean=None, std=None):
+    vol = len(config.training.crop_small) == 3
     available_losses = {
         'mse': nn.MSELoss(),
-        'L1': nn.L1Loss(),
+        'L1': nn.L1Loss(), 'l1': nn.L1Loss(),
         'psnr': PSNRLoss(),
         'perceptual': PerceptualLoss(),
         'perceptual_layers': PerceptualLoss(criterion=nn.MSELoss(),
                                             compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],  #['relu1_2', 'relu2_2'],
                                             mean=mean, std=std,
                                             imagenet_normalize=config.training.imagenet_normalize_loss,
-                                            gram=config.training.gram),
+                                            gram=config.training.gram,
+                                            vol=vol),
         'combined': CombinedLoss([PerceptualLoss().to(device), nn.L1Loss().to(device)], weights=[0.8, 0.2]),
         'combined_layers': CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
                                                         compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],  #['relu1_2', 'relu2_2'],
                                                         mean=mean, std=std,
                                                         imagenet_normalize=config.training.imagenet_normalize_loss,
-                                                        gram=config.training.gram)
+                                                        gram=config.training.gram,
+                                                        vol=vol)
                                         .to(device),
                                         nn.L1Loss().to(device)],
                                         weights=[0.8, 0.2]),
@@ -154,6 +159,7 @@ def init_loss(loss, config, device='cuda', mean=None, std=None):
 def init_model(config, device='cuda', gpus=1, args=None):
     config.model.magnification = config.training.magnification
     architecture = config.training.architecture
+    vol = len(config.training.crop_small) == 3
 
     # List available model architectures
     available_models = {
@@ -170,7 +176,7 @@ def init_model(config, device='cuda', gpus=1, args=None):
         'perceptualnet': PerceptualNet(config.training.magnification,
                                        resize_convolution=config.training.upscale_input,
                                        norm=config.training.normalization,
-                                       vol=len(config.training.crop_small) == 3),
+                                       vol=vol),
         'wgan': WGAN_VGG(input_size=config.training.crop_small[0]),
         'wgan_g': WGAN_VGG_generator(),
         'wgan_d': WGAN_VGG_discriminator(config.training.crop_small[0]),
@@ -258,8 +264,8 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
 
     # Images are in the format 3xHxW
     # and scaled to 0-1 range
-    img = img.permute(2, 0, 1)# / 255.
-    target = target.permute(2, 0, 1) / 255.
+    #img = img.permute(2, 0, 1)# / 255. # TODO Experiment for the change in input scaling
+    target = target / 255.#.permute(2, 0, 1) / 255.
 
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.99:
@@ -316,13 +322,15 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
 
     # Images are in the format 3xHxWxD
     # and scaled to 0-1 range
+    img = img.repeat(3, 1, 1, 1)
+    target = target.repeat(3, 1, 1, 1)
     target /= 255.
 
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.99:
-        print_orthogonal(img.detach().numpy(), title='Input')
+        print_orthogonal(img[0, :, :, :].numpy(), title='Input')
 
-        print_orthogonal(target.detach().numpy(), title='Target')
+        print_orthogonal(target[0, :, :, :].numpy(), title='Target')
 
     return {data_key: img, target_key: target}
 

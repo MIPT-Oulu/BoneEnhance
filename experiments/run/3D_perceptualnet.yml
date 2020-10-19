@@ -37,7 +37,7 @@ training:
   loss: combined_layers
   log_jaccard: True
   imagenet_normalize_loss: False
-  gram: False  # Calculate Gram matrix on Perceptual loss
+  gram: True  # Calculate Gram matrix on Perceptual loss
   # LR reduction
   use_LR_red: True
   patience: 5

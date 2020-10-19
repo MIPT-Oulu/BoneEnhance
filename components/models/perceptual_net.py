@@ -89,11 +89,11 @@ class PerceptualNet(nn.Module):
             padding = nn.ReflectionPad2d
 
         # Kernel
+        f_maps = [3, 64, 1]  # RGB
         kernel = 3
         pad = kernel // 2
 
         # Block types
-        f_maps = [3, 64, 1]
         first_block = [
             convolution(f_maps[0], f_maps[1], kernel_size=kernel, stride=1, padding=pad),  # Changed bias to true
             self.norm(f_maps[1], affine=True),
@@ -143,7 +143,10 @@ class PerceptualNet(nn.Module):
         x = self.net(x)
 
         # Duplicate 1-channel image to represent RGB
-        x = x.repeat(1, 3, 1, 1)
+        if len(x.size()) == 5:
+            x = x.repeat(1, 3, 1, 1, 1)
+        else:
+            x = x.repeat(1, 3, 1, 1)
 
         # Scaled Tanh activation
         x = x.tanh()

@@ -24,15 +24,26 @@ def normalize_channel_wise(tensor: torch.Tensor, mean: torch.Tensor, std: torch.
     -------
     result: torch.Tensor
     """
-    if len(tensor.size()) != 3:
+
+    # 3D
+    if len(tensor.size()) == 4:
+        # Modified shape
+        for channel in range(tensor.size(0)):
+            tensor[:, :, :, channel] -= mean[channel]
+            tensor[:, :, :, channel] /= std[channel]
+
+        return tensor
+    # Noncompatible
+    elif len(tensor.size()) != 3:
         raise ValueError
+    # 2D
+    else:
+        # Modified shape
+        for channel in range(tensor.size(0)):
+            tensor[:, :, channel] -= mean[channel]
+            tensor[:, :, channel] /= std[channel]
 
-    # Modified shape
-    for channel in range(tensor.size(2)):
-        tensor[:, :, channel] -= mean[channel]
-        tensor[:, :, channel] /= std[channel]
-
-    return tensor
+        return tensor
 
 
 def numpy2tens(x: np.ndarray, dtype='f') -> torch.Tensor:
@@ -47,10 +58,15 @@ def numpy2tens(x: np.ndarray, dtype='f') -> torch.Tensor:
     -------
     result: torch.Tensor
     """
-    x = x.squeeze()
-    x = torch.from_numpy(x)
-    if x.dim() == 2:  # CxHxW format
+    #x = x.squeeze()
+
+    # CxHxW format
+    if len(x.shape) == 2:
+        x = torch.from_numpy(x)
         x = x.unsqueeze(0)
+    else:
+        x = np.rollaxis(x, -1)
+        x = torch.from_numpy(x)
 
     if dtype == 'f':
         return x.float()
@@ -123,12 +139,17 @@ def train_test_transforms(conf, mean=None, std=None):
             slt.Blur(p=prob, blur_type='m', k_size=(3, 5), gaussian_sigma=tuple(trf.sigma))])])
     """
 
+    if len(crop_small) == 3:
+        axis = (0, 1, 2, 3)
+    else:
+        axis = (0, 1, 2)
+
     # Training transforms
     random_trf = [
         wrap_solt_double,
         slc.Stream(train_transforms),
         unwrap_solt,
-        ApplyTransform(numpy2tens, (0, 1, 2))
+        ApplyTransform(numpy2tens, axis)
     ]
 
     # Validation transforms
@@ -139,7 +160,7 @@ def train_test_transforms(conf, mean=None, std=None):
             Crop(training['magnification'], crop_mode='r', crop_to=(crop_small, crop_large))
         ]),
         unwrap_solt,
-        ApplyTransform(numpy2tens, (0, 1, 2))
+        ApplyTransform(numpy2tens, axis)
     ]
 
     # Use normalize_channel_wise if mean and std are calculated (training and evaluation)
