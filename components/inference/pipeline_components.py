@@ -6,14 +6,15 @@ import gc
 import os
 import cv2
 
-#from skimage import measure
 from time import time
 from copy import deepcopy
 from tqdm import tqdm
+from skimage import measure
 from torch.utils.data import DataLoader
 from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
 from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
 
+from BoneEnhance.components.inference.tiler import Tiler, CudaTileMerger3D
 from BoneEnhance.components.inference.model_components import InferenceModel, load_models
 from BoneEnhance.components.utilities.main import load, print_orthogonal, print_images
 from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculate_dice, \
@@ -96,6 +97,81 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     gc.collect()
 
     return merged_pred.squeeze()[:, :, 0]
+
+
+def inference_3d(inference_model, args, config, img_full, device='cuda', weight='mean', plot=False, mean=None, std=None):
+    """
+    Calculates inference on one image.
+    """
+
+    mag = config.training.magnification
+    tile = list(config['training']['crop_small'])
+
+    step = tuple([s // 2 for s in tile])
+    x, y, z, ch = img_full.shape
+    out = (x * mag, y * mag, z * mag)
+
+    # Cut large image into overlapping tiles
+    tiler = Tiler(img_full.shape, tile=tile, out=out, step=step, mag=mag)
+
+    #tiler_out = ImageSlicer((out[0], out[1], out[2], ch), tile_size=tile,
+    #                        tile_step=step, weight=weight)
+
+    # HCW -> CHW. Optionally, do normalization here
+    tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]
+
+    # Allocate a CUDA buffer for holding entire mask
+    merger = CudaTileMerger3D(tiler.target_shape, channels=ch, weight=tiler.weight)
+
+    # Run predictions for tiles and accumulate them
+    for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler.crops_out)), batch_size=config['training']['bs'],
+                                                pin_memory=True):
+        # Move tile to GPU
+        if mean is not None and std is not None:
+            tiles_batch = tiles_batch.float()
+            for ch in range(len(mean)):
+                tiles_batch[:, ch, :, :] = ((tiles_batch[:, ch, :, :] - mean[ch]) / std[ch])
+            tiles_batch = tiles_batch.to(device)
+        else:
+            tiles_batch = (tiles_batch.float() / 255.).to(device)
+
+        # Predict and move back to CPU
+        pred_batch = inference_model(tiles_batch)
+
+        # Plot
+        if plot:
+            for i in range(args.bs):
+                if args.bs != 1 and pred_batch.shape[0] != 1:
+                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').transpose(0, 2, 3, 1)[i, :, :])
+                else:
+                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').squeeze().transpose(1, 2, 0))
+                plt.show()
+
+        # Check for inconsistencies
+        #if pred_batch.shape[2] > x_out:
+        #pred_batch = pred_batch[:, :, :x_tile, :]
+        #if pred_batch.shape[3] > y_out:
+        #pred_batch = pred_batch[:, :, :, :y_tile]
+
+        # Merge on GPU
+        merger.integrate_batch(pred_batch, coords_batch)
+
+    # Normalize accumulated mask and convert back to numpy
+    merged_pred = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
+    merged_pred = tiler.crop_to_orignal_size(merged_pred)
+    # Plot
+    if plot:
+        for i in range(args.bs):
+            if args.bs != 1:
+                plt.imshow(merged_pred)
+            else:
+                plt.imshow(merged_pred.squeeze())
+            plt.show()
+
+    torch.cuda.empty_cache()
+    gc.collect()
+
+    return merged_pred.squeeze()[:, :, :, 0]
 
 
 def inference_runner_oof(args, config, split_config, device, plot=False, weight='mean'):

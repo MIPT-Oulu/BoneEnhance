@@ -114,7 +114,7 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
                                                                 eps=float(config.training.eps))),
                ScalarMeterLogger(writer=writer, comment='validation', log_dir=log_dir))
 
-    if len(config.training.crop_small) == 2:
+    if len(config.training.crop_small) == 2 or len(config.training.crop_small) == 3:
         val_cbs += (ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
                                         scale=None,
                                         plot_interp=True),#(0, 1)),

@@ -13,11 +13,9 @@ from tqdm import tqdm
 from glob import glob
 from scipy.ndimage import zoom
 from omegaconf import OmegaConf
-from skimage.transform import resize
-import h5py
 
 from BoneEnhance.components.utilities import load, save, print_orthogonal, render_volume
-from BoneEnhance.components.inference import InferenceModel, inference, largest_object, load_models, inference_3d
+from BoneEnhance.components.inference import InferenceModel, inference, largest_object, load_models
 from BoneEnhance.components.models import ConvNet, EnhanceNet
 
 cv2.ocl.setUseOpenCL(False)
@@ -27,13 +25,13 @@ cv2.setNumThreads(0)
 if __name__ == "__main__":
     start = time()
 
-    #snap = 'dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit'
-    snap = 'dios-erc-gpu_2020_10_19_14_09_24_3D_perceptualnet'
+    snap = 'dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit'
+    #snap = 'dios-erc-gpu_2020_10_19_14_09_24_3D_perceptualnet'
     #snap = 'dios-erc-gpu_2020_09_30_14_14_42_perceptualnet_noscaling_3x3_cm_curated_trainloss'
 
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='../../Data/target_mag4')
+    parser.add_argument('--dataset_root', type=Path, default='../../Data/target_original')
     parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D/{snap}')
     parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
     parser.add_argument('--bs', type=int, default=12)
@@ -96,31 +94,49 @@ if __name__ == "__main__":
         print(f'==> Processing sample {idx + 1} of {len(samples)}: {sample}')
 
         # Load image stacks
-        #data_xy, files = load(str(args.dataset_root / sample), rgb=True, axis=(1, 2, 0))
-        with h5py.File(str(args.dataset_root / sample), 'r') as f:
-            data_xy = f['data'][:]
-
-        # Resize target with the given magnification to provide the input image
-        factor = (data_xy.shape[0] // mag, data_xy.shape[1] // mag, data_xy.shape[2] // mag)
-        data_xy = resize(data_xy, factor, order=0, anti_aliasing=True, preserve_range=True)
-        # 3-channel
-        data_xy = np.expand_dims(data_xy, 3)
-        data_xy = np.repeat(data_xy, 3, axis=3)
-
+        data_xy, files = load(str(args.dataset_root / sample), rgb=True, axis=(1, 2, 0))
         x, y, z, ch = data_xy.shape
 
         print_orthogonal(data_xy[:, :, :, 0], invert=True, res=0.2, title='Input', cbar=True,
                          savepath=str(args.save_dir / 'visualizations' / (sample + '_input.png')),
                          scale_factor=1000)
 
+        data_xz = np.transpose(data_xy, (0, 2, 1, 3))  # X-Z-Y-Ch
+        data_yz = np.transpose(data_xy, (1, 2, 0, 3))  # Y-Z-X-Ch
+
+        # Interpolate 3rd dimension
+        data_xy = zoom(data_xy, zoom=(1, 1, config.training.magnification, 1))
+        data_xz = zoom(data_xz, zoom=(1, 1, config.training.magnification, 1))
+        data_yz = zoom(data_yz, zoom=(1, 1, config.training.magnification, 1))
+
+        # Output shape
+        out_xy = np.zeros((x * mag, y * mag, z * mag))
+        out_xz = np.zeros((x * mag, z * mag, y * mag))
+        out_yz = np.zeros((y * mag, z * mag, x * mag))
+
         # Loop for image slices
         # 1st orientation
         with torch.no_grad():  # Do not update gradients
 
-            out_xy = inference_3d(model, args, config, data_xy)
+            for slice_idx in tqdm(range(data_xy.shape[2]), desc='Running inference, XY'):
+                out_xy[:, :, slice_idx] = inference(model, args, config, data_xy[:, :, slice_idx, :])
+
+            # 2nd and 3rd orientation
+            if args.avg_planes:
+                for slice_idx in tqdm(range(data_xz.shape[2]), desc='Running inference, XZ'):
+                    out_xz[:, :, slice_idx] = inference(model, args, config, data_xz[:, :, slice_idx, :])
+                for slice_idx in tqdm(range(data_yz.shape[2]), desc='Running inference, YZ'):
+                    out_yz[:, :, slice_idx] = inference(model, args, config, data_yz[:, :, slice_idx, :])
 
         # Average probability maps
-        mask_avg = out_xy
+        if args.avg_planes:
+            #mask_avg = ((mask_xz + np.transpose(mask_yz, (0, 2, 1))) / 2)
+            mask_avg = ((out_xy + np.transpose(out_xz, (0, 2, 1)) + np.transpose(out_yz, (2, 0, 1))) / 3)
+        else:
+            mask_avg = out_xy
+
+        # Free memory
+        del out_xz, out_yz
 
         # Scale the dynamic range
         mask_avg -= np.min(mask_avg)

@@ -28,6 +28,7 @@ def load_models(model_path, config, n_gpus=1, magnification=4):
     # Load models
     models = glob(model_path + '/*fold_*.pth')
     models.sort()
+    vol = len(config.training.crop_small) == 3
 
     available_models = {
         'enhance': EnhanceNet(config.training.crop_small, config.training.magnification,
@@ -41,7 +42,8 @@ def load_models(model_path, config, n_gpus=1, magnification=4):
                            normalization=config.training.normalization),
         'perceptualnet': PerceptualNet(config.training.magnification,
                                        resize_convolution=config.training.upscale_input,
-                                       norm=config.training.normalization),
+                                       norm=config.training.normalization,
+                                       vol=vol),
     }
 
     # List the models
