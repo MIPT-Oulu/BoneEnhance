@@ -41,10 +41,10 @@ class Trainer:
     def run(self, num_epochs=1):
         best_loss = np.inf
         self.num_epochs = num_epochs
-        self.progress_bar = tqdm(range(num_epochs), desc=f'Training')
+
 
         losses_train, losses_val = [], []
-        for epoch, _ in enumerate(self.progress_bar):
+        for epoch in range(num_epochs):
             # Training split
             log_train = self.run_epoch(stage='train', epoch=epoch)
             losses_train.append(log_train)
@@ -82,7 +82,8 @@ class Trainer:
 
         # Iterate over minibatches
         running_loss = []
-        for batch_id in range(n_batches):
+        self.progress_bar = tqdm(range(n_batches), desc=f'Training')
+        for batch_id, _ in enumerate(self.progress_bar):
             losses = self.run_batch(self.loaders, epoch, stage, batch_id, n_batches)
             running_loss.append(losses)
         running_loss = np.mean(running_loss, axis=0)
@@ -157,10 +158,9 @@ class Trainer:
         # --------------
 
         self.progress_bar.set_description(
-            "[Epoch %d/%d %s] [Batch %d/%d] [D loss: %f] [G loss: %f]"
+            "[Epoch %d, %s] [Batch %d/%d] [D loss: %f] [G loss: %f]"
             % (
                 epoch,
-                self.num_epochs,
                 stage,
                 batch_i,
                 n_batches,
@@ -175,8 +175,10 @@ class Trainer:
                                      batches_count=n_batches, progress_bar=self.progress_bar, loss_list=loss_list,
                                      input=imgs_lr.detach().cpu(), output=gen_hr.cpu(), target=imgs_hr.detach().cpu())
 
+        # Memory management
         loss_g = loss_g.detach().cpu().numpy()
         loss_d = loss_d.detach().cpu().numpy()
+        del pred_real, pred_fake, loss_fake, loss_real, gen_hr, imgs_hr
         torch.cuda.empty_cache()
         return loss_g, loss_d
 

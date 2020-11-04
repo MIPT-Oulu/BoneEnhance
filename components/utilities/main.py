@@ -8,6 +8,24 @@ from joblib import Parallel, delayed
 #from skimage import measure
 
 
+def otsu_threshold(data):
+    """Thresholds 3D or 2D array using the Otsu method. Returns mask and threshold value."""
+    if len(data.shape) == 2:
+        val, mask = cv2.threshold(data.astype('uint8'), 0, 255, cv2.THRESH_OTSU)
+        return mask, val
+
+    mask1 = np.zeros(data.shape)
+    mask2 = np.zeros(data.shape)
+    values1 = np.zeros(data.shape[0])
+    values2 = np.zeros(data.shape[1])
+    for i in range(data.shape[0]):
+        values1[i], mask1[i, :, :] = cv2.threshold(data[i, :, :].astype('uint8'), 0, 255, cv2.THRESH_OTSU)
+    for i in range(data.shape[1]):
+        values2[i], mask2[:, i, :] = cv2.threshold(data[:, i, :].astype('uint8'), 0, 255, cv2.THRESH_OTSU)
+    value = (np.mean(values1) + np.mean(values2)) // 2
+    return data > value, value
+
+
 def load_images(path, n_jobs=12, rgb=False, uCT=False):
     """
     Loads multiple images from directory and stacks them into 3D numpy array

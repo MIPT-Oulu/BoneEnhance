@@ -80,7 +80,8 @@ class PerceptualNet(nn.Module):
         if vol:
             convolution = nn.Conv3d
             convolution_t = nn.ConvTranspose3d
-            upsampling = partial(nn.Upsample, mode='nearest')
+            #upsampling = partial(nn.Upsample, mode='trilinear')
+            upsampling = nn.Upsample
             padding = nn.ReplicationPad3d
         else:
             convolution = nn.Conv2d
@@ -140,7 +141,7 @@ class PerceptualNet(nn.Module):
     def forward(self, x):
 
         # Pass through the model
-        x = self.net(x)
+        x = self.net(x)  # TODO upsampling with F.upsample
 
         # Duplicate 1-channel image to represent RGB
         if len(x.size()) == 5:
@@ -150,6 +151,6 @@ class PerceptualNet(nn.Module):
 
         # Scaled Tanh activation
         x = x.tanh()
-        x = x.add(1.)
-        x = x.mul(0.5)
+        #x = x.add(1.)
+        #x = x.mul(0.5)
         return x

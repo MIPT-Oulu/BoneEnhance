@@ -13,18 +13,18 @@ training:
   # General
   experiment: 3D
   calc_meanstd: True
-  suffix: '_mag4'  # Options: _curated _reduced
+  suffix: '_3d'  # Options: _curated _reduced _mag4
   parse_color: False
-  crop_small: [16, 16, 8]
-  crossmodality: False
+  crop_small: [16, 16, 16]
+  crossmodality: True
   # Model
   architecture: perceptualnet
   upscale_input: True  # In PerceptualNet = resize-convolution
   add_residual: False
   activation: relu
   normalization: in
-  pretrain: False
-  existing_model: dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit
+  pretrain: True
+  existing_model: dios-erc-gpu_2020_10_26_10_18_39_3D_perceptualnet
   magnification: 4 
   n_blocks: 15
   # Training
@@ -32,7 +32,7 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 100
-  bs: 5
+  bs: 4
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: combined_layers
   log_jaccard: True

@@ -60,7 +60,8 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     # Metadata
     metadata = build_meta_from_files(data_dir, config)
     # Group_ID
-    metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:-1]), 0)
+    #metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:-1]), 0)
+    metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:1]), 0)
 
     # Mean and std
     crop = config['training']['crop_small']

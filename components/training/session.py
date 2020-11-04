@@ -30,6 +30,7 @@ from BoneEnhance.components.models import EnhanceNet, EncoderDecoder, \
     WGAN_VGG_generator, WGAN_VGG_discriminator, WGAN_VGG, ConvNet, PerceptualNet
 from BoneEnhance.components.training.loss import PerceptualLoss
 from BoneEnhance.components.utilities import print_orthogonal
+from BoneEnhance.components.training.initialize_weights import InitWeight, init_weight_normal
 
 
 def init_experiment(experiments='../experiments/run'):
@@ -84,6 +85,8 @@ def init_experiment(experiments='../experiments/run'):
 
     # Calculation resource
     device = auto_detect_device()
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.enabled = True
 
     return args, config_list, device
 
@@ -107,6 +110,10 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
                           prefix=prefix,
                           save_dir=str(current_snapshot_dir),
                           conditions='min', model=model),
+               ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
+                                   scale=None,
+                                   plot_interp=True,
+                                   sigmoid=False),  # (0, 1)),
                # Reduce LR on plateau
                SimpleLRScheduler('eval/loss', ReduceLROnPlateau(optimizer,
                                                                 patience=int(config.training.patience),
@@ -114,12 +121,9 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
                                                                 eps=float(config.training.eps))),
                ScalarMeterLogger(writer=writer, comment='validation', log_dir=log_dir))
 
-    if len(config.training.crop_small) == 2 or len(config.training.crop_small) == 3:
-        val_cbs += (ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
-                                        scale=None,
-                                        plot_interp=True),#(0, 1)),
-                    RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
-                                          sigmoid=False))
+    if len(config.training.crop_small) == 2:
+        val_cbs += (RandomImageVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
+                                          sigmoid=False), )
 
     return train_cbs, val_cbs
 
@@ -177,9 +181,9 @@ def init_model(config, device='cuda', gpus=1, args=None):
                                        resize_convolution=config.training.upscale_input,
                                        norm=config.training.normalization,
                                        vol=vol),
-        'wgan': WGAN_VGG(input_size=config.training.crop_small[0]),
-        'wgan_g': WGAN_VGG_generator(),
-        'wgan_d': WGAN_VGG_discriminator(config.training.crop_small[0]),
+        #'wgan': WGAN_VGG(input_size=config.training.crop_small[0]),
+        #'wgan_g': WGAN_VGG_generator(),
+        #'wgan_d': WGAN_VGG_discriminator(config.training.crop_small[0]),
     }
 
 
@@ -201,6 +205,9 @@ def init_model(config, device='cuda', gpus=1, args=None):
         model_path.sort()
         # Load weights
         model.load_state_dict(torch.load(model_path[0]))
+    else:
+        init = InitWeight(init_weight_normal, [0.0, 0.02], type='conv')
+        model.apply(init)
 
     return model.to(device)
 
@@ -218,7 +225,6 @@ def create_data_provider(args, config, parser, metadata, mean, std):
     return DataProvider(item_loaders)
 
 
-# TODO: parse 3D, h5py files one per sample
 # 16x16x16 crops for the input data
 # 8x8x8 patches randomly inside the 16x16x16
 # 32x32x32 with 4x magnification
@@ -297,8 +303,8 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
     if config is not None and not config.training.crossmodality:
 
         # Resize target with the given magnification to provide the input image
-        factor = (target.shape[0] // mag, target.shape[1] // mag, target.shape[2] // mag)
-        img = resize(target, factor, order=0, anti_aliasing=True, preserve_range=True)
+        new_size = (target.shape[0] // mag, target.shape[1] // mag, target.shape[2] // mag)
+        img = resize(target, new_size, order=0, anti_aliasing=True, preserve_range=True)
 
     elif config is not None:
 
@@ -307,9 +313,9 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
             img = f['data'][:]
 
         # Resize the target to match input in case of a mismatch
-        factor = (img.shape[0] * mag, img.shape[1] * mag, img.shape[2] * mag)
-        if target.shape != factor:
-            target = resize(target, factor, order=0, anti_aliasing=True, preserve_range=True)
+        new_size = (int(img.shape[0] * mag), int(img.shape[1] * mag), int(img.shape[2] * mag))
+        if target.shape != new_size:
+            target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True)
     else:
         raise NotImplementedError
 

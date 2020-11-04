@@ -28,7 +28,8 @@ if __name__ == "__main__":
     start = time()
 
     #snap = 'dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit'
-    snap = 'dios-erc-gpu_2020_10_19_14_09_24_3D_perceptualnet'
+    #snap = 'dios-erc-gpu_2020_10_23_13_42_37_3D_perceptualnet'  # MSE
+    snap = 'dios-erc-gpu_2020_10_26_10_18_39_3D_perceptualnet' # Perceptual scratch
     #snap = 'dios-erc-gpu_2020_09_30_14_14_42_perceptualnet_noscaling_3x3_cm_curated_trainloss'
 
 
@@ -110,7 +111,7 @@ if __name__ == "__main__":
         x, y, z, ch = data_xy.shape
 
         print_orthogonal(data_xy[:, :, :, 0], invert=True, res=0.2, title='Input', cbar=True,
-                         savepath=str(args.save_dir / 'visualizations' / (sample + '_input.png')),
+                         savepath=str(args.save_dir / 'visualizations' / (sample[:-3] + '_input.png')),
                          scale_factor=1000)
 
         # Loop for image slices
@@ -129,7 +130,7 @@ if __name__ == "__main__":
         mask_avg = (mask_avg * 255).astype('uint8')
 
         # Save predicted full mask
-        save(str(args.save_dir / sample), sample, mask_avg, dtype=args.dtype)
+        save(str(args.save_dir / sample[:-3]), sample, mask_avg, dtype=args.dtype)
         """
         render_volume(data_yz[:, :, :, 0] * mask_final,
                       savepath=str(args.save_dir / 'visualizations' / (sample + '_render' + args.dtype)),
@@ -137,7 +138,7 @@ if __name__ == "__main__":
         """
 
         print_orthogonal(mask_avg, invert=True, res=0.2/4, title='Output', cbar=True,
-                         savepath=str(args.save_dir / 'visualizations' / (sample + '_prediction.png')),
+                         savepath=str(args.save_dir / 'visualizations' / (sample[:-3] + '_prediction.png')),
                          scale_factor=1000)
 
     dur = time() - start

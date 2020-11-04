@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
 from torch import nn
 from BoneEnhance.components.models.wgan import WGAN_VGG_FeatureExtractor
-from BoneEnhance.components.models.perceptual import Vgg16
+from BoneEnhance.components.models.perceptual_loss import Vgg16
+from BoneEnhance.components.training.initialize_weights import InitWeight, init_weight_normal
 from random import uniform
 
 
@@ -20,7 +21,12 @@ class PerceptualLoss(nn.Module):
             self.feature_extractor = WGAN_VGG_FeatureExtractor()
         else:
             self.feature_extractor = Vgg16(vol=vol)
-            self.feature_extractor.eval()  # or train?
+            self.feature_extractor.train()#.eval()  # or train?
+
+            # Weight init
+            init = InitWeight(init_weight_normal, [0.0, 0.02], type='conv')
+            self.feature_extractor.apply(init)
+
         self.p_criterion = criterion
         self.compare_layer = compare_layer
         self.imagenet_normalize = imagenet_normalize
@@ -103,7 +109,9 @@ class PerceptualLoss(nn.Module):
                 loss /= len(layer)
 
                 # Weight the gram matrix loss to a reasonable range
-                if self.calculate_gram:
+                if self.calculate_gram and self.vol:
+                    loss *= 1e-5
+                elif self.calculate_gram:
                     loss *= 1e5
             else:
                 loss = self.p_criterion(pred_feature[layer], target_feature[layer])
