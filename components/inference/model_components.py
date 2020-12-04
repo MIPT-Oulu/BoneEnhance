@@ -17,16 +17,22 @@ class InferenceModel(nn.Module):
 
     def forward(self, x):
         res = 0
+        preds = []
         for idx in range(self.n_folds):
             fold = self.__dict__['_modules'][f'fold_{idx}']
-            res += fold(x)
+            pred = fold(x)
+            res += pred
+            preds.append(pred)
 
         return res / self.n_folds
 
 
-def load_models(model_path, config, n_gpus=1, magnification=4):
+def load_models(model_path, config, n_gpus=1, magnification=4, fold=None):
     # Load models
-    models = glob(model_path + '/*fold_*.pth')
+    if fold is not None:
+        models = glob(model_path + f'/*fold_{fold}*.pth')
+    else:
+        models = glob(model_path + '/*fold_*.pth')
     models.sort()
     vol = len(config.training.crop_small) == 3
 
@@ -50,8 +56,12 @@ def load_models(model_path, config, n_gpus=1, magnification=4):
     model_list = []
     for fold in range(len(models)):
         if n_gpus > 1:
-            model = nn.DataParallel(
-                available_models[config.training.architecture])
+            #model = nn.DataParallel(
+            #    available_models[config.training.architecture])
+            model = nn.DataParallel(PerceptualNet(config.training.magnification,
+                                                  resize_convolution=config.training.upscale_input,
+                                                  norm=config.training.normalization,
+                                                  vol=vol))
         else:
             model = available_models[config.training.architecture]
         model.load_state_dict(torch.load(models[fold]))

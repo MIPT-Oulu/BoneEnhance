@@ -124,7 +124,6 @@ def train_test_transforms(conf, mean=None, std=None):
 
     ])]
 
-    """
     # Intensity
     # Brightness/contrast
     slc.SelectiveStream([
@@ -135,9 +134,8 @@ def train_test_transforms(conf, mean=None, std=None):
         # slt.SaltAndPepper(p=prob, gain_range=trf['gain_sp']),
         # slt.Noise(p=prob, gain_range=trf['gain_gn']),
         slc.SelectiveStream([
-            slt.Blur(p=prob, blur_type='g', k_size=(3, 5), gaussian_sigma=tuple(trf.sigma)),
-            slt.Blur(p=prob, blur_type='m', k_size=(3, 5), gaussian_sigma=tuple(trf.sigma))])])
-    """
+            slt.Blur(p=prob, blur_type='g', k_size=3, gaussian_sigma=tuple(trf.sigma)),
+            slt.Blur(p=prob, blur_type='m', k_size=3, gaussian_sigma=tuple(trf.sigma))])])
 
     if len(crop_small) == 3:
         axis = (0, 1, 2, 3)

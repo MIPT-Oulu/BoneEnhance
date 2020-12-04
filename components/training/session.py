@@ -11,7 +11,7 @@ import cv2
 import os
 import h5py
 from pathlib import Path
-from random import uniform
+from random import uniform, choice
 from glob import glob
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -67,7 +67,7 @@ def init_experiment(experiments='../experiments/run'):
 
         # Snapshot directory
         #snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{architecture}_{loss}_{lr}_mag{mag}')
-        snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{config_path[:-4]}')
+        snapshot_name = time.strftime(f'%Y_%m_%d_%H_%M_%S_{config_path[:-4]}')
         (args.snapshots_dir / snapshot_name).mkdir(exist_ok=True, parents=True)
         config['training']['snapshot'] = snapshot_name
 
@@ -189,7 +189,11 @@ def init_model(config, device='cuda', gpus=1, args=None):
 
     # Check for multi-gpu
     if gpus > 1:
-        model = nn.DataParallel(available_models[architecture])
+        #model = nn.DataParallel(available_models[architecture])
+        model = nn.DataParallel(PerceptualNet(config.training.magnification,
+                                       resize_convolution=config.training.upscale_input,
+                                       norm=config.training.normalization,
+                                       vol=vol))
     else:
         model = available_models[architecture]
 
@@ -299,12 +303,17 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
     # Magnification
     mag = config.training.magnification
 
+    cm = choice([True, False])
+
     # Resize target to 4x magnification respect to input
-    if config is not None and not config.training.crossmodality:
+    #if config is not None and not config.training.crossmodality:
+    if not cm:
 
         # Resize target with the given magnification to provide the input image
         new_size = (target.shape[0] // mag, target.shape[1] // mag, target.shape[2] // mag)
-        img = resize(target, new_size, order=0, anti_aliasing=True, preserve_range=True)
+
+        sigma = choice([1, 2, 3, 4, 5])
+        img = resize(target, new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=sigma)
 
     elif config is not None:
 
@@ -333,10 +342,11 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
     target /= 255.
 
     # Plot a small random portion of image-target pairs during debug
-    if debug and uniform(0, 1) >= 0.99:
-        print_orthogonal(img[0, :, :, :].numpy(), title='Input')
+    if debug and uniform(0, 1) >= 0.98:
+        res = 0.2 # In mm
+        print_orthogonal(img[0, :, :, :].numpy(), title='Input', res=res)
 
-        print_orthogonal(target[0, :, :, :].numpy(), title='Target')
+        print_orthogonal(target[0, :, :, :].numpy(), title='Target', res=res / mag)
 
     return {data_key: img, target_key: target}
 

@@ -8,22 +8,38 @@ from joblib import Parallel, delayed
 #from skimage import measure
 
 
-def otsu_threshold(data):
+def threshold(data, method='otsu', block=11):
     """Thresholds 3D or 2D array using the Otsu method. Returns mask and threshold value."""
+
+    # Select thresholding method
+    available_methods = {
+        'otsu': cv2.THRESH_OTSU,
+        'gaussian': cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        'mean': cv2.ADAPTIVE_THRESH_MEAN_C
+    }
+    th = available_methods[method]
+
     if len(data.shape) == 2:
-        val, mask = cv2.threshold(data.astype('uint8'), 0, 255, cv2.THRESH_OTSU)
+        val, mask = cv2.threshold(data.astype('uint8'), 0, 255, th)
         return mask, val
 
     mask1 = np.zeros(data.shape)
     mask2 = np.zeros(data.shape)
     values1 = np.zeros(data.shape[0])
     values2 = np.zeros(data.shape[1])
-    for i in range(data.shape[0]):
-        values1[i], mask1[i, :, :] = cv2.threshold(data[i, :, :].astype('uint8'), 0, 255, cv2.THRESH_OTSU)
-    for i in range(data.shape[1]):
-        values2[i], mask2[:, i, :] = cv2.threshold(data[:, i, :].astype('uint8'), 0, 255, cv2.THRESH_OTSU)
-    value = (np.mean(values1) + np.mean(values2)) // 2
-    return data > value, value
+    if method == 'otsu':
+        for i in range(data.shape[0]):
+            values1[i], mask1[i, :, :] = cv2.threshold(data[i, :, :].astype('uint8'), 0, 255, th)
+        for i in range(data.shape[1]):
+            values2[i], mask2[:, i, :] = cv2.threshold(data[:, i, :].astype('uint8'), 0, 255, th)
+        value = (np.mean(values1) + np.mean(values2)) // 2
+        return data > value, value
+    else:
+        for i in range(data.shape[0]):
+            mask1[i, :, :] = cv2.adaptiveThreshold(data[i, :, :].astype('uint8'), 255,
+                                                               adaptiveMethod=th, thresholdType=cv2.THRESH_BINARY,
+                                                               blockSize=block, C=0)
+        return mask1.astype('bool'), 0
 
 
 def load_images(path, n_jobs=12, rgb=False, uCT=False):
@@ -226,7 +242,7 @@ def bounding_box(image, largest=True):
         return cv2.boundingRect(c), contours
 
 
-def print_orthogonal(data, mask=None, invert=True, res=3.2, title=None, cbar=True, cmap='gray', savepath=None, scale_factor=1000):
+def print_orthogonal(data, mask=None, invert=True, res=200, title=None, cbar=True, cmap='gray', savepath=None, scale_factor=2):
     """Print three orthogonal planes from given 3D-numpy array.
 
     Set pixel resolution in µm to set axes correctly.

@@ -1,10 +1,11 @@
 import numpy as np
 import torch
 import cv2
+from typing import List
 import math
 
 
-class Tiler():
+class Tiler3D:
     def __init__(self, image_shape, tile, step, out, mag=4):
 
         tile_out = tuple([s * mag for s in tile])
@@ -16,9 +17,9 @@ class Tiler():
         self.dim = dim
         self.tile = tile
         self.tile = np.min((tile, self.input[:-1]), axis=0)  # Remove channel dimension
-        self.step = step
+        self.step = tuple([s // step for s in tile])
         self.tile_out = np.min((tile_out, out), axis=0)
-        self.step_out = tuple([s // 2 for s in tile_out])
+        self.step_out = tuple([s // step for s in tile_out])
 
         overlap = [(self.tile[x] - self.step[x]) for x in range(dim)]
 
@@ -83,6 +84,28 @@ class Tiler():
             self.margin_begin[2]: self.out[2] + self.margin_end[2],
         ]
         return crop
+
+    def merge(self, tiles: List[np.ndarray], channels, dtype=np.float32):
+        if len(tiles) != len(self.crops):
+            raise ValueError
+
+        target_shape = self.target_shape
+
+        image = np.zeros((channels, target_shape[0], target_shape[1], target_shape[2]), dtype=np.float32)
+        norm_mask = np.zeros((1, target_shape[0], target_shape[1], target_shape[2]), dtype=np.float32)
+
+        #w = np.dstack([self.weight] * channels)
+        w = np.expand_dims(self.weight, axis=0)
+
+        for tile, (x, y, z, tile_x, tile_y, tile_z) in zip(tiles, self.crops_out):
+            image[:, x: x + tile_x, y: y + tile_y, z: z + tile_z] += tile * w
+            norm_mask[:, x: x + tile_x, y: y + tile_y, z: z + tile_z] += w
+
+        #norm_mask = np.clip(norm_mask, a_min=np.finfo(norm_mask.dtype).eps, a_max=None)
+        image = np.divide(image, norm_mask).astype(dtype)
+        image = np.moveaxis(image, 0, -1).astype('float32')
+        image = self.crop_to_orignal_size(image)
+        return image
 
     @property
     def target_shape(self):

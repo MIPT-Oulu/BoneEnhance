@@ -24,7 +24,7 @@ training:
   activation: relu
   normalization: in
   pretrain: True
-  existing_model: dios-erc-gpu_2020_10_26_10_18_39_3D_perceptualnet
+  existing_model: dios-erc-gpu_2020_11_04_15_58_20_3D_perceptualnet_ds
   magnification: 4 
   n_blocks: 15
   # Training
@@ -33,7 +33,6 @@ training:
   n_folds: 4
   epochs: 100
   bs: 4
-  # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: combined_layers
   log_jaccard: True
   imagenet_normalize_loss: False

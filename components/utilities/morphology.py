@@ -9,6 +9,9 @@ def calculate_bvtv(mask, voi, percentage=True):
     :param percetage:  Whether to output a decimal or percentage number as result.
     :return: Bone volume fraction
     """
+    # Make sure that the images are in right format
+    mask = (mask / np.max(mask)).astype(np.uint8)
+    voi = (voi / np.max(voi)).astype(np.uint8)
 
     bone = np.sum(mask)
     volume = np.sum(voi)

@@ -27,14 +27,17 @@ cv2.setNumThreads(0)
 if __name__ == "__main__":
     start = time()
 
-    #snap = 'dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit'
-    #snap = 'dios-erc-gpu_2020_10_23_13_42_37_3D_perceptualnet'  # MSE
-    snap = 'dios-erc-gpu_2020_10_26_10_18_39_3D_perceptualnet' # Perceptual scratch
-    #snap = 'dios-erc-gpu_2020_09_30_14_14_42_perceptualnet_noscaling_3x3_cm_curated_trainloss'
-
+    # snap = 'dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit'
+    #snap = 'dios-erc-gpu_2020_11_04_15_58_20_3D_perceptualnet_ds'
+    snap = 'dios-erc-gpu_2020_11_04_14_10_25_3D_perceptualnet_scratch'  # Perceptual scratch
+    # snap = 'dios-erc-gpu_2020_09_30_14_14_42_perceptualnet_noscaling_3x3_cm_curated_trainloss'
+    ds = False
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='../../Data/target_mag4')
+    if ds:
+        parser.add_argument('--dataset_root', type=Path, default='../../Data/target_mag4')
+    else:
+        parser.add_argument('--dataset_root', type=Path, default='../../Data/input_mag4')
     parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D/{snap}')
     parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
     parser.add_argument('--bs', type=int, default=12)
@@ -46,7 +49,6 @@ if __name__ == "__main__":
                         default=f'../../Workdir/snapshots/{snap}')
     parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
     args = parser.parse_args()
-    #subdir = 'NN_prediction'  # 'NN_prediction'
 
     # Load snapshot configuration
     with open(args.snapshot / 'config.yml', 'r') as f:
@@ -62,10 +64,6 @@ if __name__ == "__main__":
     (args.save_dir / 'visualizations').mkdir(exist_ok=True)
 
     # Load models
-    models = glob(str(args.snapshot) + '/*fold_[0-9]_*.pth')
-    #models = glob(str(args.snapshot) + '/*fold_3_*.pth')
-    models.sort()
-    #device = auto_detect_device()
     device = 'cuda'  # Use the second GPU for inference
 
     crop = config.training.crop_small
@@ -101,9 +99,10 @@ if __name__ == "__main__":
         with h5py.File(str(args.dataset_root / sample), 'r') as f:
             data_xy = f['data'][:]
 
-        # Resize target with the given magnification to provide the input image
-        factor = (data_xy.shape[0] // mag, data_xy.shape[1] // mag, data_xy.shape[2] // mag)
-        data_xy = resize(data_xy, factor, order=0, anti_aliasing=True, preserve_range=True)
+        if ds:
+            # Resize target with the given magnification to provide the input image
+            factor = (data_xy.shape[0] // mag, data_xy.shape[1] // mag, data_xy.shape[2] // mag)
+            data_xy = resize(data_xy, factor, order=0, anti_aliasing=True, preserve_range=True)
         # 3-channel
         data_xy = np.expand_dims(data_xy, 3)
         data_xy = np.repeat(data_xy, 3, axis=3)
@@ -117,7 +116,6 @@ if __name__ == "__main__":
         # Loop for image slices
         # 1st orientation
         with torch.no_grad():  # Do not update gradients
-
             out_xy = inference_3d(model, args, config, data_xy)
 
         # Average probability maps

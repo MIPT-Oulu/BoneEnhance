@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
 from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
 
-from BoneEnhance.components.inference.tiler import Tiler, CudaTileMerger3D
+from BoneEnhance.components.inference.tiler3d import Tiler3D, CudaTileMerger3D
 from BoneEnhance.components.inference.model_components import InferenceModel, load_models
 from BoneEnhance.components.utilities.main import load, print_orthogonal, print_images
 from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculate_dice, \
@@ -99,7 +99,8 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     return merged_pred.squeeze()[:, :, 0]
 
 
-def inference_3d(inference_model, args, config, img_full, device='cuda', weight='mean', plot=False, mean=None, std=None):
+def inference_3d(inference_model, args, config, img_full, device='cuda', weight='mean', plot=False,
+                 mean=None, std=None, step=2, cuda=True):
     """
     Calculates inference on one image.
     """
@@ -107,12 +108,11 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', weight=
     mag = config.training.magnification
     tile = list(config['training']['crop_small'])
 
-    step = tuple([s // 2 for s in tile])
     x, y, z, ch = img_full.shape
     out = (x * mag, y * mag, z * mag)
 
     # Cut large image into overlapping tiles
-    tiler = Tiler(img_full.shape, tile=tile, out=out, step=step, mag=mag)
+    tiler = Tiler3D(img_full.shape, tile=tile, out=out, step=step, mag=mag)
 
     #tiler_out = ImageSlicer((out[0], out[1], out[2], ch), tile_size=tile,
     #                        tile_step=step, weight=weight)
@@ -121,7 +121,10 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', weight=
     tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]
 
     # Allocate a CUDA buffer for holding entire mask
-    merger = CudaTileMerger3D(tiler.target_shape, channels=ch, weight=tiler.weight)
+    if cuda:
+        merger = CudaTileMerger3D(tiler.target_shape, channels=ch, weight=tiler.weight)
+    else:
+        tile_list = None
 
     # Run predictions for tiles and accumulate them
     for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler.crops_out)), batch_size=config['training']['bs'],
@@ -154,11 +157,21 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', weight=
         #pred_batch = pred_batch[:, :, :, :y_tile]
 
         # Merge on GPU
-        merger.integrate_batch(pred_batch, coords_batch)
+        if cuda:
+            merger.integrate_batch(pred_batch, coords_batch)
+        else:  # List patches, merge later
+            if tile_list is None:
+                tile_list = pred_batch.cpu().numpy()
+            else:
+                tile_list = np.concatenate((tile_list, pred_batch.cpu().numpy()), axis=0)
 
     # Normalize accumulated mask and convert back to numpy
-    merged_pred = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
-    merged_pred = tiler.crop_to_orignal_size(merged_pred)
+    if cuda:
+        merged_pred = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
+        merged_pred = tiler.crop_to_orignal_size(merged_pred)
+    else:
+        merged_pred = tiler.merge(tile_list, channels=ch)
+
     # Plot
     if plot:
         for i in range(args.bs):
@@ -384,7 +397,7 @@ def largest_object(input_mask, area_limit=None):
 
     if area_limit is not None:
 
-        for blob_ind, blob in enumerate(area):
+        for blob_ind, blob in enumerate(tqdm(area)):
             if blob > area_limit:
                 label = proportions[blob_ind].label
                 output_mask[blobs == label] = 255
