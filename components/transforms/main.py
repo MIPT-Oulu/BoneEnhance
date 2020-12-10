@@ -5,7 +5,9 @@ from functools import partial
 from solt import DataContainer
 import solt.transforms as slt
 import solt.core as slc
-from BoneEnhance.components.transforms.custom_transforms import Crop, Pad, Brightness, Contrast, Blur, Flip, Rotate90
+from BoneEnhance.components.transforms.custom_transforms import Crop, Pad, Brightness, Contrast, Blur, Flip, Rotate90, \
+    Noise
+
 
 from collagen.data.utils import ApplyTransform, Compose
 
@@ -115,16 +117,23 @@ def train_test_transforms(conf, mean=None, std=None):
             Pad(pad_to=(crop_small, crop_large)),
 
             # 50% Chance for Brightness & contrast adjustment
-            slc.SelectiveStream([
-                slc.Stream([
-                    Brightness(brightness_range=tuple(trf.brightness), p=prob),
-                    Contrast(contrast_range=trf.contrast, p=prob)]),
-                slc.Stream([])]),
+            slc.Stream([
+                Brightness(brightness_range=tuple(trf.brightness), p=prob),
+                Contrast(contrast_range=trf.contrast, p=prob)]),
 
+            # 50% Chance for smoothing/blurring
             slc.SelectiveStream([
                 Blur(p=prob, blur_type='g', k_size=3, gaussian_sigma=tuple(trf.sigma)),
                 Blur(p=prob, blur_type='m', k_size=3, gaussian_sigma=tuple(trf.sigma))
-                ])
+                ]),
+
+            # 50% Chance for Added noise
+            slc.SelectiveStream([
+                Noise(p=prob, mode='gaussian', gain_range=trf['gain_gn']),
+                Noise(p=prob, mode='poisson', gain_range=trf['gain_gn']),
+                Noise(p=prob, mode='s&p', gain_range=trf['gain_sp']),
+                Noise(p=prob, mode='speckle', gain_range=trf['gain_sp']),
+            ])
         ]),
 
         # Empty stream

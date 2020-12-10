@@ -5,6 +5,7 @@ import numpy as np
 import scipy
 import scipy.signal
 from skimage.filters import gaussian, median
+from skimage.util import random_noise
 from skimage.morphology import ball
 from random import randint
 
@@ -554,6 +555,7 @@ class Rotate90(Rotate):
 
     @ensure_valid_image(num_dims_spatial=(3,))
     def _apply_img(self, img: np.ndarray, settings: dict):
+        # Rotate to random axis along 3D
         axis = randint(0, 2)
         if axis != 2:
             return np.ascontiguousarray(np.rot90(img, -self.k, axes=(axis, axis + 1)))
@@ -569,3 +571,68 @@ class Rotate90(Rotate):
             return np.ascontiguousarray(np.rot90(mask, -self.k, axes=(0, axis)))
 
 
+class Noise(ImageTransform):
+    """Adds noise to an image. Other types of data than the image are ignored.
+
+    Parameters
+    ----------
+    p : float
+        Probability of applying this transform,
+    gain_range : tuple or float or None
+        Gain of the noise. Final image is created as ``(1-gain)*img + gain*noise``.
+        If float, then ``gain_range = (0, gain_range)``. If None, then ``gain_range=(0, 0)``.
+    data_indices : tuple or None
+        Indices of the images within the data container to which this transform needs to be applied.
+        Every element within the tuple must be integer numbers.
+        If None, then the transform will be applied to all the images withing the DataContainer.
+
+    """
+
+    _default_range = (0, 0)
+
+    serializable_name = "noise"
+    """How the class should be stored in the registry"""
+
+    def __init__(self, p=0.5, gain_range=0.1, data_indices=None, mode='gaussian'):
+        super(Noise, self).__init__(p=p, data_indices=data_indices)
+        if isinstance(gain_range, float):
+            gain_range = (0, gain_range)
+
+        self.type = mode
+        self.gain_range = validate_numeric_range_parameter(gain_range, self._default_range, min_val=0, max_val=1)
+
+    def sample_transform(self, data: DataContainer):
+        super(Noise, self).sample_transform(data)
+        gain = random.uniform(self.gain_range[0], self.gain_range[1])
+        h = None
+        w = None
+        c = None
+        obj = None
+        for obj, t, _ in data:
+            if t == "I":
+                h = obj.shape[0]
+                w = obj.shape[1]
+                c = obj.shape[2]
+                break
+
+        if w is None or h is None or c is None:
+            raise ValueError
+
+        random_state = np.random.RandomState(random.randint(0, 2 ** 32 - 1))
+        noise_img = random_state.randn(h, w, c)
+
+        noise_img -= noise_img.min()
+        noise_img /= noise_img.max()
+        noise_img *= 255
+        noise_img = noise_img.astype(obj.dtype)
+
+        self.state_dict = {"noise": noise_img, "gain": gain}
+
+    @ensure_valid_image(num_dims_spatial=(3,))
+    def _apply_img(self, img: np.ndarray, settings: dict):
+        if self.type == 'gaussian' or self.type == 'speckle':
+            return random_noise(img, mode=self.type, var=self.state_dict['gain'])
+        elif self.type == 's&p':
+            return random_noise(img, mode=self.type, amount=self.state_dict['gain'])
+        else:
+            return random_noise(img, mode=self.type)
