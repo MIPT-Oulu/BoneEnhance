@@ -304,6 +304,7 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
     mag = config.training.magnification
 
     cm = choice([True, False])
+    cm = config.training.crossmodality
 
     # Resize target to 4x magnification respect to input
     #if config is not None and not config.training.crossmodality:

@@ -5,7 +5,7 @@ from functools import partial
 from solt import DataContainer
 import solt.transforms as slt
 import solt.core as slc
-from BoneEnhance.components.transforms.custom_transforms import Crop, Pad
+from BoneEnhance.components.transforms.custom_transforms import Crop, Pad, Brightness, Contrast, Blur, Flip, Rotate90
 
 from collagen.data.utils import ApplyTransform, Compose
 
@@ -109,11 +109,22 @@ def train_test_transforms(conf, mean=None, std=None):
             #    ]),
             #    v_range=tuple(trf['v_range'])),
             # Spatial
-            #slt.Flip(axis=-1, p=prob),
-            #slc.SelectiveStream([slt.Rotate90(k=1, p=prob), slt.Rotate90(k=-1, p=prob), slt.Rotate90(k=2, p=prob)]),
+            Flip(axis=-1, p=prob),
+            slc.SelectiveStream([Rotate90(k=1, p=prob), Rotate90(k=-1, p=prob), Rotate90(k=2, p=prob)]),
             Crop(training.magnification, crop_mode='r', crop_to=(crop_small, crop_large)),
             Pad(pad_to=(crop_small, crop_large)),
 
+            # 50% Chance for Brightness & contrast adjustment
+            slc.SelectiveStream([
+                slc.Stream([
+                    Brightness(brightness_range=tuple(trf.brightness), p=prob),
+                    Contrast(contrast_range=trf.contrast, p=prob)]),
+                slc.Stream([])]),
+
+            slc.SelectiveStream([
+                Blur(p=prob, blur_type='g', k_size=3, gaussian_sigma=tuple(trf.sigma)),
+                Blur(p=prob, blur_type='m', k_size=3, gaussian_sigma=tuple(trf.sigma))
+                ])
         ]),
 
         # Empty stream

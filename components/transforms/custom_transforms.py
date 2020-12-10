@@ -4,6 +4,11 @@ import cv2
 import numpy as np
 import scipy
 import scipy.signal
+from skimage.filters import gaussian, median
+from skimage.morphology import ball
+from random import randint
+
+from BoneEnhance.components.utilities import print_orthogonal
 
 from solt.core import (
     BaseTransform,
@@ -229,3 +234,338 @@ class Pad(BaseTransform, PaddingPropertyHolder):
         frame = [self.offsets_s[i] + pts.frame[i] + self.offsets_e[i] for i in range(ndim)]
 
         return Keypoints(pts_out, frame=frame)
+
+
+class Brightness(ImageTransform):
+    """Performs a random brightness augmentation
+
+    Parameters
+    ----------
+    p : float
+        Probability of applying this transform,
+    brightness_range: tuple or None
+        brightness_range shift range. If None, then ``brightness_range=(0, 0)``.
+    data_indices : tuple or None
+        Indices of the images within the data container to which this transform needs to be applied.
+        Every element within the tuple must be integer numbers.
+        If None, then the transform will be applied to all the images withing the DataContainer.
+
+    """
+
+    _default_range = (0, 0)
+
+    serializable_name = "brightness"
+    """How the class should be stored in the registry"""
+
+    def __init__(self, brightness_range=None, data_indices=None, p=0.5):
+        super(Brightness, self).__init__(p=p, data_indices=data_indices)
+        self.brightness_range = validate_numeric_range_parameter(brightness_range, self._default_range)
+
+    def sample_transform(self, data):
+        brightness_fact = random.uniform(self.brightness_range[0], self.brightness_range[1])
+        lut = np.arange(0, 256) + brightness_fact
+        lut = np.clip(lut, 0, 255).astype("uint8")
+        self.state_dict = {"brightness_fact": brightness_fact, "LUT": lut}
+
+    @ensure_valid_image(num_dims_spatial=(3,))
+    def _apply_img(self, img: np.ndarray, settings: dict):
+        return cv2.LUT(img, self.state_dict["LUT"])
+
+
+class Contrast(ImageTransform):
+    """Transform randomly changes the contrast
+
+    Parameters
+    ----------
+    p : float
+        Probability of applying this transform,
+    contrast_range : tuple or float or None
+        Gain of the noise. Indicates percentage of indices, which will be changed.
+        If float, then ``gain_range = (1-contrast_range, 1+contrast_range)``.
+    data_indices : tuple or None
+        Indices of the images within the data container to which this transform needs to be applied.
+        Every element within the tuple must be integer numbers.
+        If None, then the transform will be applied to all the images withing the DataContainer.
+
+    """
+
+    _default_range = (1, 1)
+    serializable_name = "contrast"
+    """How the class should be stored in the registry"""
+
+    def __init__(self, p=0.5, contrast_range=0.1, data_indices=None):
+        super(Contrast, self).__init__(p=p, data_indices=data_indices)
+
+        if isinstance(contrast_range, float):
+            contrast_range = (1 - contrast_range, 1 + contrast_range)
+
+        self.contrast_range = validate_numeric_range_parameter(contrast_range, self._default_range, 0)
+
+    def sample_transform(self, data):
+        contrast_mul = random.uniform(self.contrast_range[0], self.contrast_range[1])
+        lut = np.arange(0, 256) * contrast_mul
+        lut = np.clip(lut, 0, 255).astype("uint8")
+        self.state_dict = {"contrast_mul": contrast_mul, "LUT": lut}
+
+    @ensure_valid_image(num_dims_spatial=(3,))
+    def _apply_img(self, img: np.ndarray, settings: dict):
+        return cv2.LUT(img, self.state_dict["LUT"])
+
+
+class Blur(ImageTransform):
+    """Transform blurs an image
+
+    Parameters
+    ----------
+    p : float
+        Probability of applying this transform,
+    blur_type : str
+        Blur type. See allowed blurs in `solt.constants`
+    k_size: int or tuple
+        Kernel sizes of the blur. if int, then sampled from ``(k_size, k_size)``. If tuple,
+        then sampled from the whole tuple. All the values here must be odd.
+    gaussian_sigma: int or float or tuple
+        Gaussian sigma value. Used for both X and Y axes. If None, then gaussian_sigma=1.
+    data_indices : tuple or None
+        Indices of the images within the data container to which this transform needs to be applied.
+        Every element within the tuple must be integer numbers.
+        If None, then the transform will be applied to all the images withing the DataContainer.
+
+    See also
+    --------
+    solt.constants.ALLOWED_BLURS
+
+    """
+
+    _default_range = (1, 1)
+
+    serializable_name = "blur"
+    """How the class should be stored in the registry"""
+
+    def __init__(self, p=0.5, blur_type="g", k_size=3, gaussian_sigma=None, data_indices=None):
+        super(Blur, self).__init__(p=p, data_indices=data_indices)
+        if not isinstance(k_size, (int, tuple, list)):
+            raise TypeError("Incorrect kernel size")
+
+        if isinstance(k_size, list):
+            k_size = tuple(k_size)
+
+        if isinstance(k_size, int):
+            k_size = (k_size, k_size)
+
+        for k in k_size:
+            if k % 2 == 0 or k < 1 or not isinstance(k, int):
+                raise ValueError
+
+        if isinstance(gaussian_sigma, (int, float)):
+            gaussian_sigma = (gaussian_sigma, gaussian_sigma)
+
+        self.blur = validate_parameter(blur_type, ALLOWED_BLURS, "g", basic_type=str, heritable=False)
+        self.k_size = k_size
+        self.gaussian_sigma = validate_numeric_range_parameter(gaussian_sigma, self._default_range, 0)
+
+    def sample_transform(self, data):
+        k = random.choice(self.k_size)
+        s = random.uniform(self.gaussian_sigma[0], self.gaussian_sigma[1])
+        self.state_dict = {"k_size": k, "sigma": s}
+
+        if self.blur == "mo":
+            if self.k_size[0] <= 2:
+                raise ValueError("Lower bound for blur kernel size cannot be less than 2 for motion blur")
+
+            kernel = np.zeros((k, k), dtype=np.uint8)
+            xs, xe = random.randint(0, k - 1), random.randint(0, k - 1)
+
+            if xs == xe:
+                ys, ye = random.sample(range(k), 2)
+            else:
+                ys, ye = random.randint(0, k - 1), random.randint(0, k - 1)
+            cv2.line(kernel, (xs, ys), (xe, ye), 1, thickness=1)
+            kernel = kernel / np.sum(kernel)
+            self.state_dict.update({"motion_kernel": kernel})
+
+    @ensure_valid_image(num_dims_spatial=(3,))
+    def _apply_img(self, img: np.ndarray, settings: dict):
+        if self.blur == "g":
+            return gaussian(img, sigma=self.state_dict["sigma"])
+        if self.blur == "m":
+            return median(img, selem=np.expand_dims(ball(self.state_dict["k_size"]), axis=3))
+
+        if self.blur == "mo":
+            return cv2.filter2D(img, -1, self.state_dict["motion_kernel"])
+
+
+class Flip(BaseTransform):
+    """Random Flipping transform.
+
+    Parameters
+    ----------
+    p : float
+        Probability of flip
+    axis : int
+        Flipping axis. 0 - vertical, 1 - horizontal, etc. -1 - all axes.
+    """
+
+    serializable_name = "flip"
+    """How the class should be stored in the registry"""
+
+    def __init__(self, p=0.5, axis=1, data_indices=None):
+        super(Flip, self).__init__(p=p, data_indices=data_indices)
+        if axis not in [-1, 0, 1]:
+            raise ValueError("Incorrect Value of axis!")
+
+        self.axis = axis
+
+    @ensure_valid_image(num_dims_spatial=(3,))
+    def _apply_img(self, img: np.ndarray, settings: dict):
+        return self._flip(img)
+
+    @ensure_valid_image(num_dims_total=(3,))
+    def _apply_mask(self, mask: np.ndarray, settings: dict):
+        return self._flip(mask)
+
+    def _flip(self, img):
+        if self.axis == 0:
+            return np.ascontiguousarray(img[::-1, ...])
+        elif self.axis == 1:
+            return np.ascontiguousarray(img[:, ::-1, ...])
+        elif self.axis == 2:
+            return np.ascontiguousarray(img[:, :, ::-1, ...])
+        else:
+            orientation = randint(0, 6)
+            if orientation == 0:
+                return np.ascontiguousarray(img[::-1, ...])
+            elif orientation == 1:
+                return np.ascontiguousarray(img[:, ::-1, ...])
+            elif orientation == 2:
+                return np.ascontiguousarray(img[:, :, ::-1, ...])
+            elif orientation == 3:
+                return np.ascontiguousarray(img[::-1, ::-1, ...])
+            elif orientation == 4:
+                return np.ascontiguousarray(img[:, ::-1, ::-1, ...])
+            elif orientation == 5:
+                return np.ascontiguousarray(img[::-1, :, ::-1, ...])
+            else:
+                return np.ascontiguousarray(img[::-1, ::-1, ::-1, ...])
+
+    def _apply_labels(self, labels, settings: dict):
+        return labels
+
+    def _apply_pts(self, pts: Keypoints, settings: dict):
+        # We should guarantee that we do not change the original data.
+        pts_data = pts.data.copy()
+        if self.axis == 0:
+            pts_data[:, 1] = pts.frame[0] - 1 - pts_data[:, 1]
+        elif self.axis == 1:
+            pts_data[:, 0] = pts.frame[1] - 1 - pts_data[:, 0]
+        elif self.axis == -1:
+            pts_data[:, 1] = pts.frame[0] - 1 - pts_data[:, 1]
+            pts_data[:, 0] = pts.frame[1] - 1 - pts_data[:, 0]
+
+        return Keypoints(pts=pts_data, frame=pts.frame)
+
+
+class Rotate(MatrixTransform):
+    """Random rotation around the center clockwise
+
+    Parameters
+    ----------
+    angle_range : tuple or float or None
+        Range of rotation.
+        If float, then (-angle_range, angle_range) will be used for transformation sampling.
+        if None, then angle_range=(0,0).
+    interpolation : str or tuple or None
+        Interpolation type. Check the allowed interpolation types.
+    padding : str or tuple or None
+        Padding mode. Check the allowed padding modes.
+    p : float
+        Probability of using this transform
+    ignore_state : bool
+        Whether to ignore the state. See details in the docs for `MatrixTransform`.
+
+    """
+
+    _default_range = (0, 0)
+
+    serializable_name = "rotate"
+    """How the class should be stored in the registry"""
+
+    def __init__(
+        self, angle_range=None, interpolation="bilinear", padding="z", p=0.5, ignore_state=True, ignore_fast_mode=False,
+    ):
+        super(Rotate, self).__init__(
+            interpolation=interpolation,
+            padding=padding,
+            p=p,
+            ignore_state=ignore_state,
+            affine=True,
+            ignore_fast_mode=ignore_fast_mode,
+        )
+        if isinstance(angle_range, (int, float)):
+            angle_range = (-angle_range, angle_range)
+
+        self.angle_range = validate_numeric_range_parameter(angle_range, self._default_range)
+
+    def sample_angle(self):
+        self.state_dict["rot"] = np.deg2rad(random.uniform(self.angle_range[0], self.angle_range[1]))
+        return self.state_dict["rot"]
+
+    def sample_transform_matrix(self, data):
+        """
+        Samples random rotation within specified range and saves it as an object state.
+
+        """
+        self.sample_angle()
+
+        self.state_dict["transform_matrix"][0, 0] = np.cos(self.state_dict["rot"])
+        self.state_dict["transform_matrix"][0, 1] = -np.sin(self.state_dict["rot"])
+        self.state_dict["transform_matrix"][0, 2] = 0
+
+        self.state_dict["transform_matrix"][1, 0] = np.sin(self.state_dict["rot"])
+        self.state_dict["transform_matrix"][1, 1] = np.cos(self.state_dict["rot"])
+        self.state_dict["transform_matrix"][1, 2] = 0
+
+        self.state_dict["transform_matrix"][2, 0] = 0
+        self.state_dict["transform_matrix"][2, 1] = 0
+        self.state_dict["transform_matrix"][2, 2] = 1
+
+
+class Rotate90(Rotate):
+    """Random rotation around the center by 90 degrees.
+
+    Parameters
+    ----------
+    k : int
+        How many times to rotate the data. If positive, indicates the clockwise direction.
+        Zero by default.
+    p : float
+        Probability of using this transform
+
+    """
+
+    serializable_name = "rotate_90"
+    """How the class should be stored in the registry"""
+
+    def __init__(self, k=0, p=0.5, ignore_fast_mode=False):
+        if not isinstance(k, int):
+            raise TypeError("Argument `k` must be an integer!")
+        super(Rotate90, self).__init__(p=p, angle_range=(k * 90, k * 90), ignore_fast_mode=ignore_fast_mode)
+        self.k = k
+
+    @ensure_valid_image(num_dims_spatial=(3,))
+    def _apply_img(self, img: np.ndarray, settings: dict):
+        axis = randint(0, 2)
+        if axis != 2:
+            return np.ascontiguousarray(np.rot90(img, -self.k, axes=(axis, axis + 1)))
+        else:
+            return np.ascontiguousarray(np.rot90(img, -self.k, axes=(0, axis)))
+
+    @ensure_valid_image(num_dims_total=(3,))
+    def _apply_mask(self, mask: np.ndarray, settings: dict):
+        axis = randint(0, 2)
+        if axis != 2:
+            return np.ascontiguousarray(np.rot90(mask -self.k, axes=(axis, axis + 1)))
+        else:
+            return np.ascontiguousarray(np.rot90(mask, -self.k, axes=(0, axis)))
+
+

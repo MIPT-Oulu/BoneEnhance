@@ -29,8 +29,10 @@ if __name__ == "__main__":
 
     #snap = 'dios-erc-gpu_2020_11_04_14_10_25_3D_perceptualnet_scratch'  # Perceptual scratch
     #snap = '2020_11_27_12_06_12_3D_perceptualnet_ds'
-    snap = '2020_12_01_10_52_00_3D_perceptualnet_ds'
-    snap = '2020_12_01_13_39_52_3D_perceptualnet_ds'
+    #snap = '2020_12_01_10_52_00_3D_perceptualnet_ds'
+    #snap = '2020_12_01_13_39_52_3D_perceptualnet_ds'
+    snap = '2020_12_07_09_36_17_3D_perceptualnet_ds_20'
+    snap = '2020_12_10_09_16_07_3D_perceptualnet_ds_20'  # Brightness and contrast augmentations applied
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
@@ -43,8 +45,8 @@ if __name__ == "__main__":
     parser.add_argument('--step', type=int, default=2, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
     parser.add_argument('--avg_planes', type=bool, default=False)
     parser.add_argument('--cuda', type=bool, default=False, help='Whether to merge the inference tiles on GPU or CPU')
-    parser.add_argument('--mask', type=bool, default=True, help='Whether to remove background with postprocessing')
-    parser.add_argument('--scale', type=bool, default=False, help='Whether to scale prediction to full dynamic range')
+    parser.add_argument('--mask', type=bool, default=False, help='Whether to remove background with postprocessing')
+    parser.add_argument('--scale', type=bool, default=True, help='Whether to scale prediction to full dynamic range')
     parser.add_argument('--snapshot', type=Path, default=f'../../Workdir/snapshots/{snap}')
     parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
     args = parser.parse_args()
@@ -68,7 +70,11 @@ if __name__ == "__main__":
     crop = config.training.crop_small
     config.training.bs = args.bs
     mag = config.training.magnification
-    mean_std_path = args.snapshot.parent / f"mean_std_{crop[0]}x{crop[1]}.pth"
+    if config.training.crossmodality:
+        cm = 'cm'
+    else:
+        cm = 'ds'
+    mean_std_path = args.snapshot.parent / f"mean_std_{crop}_{cm}.pth"
     tmp = torch.load(mean_std_path)
     mean, std = tmp['mean'], tmp['std']
 
@@ -83,7 +89,7 @@ if __name__ == "__main__":
     # samples = [os.path.basename(x) for x in glob(str(args.dataset_root / '*XZ'))]  # Load with specific name
     samples = os.listdir(args.dataset_root)
     samples.sort()
-    samples = [samples[id] for id in [4]]  # Get intended samples from list
+    samples = [samples[id] for id in [3]]  # Get intended samples from list
 
     # Skip the completed samples
     if args.completed > 0:
@@ -113,8 +119,8 @@ if __name__ == "__main__":
         # Loop for image slices
         # 1st orientation
         with torch.no_grad():  # Do not update gradients
-            #prediction = inference_3d(model, args, config, data_xy, step=args.step, cuda=args.cuda)
-            prediction, _ = load(str(args.save_dir / sample[:-3]), axis=(1, 2, 0))
+            prediction = inference_3d(model, args, config, data_xy, step=args.step, cuda=args.cuda)
+            #prediction, _ = load(str(args.save_dir / sample[:-3]), axis=(1, 2, 0))
             print_orthogonal(prediction, invert=True, res=50 / 1000, title='Output', cbar=True,
                              savepath=str(args.save_dir / 'visualizations' / (sample[:-3] + '_prediction.png')),
                              scale_factor=10)
@@ -125,7 +131,7 @@ if __name__ == "__main__":
             prediction /= np.max(prediction)
 
         # Convert to uint8
-        #prediction = (prediction * 255).astype('uint8')
+        prediction = (prediction * 255).astype('uint8')
 
         # Background removal
         if args.mask:
