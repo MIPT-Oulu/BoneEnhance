@@ -15,7 +15,7 @@ training:
   calc_meanstd: True
   suffix: '_mag4'  # Options: _curated _reduced
   parse_color: False
-  crop_small: [20, 20, 20]
+  crop_small: [16, 16, 16]
   crossmodality: False
   # Model
   architecture: perceptualnet
@@ -31,8 +31,8 @@ training:
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 100
-  bs: 4
+  epochs: 80
+  bs: 2
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: combined_layers
   train_loss: True
@@ -48,7 +48,7 @@ transforms:
   probability: 0.5
   scale: [0.9, 1.1]
   translation: 30
-  rotation: [-10, 10]
+  rotation: [-30, 30]
   shear: [-0.1, 0.1]
   gamma: [0.7, 1.5]
   sigma: [0.4, 1.5]

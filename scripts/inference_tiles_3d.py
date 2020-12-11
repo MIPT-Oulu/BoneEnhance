@@ -31,6 +31,7 @@ if __name__ == "__main__":
     #snap = 'dios-erc-gpu_2020_11_04_15_58_20_3D_perceptualnet_ds'
     snap = 'dios-erc-gpu_2020_11_04_14_10_25_3D_perceptualnet_scratch'  # Perceptual scratch
     # snap = 'dios-erc-gpu_2020_09_30_14_14_42_perceptualnet_noscaling_3x3_cm_curated_trainloss'
+    snap = '2020_12_11_07_10_16_3D_perceptualnet_ds_16'  # Intensity augmentations applied
     ds = False
 
     parser = argparse.ArgumentParser()
@@ -39,8 +40,8 @@ if __name__ == "__main__":
     else:
         parser.add_argument('--dataset_root', type=Path, default='../../Data/input_mag4')
     parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D/{snap}')
-    parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
     parser.add_argument('--bs', type=int, default=12)
+    parser.add_argument('--step', type=int, default=4)
     parser.add_argument('--plot', type=bool, default=False)
     parser.add_argument('--weight', type=str, choices=['pyramid', 'mean'], default='mean')
     parser.add_argument('--completed', type=int, default=0)
@@ -116,7 +117,7 @@ if __name__ == "__main__":
         # Loop for image slices
         # 1st orientation
         with torch.no_grad():  # Do not update gradients
-            out_xy = inference_3d(model, args, config, data_xy)
+            out_xy = inference_3d(model, args, config, data_xy, step=args.step)
 
         # Average probability maps
         mask_avg = out_xy

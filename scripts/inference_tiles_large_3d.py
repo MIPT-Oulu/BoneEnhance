@@ -33,6 +33,7 @@ if __name__ == "__main__":
     #snap = '2020_12_01_13_39_52_3D_perceptualnet_ds'
     snap = '2020_12_07_09_36_17_3D_perceptualnet_ds_20'
     snap = '2020_12_10_09_16_07_3D_perceptualnet_ds_20'  # Brightness and contrast augmentations applied
+    snap = '2020_12_11_07_10_16_3D_perceptualnet_ds_16'  # Intensity augmentations applied
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')

@@ -40,7 +40,7 @@ def init_experiment(experiments='../experiments/run'):
     parser.add_argument('--workdir', type=Path, default='../../Workdir/')
     parser.add_argument('--experiment', type=Path, default=experiments)
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--num_threads', type=int, default=16)
+    parser.add_argument('--num_threads', type=int, default=16   )
     parser.add_argument('--gpus', type=int, default=2)
     args = parser.parse_args()
 
@@ -340,12 +340,13 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
     # and scaled to 0-1 range
     img = img.repeat(3, 1, 1, 1)
     target = target.repeat(3, 1, 1, 1)
+    #img /= 255.
     target /= 255.
 
     # Plot a small random portion of image-target pairs during debug
-    if debug and uniform(0, 1) >= 0.98:
-        res = 0.2 # In mm
-        print_orthogonal(img[0, :, :, :].numpy(), title='Input', res=res)
+    if debug and uniform(0, 1) >= 0.95:
+        res = 0.2  # In mm
+        print_orthogonal(img[0, :, :, :].numpy() / 255, title='Input', res=res)
 
         print_orthogonal(target[0, :, :, :].numpy(), title='Target', res=res / mag)
 

@@ -7,6 +7,7 @@ import solt.transforms as slt
 import solt.core as slc
 from BoneEnhance.components.transforms.custom_transforms import Crop, Pad, Brightness, Contrast, Blur, Flip, Rotate90, \
     Noise
+from BoneEnhance.components.transforms.spatial_transforms import Rotate, Translate
 
 
 from collagen.data.utils import ApplyTransform, Compose
@@ -110,9 +111,14 @@ def train_test_transforms(conf, mean=None, std=None):
             # slt.Translate(range_x=trf['translation'], range_y=trf['translation'], p=prob)
             #    ]),
             #    v_range=tuple(trf['v_range'])),
+
             # Spatial
+            Rotate(angle_range=tuple(trf['rotation']), p=prob),
+            Translate(range_x=trf['translation'], range_y=trf['translation'], range_z=trf['translation'], p=prob),
             Flip(axis=-1, p=prob),
             slc.SelectiveStream([Rotate90(k=1, p=prob), Rotate90(k=-1, p=prob), Rotate90(k=2, p=prob)]),
+
+            # Make sure the batch is the correct size
             Crop(training.magnification, crop_mode='r', crop_to=(crop_small, crop_large)),
             Pad(pad_to=(crop_small, crop_large)),
 
@@ -144,19 +150,7 @@ def train_test_transforms(conf, mean=None, std=None):
 
     ])]
 
-    # Intensity
-    # Brightness/contrast
-    slc.SelectiveStream([
-        slt.Brightness(brightness_range=tuple(trf.brightness), p=prob),
-        slt.Contrast(contrast_range=trf.contrast, p=prob)]),
-    # Noise
-    slc.SelectiveStream([
-        # slt.SaltAndPepper(p=prob, gain_range=trf['gain_sp']),
-        # slt.Noise(p=prob, gain_range=trf['gain_gn']),
-        slc.SelectiveStream([
-            slt.Blur(p=prob, blur_type='g', k_size=3, gaussian_sigma=tuple(trf.sigma)),
-            slt.Blur(p=prob, blur_type='m', k_size=3, gaussian_sigma=tuple(trf.sigma))])])
-
+    # 2D or 3D?
     if len(crop_small) == 3:
         axis = (0, 1, 2, 3)
     else:

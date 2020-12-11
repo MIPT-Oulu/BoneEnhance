@@ -604,35 +604,15 @@ class Noise(ImageTransform):
     def sample_transform(self, data: DataContainer):
         super(Noise, self).sample_transform(data)
         gain = random.uniform(self.gain_range[0], self.gain_range[1])
-        h = None
-        w = None
-        c = None
-        obj = None
-        for obj, t, _ in data:
-            if t == "I":
-                h = obj.shape[0]
-                w = obj.shape[1]
-                c = obj.shape[2]
-                break
-
-        if w is None or h is None or c is None:
-            raise ValueError
-
-        random_state = np.random.RandomState(random.randint(0, 2 ** 32 - 1))
-        noise_img = random_state.randn(h, w, c)
-
-        noise_img -= noise_img.min()
-        noise_img /= noise_img.max()
-        noise_img *= 255
-        noise_img = noise_img.astype(obj.dtype)
-
-        self.state_dict = {"noise": noise_img, "gain": gain}
+        self.state_dict = {"gain": gain}
 
     @ensure_valid_image(num_dims_spatial=(3,))
     def _apply_img(self, img: np.ndarray, settings: dict):
         if self.type == 'gaussian' or self.type == 'speckle':
-            return random_noise(img, mode=self.type, var=self.state_dict['gain'])
+            return random_noise(img, mode=self.type, var=self.state_dict['gain']) * 255
         elif self.type == 's&p':
-            return random_noise(img, mode=self.type, amount=self.state_dict['gain'])
+            return random_noise(img, mode=self.type, amount=self.state_dict['gain']) * 255
         else:
-            return random_noise(img, mode=self.type)
+            return random_noise(img, mode=self.type) * 255
+
+
