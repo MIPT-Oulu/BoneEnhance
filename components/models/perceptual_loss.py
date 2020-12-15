@@ -57,26 +57,28 @@ class Vgg16(nn.Module):
                 ReLU(inplace=True),
                 MaxPool3d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False),
             ]
-            for x in range(4):
-                self.slice1.add_module(str(x), layers_3d[x])
-                if isinstance(layers_3d[x], nn.Conv3d):
-                    weights = Parameter(vgg_pretrained_features[x].weight.unsqueeze(2).repeat(1, 1, 3, 1, 1))
-                    self.slice1[x].weight = weights
-            for x in range(4, 9):
-                self.slice2.add_module(str(x), layers_3d[x])
-                if isinstance(layers_3d[x], nn.Conv3d):
-                    weights = Parameter(vgg_pretrained_features[x].weight.unsqueeze(2).repeat(1, 1, 3, 1, 1))
-                    self.slice2[x - 4].weight = weights
-            for x in range(9, 16):
-                self.slice3.add_module(str(x), layers_3d[x])
-                if isinstance(layers_3d[x], nn.Conv3d):
-                    weights = Parameter(vgg_pretrained_features[x].weight.unsqueeze(2).repeat(1, 1, 3, 1, 1))
-                    self.slice3[x - 9].weight = weights
-            for x in range(16, 23):
-                self.slice4.add_module(str(x), layers_3d[x])
-                if isinstance(layers_3d[x], nn.Conv3d):
-                    weights = Parameter(vgg_pretrained_features[x].weight.unsqueeze(2).repeat(1, 1, 3, 1, 1))
-                    self.slice4[x - 16].weight = weights
+            # Use torch.no_grad() to prevent Autograd from tracking the weight changes
+            with torch.no_grad():
+                for x in range(4):
+                    self.slice1.add_module(str(x), layers_3d[x])
+                    if isinstance(layers_3d[x], nn.Conv3d):
+                        weights = Parameter(vgg_pretrained_features[x].weight.unsqueeze(2).repeat(1, 1, 3, 1, 1))
+                        self.slice1[x].weight = weights
+                for x in range(4, 9):
+                    self.slice2.add_module(str(x), layers_3d[x])
+                    if isinstance(layers_3d[x], nn.Conv3d):
+                        weights = Parameter(vgg_pretrained_features[x].weight.unsqueeze(2).repeat(1, 1, 3, 1, 1))
+                        self.slice2[x - 4].weight = weights
+                for x in range(9, 16):
+                    self.slice3.add_module(str(x), layers_3d[x])
+                    if isinstance(layers_3d[x], nn.Conv3d):
+                        weights = Parameter(vgg_pretrained_features[x].weight.unsqueeze(2).repeat(1, 1, 3, 1, 1))
+                        self.slice3[x - 9].weight = weights
+                for x in range(16, 23):
+                    self.slice4.add_module(str(x), layers_3d[x])
+                    if isinstance(layers_3d[x], nn.Conv3d):
+                        weights = Parameter(vgg_pretrained_features[x].weight.unsqueeze(2).repeat(1, 1, 3, 1, 1))
+                        self.slice4[x - 16].weight = weights
         else:
             for x in range(4):
                 self.slice1.add_module(str(x), vgg_pretrained_features[x])

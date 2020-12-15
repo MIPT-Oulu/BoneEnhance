@@ -14,7 +14,7 @@ training:
   calc_meanstd: True
   suffix: ''  # Options: _curated _reduced
   parse_color: False
-  crop_small: [16, 16, 16]
+  crop_small: [16, 16]
   crossmodality: False
   # Model
   architecture: perceptualnet
@@ -31,7 +31,7 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 80
-  bs: 4
+  bs: 48
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: combined_tv
   train_loss: True

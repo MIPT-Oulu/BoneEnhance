@@ -337,8 +337,7 @@ class Rotate(ImageTransform):
     """How the class should be stored in the registry"""
 
     def __init__(
-        self, angle_range=None, interpolation="bilinear", padding="z", p=0.5, ignore_state=True, ignore_fast_mode=False,
-            data_indices=None
+        self, angle_range=None, p=0.5, data_indices=None, vol=False
     ):
         super(Rotate, self).__init__(p=p, data_indices=data_indices)
 
@@ -346,15 +345,18 @@ class Rotate(ImageTransform):
             angle_range = (-angle_range, angle_range)
 
         self.angle_range = validate_numeric_range_parameter(angle_range, self._default_range)
+        self.vol = vol
 
     def sample_transform(self, data: DataContainer):
         super(Rotate, self).sample_transform(data)
         self.state_dict['rot'] = random.uniform(self.angle_range[0], self.angle_range[1])
         self.state_dict['axes'] = random.sample([0, 1, 2], k=2)
 
-    @ensure_valid_image(num_dims_spatial=(3,))
     def _apply_img(self, img: np.ndarray, settings: dict):
-        return rotate(img, angle=self.state_dict['rot'], axes=self.state_dict['axes'], reshape=False)
+        if self.vol:
+            return rotate(img, angle=self.state_dict['rot'], axes=self.state_dict['axes'], reshape=False)
+        else:
+            return rotate(img, angle=self.state_dict['rot'], reshape=False)
 
 
 class Translate(ImageTransform):
@@ -384,7 +386,7 @@ class Translate(ImageTransform):
                  range_z=None,
                  p=0.5,
                  data_indices=None,
-                 magnification=4
+                 magnification=4,
     ):
         super(Translate, self).__init__(p=p, data_indices=data_indices)
         if isinstance(range_x, (int, float)):
@@ -398,8 +400,17 @@ class Translate(ImageTransform):
 
         self.range_x = validate_numeric_range_parameter(range_x, self._default_range)
         self.range_y = validate_numeric_range_parameter(range_y, self._default_range)
-        self.range_z = validate_numeric_range_parameter(range_z, self._default_range)
+
+        # Range z only in 3D
+        if range_z is not None:
+            self.range_z = validate_numeric_range_parameter(range_z, self._default_range)
+        else:
+            self.range_z = None
+
+        # Other attributes
         self.magnification = magnification
+        self.frame_sml = None
+        self.frame_lrg = None
 
     def sample_transform(self, data: DataContainer):
         super(Translate, self).sample_transform(data)
@@ -407,17 +418,25 @@ class Translate(ImageTransform):
         self.frame_sml = data.data[0].shape[:-1]
         self.frame_lrg = data.data[1].shape[:-1]
 
-        self.state_dict['translate'] = [random.uniform(self.range_x[0], self.range_x[1]),
-                                        random.uniform(self.range_y[0], self.range_y[1]),
-                                        random.uniform(self.range_z[0], self.range_z[1]),
-                                        0]
+        if self.range_z is not None:
+            self.state_dict['translate'] = [random.uniform(self.range_x[0], self.range_x[1]),
+                                            random.uniform(self.range_y[0], self.range_y[1]),
+                                            random.uniform(self.range_z[0], self.range_z[1]),
+                                            0]
 
-        self.state_dict['translate_target'] = [self.state_dict['translate'][0] * self.magnification,
-                                               self.state_dict['translate'][1] * self.magnification,
-                                               self.state_dict['translate'][2] * self.magnification,
-                                               0]
+            self.state_dict['translate_target'] = [self.state_dict['translate'][0] * self.magnification,
+                                                   self.state_dict['translate'][1] * self.magnification,
+                                                   self.state_dict['translate'][2] * self.magnification,
+                                                   0]
+        else:
+            self.state_dict['translate'] = [random.uniform(self.range_x[0], self.range_x[1]),
+                                            random.uniform(self.range_y[0], self.range_y[1]),
+                                            0]
 
-    @ensure_valid_image(num_dims_spatial=(3,))
+            self.state_dict['translate_target'] = [self.state_dict['translate'][0] * self.magnification,
+                                                   self.state_dict['translate'][1] * self.magnification,
+                                                   0]
+
     def _apply_img(self, img: np.ndarray, settings: dict):
         if img.shape[:-1] == self.frame_sml:
             return shift(img, shift=self.state_dict['translate'])

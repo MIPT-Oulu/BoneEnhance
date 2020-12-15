@@ -27,7 +27,7 @@ def return_transforms(prob, trf, magnification, crop_small, vol=False):
                 #    v_range=tuple(trf['v_range'])),
 
                 # Spatial
-                Rotate(angle_range=tuple(trf['rotation']), p=prob),
+                Rotate(angle_range=tuple(trf['rotation']), p=prob, vol=True),
                 Translate(range_x=trf['translation'], range_y=trf['translation'], range_z=trf['translation'], p=prob),
                 Flip(axis=-1, p=prob),
                 slc.SelectiveStream([Rotate90(k=1, p=prob), Rotate90(k=-1, p=prob), Rotate90(k=2, p=prob)]),
@@ -66,6 +66,9 @@ def return_transforms(prob, trf, magnification, crop_small, vol=False):
         transforms = slc.SelectiveStream([
             slc.Stream([
 
+                # Spatial
+                Rotate(angle_range=tuple(trf['rotation']), p=prob, vol=False),
+                Translate(range_x=trf['translation'], range_y=trf['translation'], p=prob),
                 slt.Flip(axis=-1, p=prob),
                 slc.SelectiveStream([slt.Rotate90(k=1, p=prob), slt.Rotate90(k=-1, p=prob), slt.Rotate90(k=2, p=prob)]),
 
