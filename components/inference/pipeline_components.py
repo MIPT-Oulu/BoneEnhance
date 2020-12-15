@@ -163,13 +163,14 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', weight=
             if tile_list is None:
                 tile_list = pred_batch.cpu().numpy()
             else:
-                tile_list = np.concatenate((tile_list, pred_batch.cpu().numpy()), axis=0)
+                tile_list = np.concatenate((tile_list, pred_batch.cpu().numpy().astype(np.float16)), axis=0)
 
     # Normalize accumulated mask and convert back to numpy
     if cuda:
         merged_pred = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
         merged_pred = tiler.crop_to_orignal_size(merged_pred)
     else:
+        del tiles
         merged_pred = tiler.merge(tile_list, channels=ch)
 
     # Plot

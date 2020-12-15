@@ -81,7 +81,7 @@ class PerceptualNet(nn.Module):
             convolution = nn.Conv3d
             convolution_t = nn.ConvTranspose3d
             #upsampling = partial(nn.Upsample, mode='trilinear')
-            upsampling = nn.Upsample
+            upsampling = nn.Upsample  # Nearest neighbors
             padding = nn.ReplicationPad3d
         else:
             convolution = nn.Conv2d
@@ -96,7 +96,7 @@ class PerceptualNet(nn.Module):
 
         # Block types
         first_block = [
-            convolution(f_maps[0], f_maps[1], kernel_size=kernel, stride=1, padding=pad),  # Changed bias to true
+            convolution(f_maps[0], f_maps[1], kernel_size=kernel, stride=1, padding=pad, bias=True),  # Changed bias to true
             self.norm(f_maps[1], affine=True),
             self.activation
         ]
@@ -110,19 +110,19 @@ class PerceptualNet(nn.Module):
             upscale_block = [
                 upsampling(scale_factor=2),
                 padding(1),
-                convolution(f_maps[1], f_maps[1], kernel_size=3, stride=1, padding=0),
+                convolution(f_maps[1], f_maps[1], kernel_size=3, stride=1, padding=0, bias=True),
                 self.norm(f_maps[1], affine=True),
                 self.activation
             ]
         else:
             upscale_block = [
-                convolution_t(f_maps[1], f_maps[1], kernel_size=4, stride=2, padding=1, output_padding=0),
+                convolution_t(f_maps[1], f_maps[1], kernel_size=4, stride=2, padding=1, output_padding=0, bias=True),
                 self.norm(f_maps[1], affine=True),
                 self.activation
             ]
 
         final_block = [
-            convolution(f_maps[1], f_maps[2], kernel_size=kernel, stride=1, padding=pad),
+            convolution(f_maps[1], f_maps[2], kernel_size=kernel, stride=1, padding=pad, bias=True),
             self.norm(f_maps[2], affine=True),
             self.activation
         ]
@@ -150,7 +150,7 @@ class PerceptualNet(nn.Module):
             x = x.repeat(1, 3, 1, 1)
 
         # Scaled Tanh activation
-        x = x.tanh()
+        #x = x.tanh()
         #x = x.add(1.)
         #x = x.mul(0.5)
         return x

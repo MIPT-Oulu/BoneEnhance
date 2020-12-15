@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
-from torch import nn
+import torch
+from torch import nn, Tensor
 from BoneEnhance.components.models.wgan import WGAN_VGG_FeatureExtractor
 from BoneEnhance.components.models.perceptual_loss import Vgg16
 from BoneEnhance.components.training.initialize_weights import InitWeight, init_weight_normal
@@ -21,11 +22,11 @@ class PerceptualLoss(nn.Module):
             self.feature_extractor = WGAN_VGG_FeatureExtractor()
         else:
             self.feature_extractor = Vgg16(vol=vol)
-            self.feature_extractor.train()#.eval()  # or train?
+            #self.feature_extractor.train()
 
             # Weight init
-            init = InitWeight(init_weight_normal, [0.0, 0.02], type='conv')
-            self.feature_extractor.apply(init)
+            #init = InitWeight(init_weight_normal, [0.0, 0.02], type='conv')
+            #self.feature_extractor.apply(init)
 
         self.p_criterion = criterion
         self.compare_layer = compare_layer
@@ -132,3 +133,25 @@ class PerceptualLoss(nn.Module):
         f_T = f.transpose(1, 2)
         G = f.bmm(f_T) / (ch * d * h * w)
         return G
+
+
+class TotalVariationLoss(nn.Module):
+    """Total variation loss in 2D and 3D."""
+    def __init__(self):
+        super(TotalVariationLoss, self).__init__()
+
+    def forward(self, input: Tensor, target: Tensor):
+        tv = 0
+        if len(input.size()) == 5:
+            # Width
+            tv += torch.pow(input[:, :, 1:, :, :] - input[:, :, :-1, :, :], 2).sum()
+            # Height
+            tv += torch.pow(input[:, :, :, 1:, :] - input[:, :, :, :-1, :], 2).sum()
+            # Depth
+            tv += torch.pow(input[:, :, :, :, 1:] - input[:, :, :, :, :-1], 2).sum()
+        else:
+            # Width
+            tv += torch.pow(input[:, :, 1:, :] - input[:, :, :-1, :], 2).sum()
+            # Height
+            tv += torch.pow(input[:, :, :, 1:] - input[:, :, :, :-1], 2).sum()
+        return tv / input.numel()

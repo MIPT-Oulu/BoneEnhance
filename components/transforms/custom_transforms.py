@@ -18,6 +18,7 @@ from solt.core import (
     MatrixTransform,
     PaddingPropertyHolder,
 )
+from solt.transforms import Rotate
 from solt.constants import (
     ALLOWED_BLURS,
     ALLOWED_COLOR_CONVERSIONS,
@@ -464,71 +465,6 @@ class Flip(BaseTransform):
             pts_data[:, 0] = pts.frame[1] - 1 - pts_data[:, 0]
 
         return Keypoints(pts=pts_data, frame=pts.frame)
-
-
-class Rotate(MatrixTransform):
-    """Random rotation around the center clockwise
-
-    Parameters
-    ----------
-    angle_range : tuple or float or None
-        Range of rotation.
-        If float, then (-angle_range, angle_range) will be used for transformation sampling.
-        if None, then angle_range=(0,0).
-    interpolation : str or tuple or None
-        Interpolation type. Check the allowed interpolation types.
-    padding : str or tuple or None
-        Padding mode. Check the allowed padding modes.
-    p : float
-        Probability of using this transform
-    ignore_state : bool
-        Whether to ignore the state. See details in the docs for `MatrixTransform`.
-
-    """
-
-    _default_range = (0, 0)
-
-    serializable_name = "rotate"
-    """How the class should be stored in the registry"""
-
-    def __init__(
-        self, angle_range=None, interpolation="bilinear", padding="z", p=0.5, ignore_state=True, ignore_fast_mode=False,
-    ):
-        super(Rotate, self).__init__(
-            interpolation=interpolation,
-            padding=padding,
-            p=p,
-            ignore_state=ignore_state,
-            affine=True,
-            ignore_fast_mode=ignore_fast_mode,
-        )
-        if isinstance(angle_range, (int, float)):
-            angle_range = (-angle_range, angle_range)
-
-        self.angle_range = validate_numeric_range_parameter(angle_range, self._default_range)
-
-    def sample_angle(self):
-        self.state_dict["rot"] = np.deg2rad(random.uniform(self.angle_range[0], self.angle_range[1]))
-        return self.state_dict["rot"]
-
-    def sample_transform_matrix(self, data):
-        """
-        Samples random rotation within specified range and saves it as an object state.
-
-        """
-        self.sample_angle()
-
-        self.state_dict["transform_matrix"][0, 0] = np.cos(self.state_dict["rot"])
-        self.state_dict["transform_matrix"][0, 1] = -np.sin(self.state_dict["rot"])
-        self.state_dict["transform_matrix"][0, 2] = 0
-
-        self.state_dict["transform_matrix"][1, 0] = np.sin(self.state_dict["rot"])
-        self.state_dict["transform_matrix"][1, 1] = np.cos(self.state_dict["rot"])
-        self.state_dict["transform_matrix"][1, 2] = 0
-
-        self.state_dict["transform_matrix"][2, 0] = 0
-        self.state_dict["transform_matrix"][2, 1] = 0
-        self.state_dict["transform_matrix"][2, 2] = 1
 
 
 class Rotate90(Rotate):

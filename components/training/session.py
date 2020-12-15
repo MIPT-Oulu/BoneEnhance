@@ -28,7 +28,7 @@ from collagen.losses import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss, 
 from BoneEnhance.components.transforms import train_test_transforms
 from BoneEnhance.components.models import EnhanceNet, EncoderDecoder, \
     WGAN_VGG_generator, WGAN_VGG_discriminator, WGAN_VGG, ConvNet, PerceptualNet
-from BoneEnhance.components.training.loss import PerceptualLoss
+from BoneEnhance.components.training.loss import PerceptualLoss, TotalVariationLoss
 from BoneEnhance.components.utilities import print_orthogonal
 from BoneEnhance.components.training.initialize_weights import InitWeight, init_weight_normal
 
@@ -40,7 +40,7 @@ def init_experiment(experiments='../experiments/run'):
     parser.add_argument('--workdir', type=Path, default='../../Workdir/')
     parser.add_argument('--experiment', type=Path, default=experiments)
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--num_threads', type=int, default=16   )
+    parser.add_argument('--num_threads', type=int, default=16)
     parser.add_argument('--gpus', type=int, default=2)
     args = parser.parse_args()
 
@@ -133,6 +133,7 @@ def init_loss(loss, config, device='cuda', mean=None, std=None):
     available_losses = {
         'mse': nn.MSELoss(),
         'L1': nn.L1Loss(), 'l1': nn.L1Loss(),
+        'tv': TotalVariationLoss(),
         'psnr': PSNRLoss(),
         'perceptual': PerceptualLoss(),
         'perceptual_layers': PerceptualLoss(criterion=nn.MSELoss(),
@@ -151,10 +152,21 @@ def init_loss(loss, config, device='cuda', mean=None, std=None):
                                         .to(device),
                                         nn.L1Loss().to(device)],
                                         weights=[0.8, 0.2]),
+        'combined_tv': CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
+                                                    compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],
+                                                    mean=mean, std=std,
+                                                    imagenet_normalize=config.training.imagenet_normalize_loss,
+                                                    gram=config.training.gram,
+                                                    vol=vol)
+                                     .to(device),
+                                     nn.MSELoss().to(device),
+                                     TotalVariationLoss()],
+                                    weights=[0.6, 0.2, 0.2]),
         # GAN
         # Segmentation losses
         'bce': BCEWithLogitsLoss2d(),
         'jaccard': SoftJaccardLoss(use_log=config.training.log_jaccard),
+
     }
 
     return available_losses[loss].to(device)
@@ -242,20 +254,27 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
 
     # Magnification
     mag = config.training.magnification
+    k = choice([5])
 
     # Resize target to 4x magnification respect to input
     if config is not None and not config.training.crossmodality:
 
-        # Antialiasing
-        #target = cv2.GaussianBlur(target, ksize=)
-        #target = zoom(target, zoom=1/16)
-
         # Resize target to a relevant size (from the 3.2µm resolution to 51.2µm
-        resize_target = (target.shape[1] // 16, target.shape[0] // 16)
-        target = cv2.resize(target.copy(), resize_target, interpolation=cv2.INTER_LANCZOS4)  # .transpose(1, 0, 2)
+        new_size = (target.shape[1] // 16, target.shape[0] // 16)
 
-        resize = (target.shape[1] // mag, target.shape[0] // mag)
-        img = cv2.resize(target, resize, interpolation=cv2.INTER_LANCZOS4)  # .transpose(1, 0, 2)
+        # Antialiasing
+        target = cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0)
+
+        target = cv2.resize(target.copy(), new_size)  # .transpose(1, 0, 2)
+        #target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True).astype('uint8')
+
+        new_size = (target.shape[1] // mag, target.shape[0] // mag)
+
+        # No antialias
+        #img = cv2.resize(target, new_size, interpolation=cv2.INTER_LANCZOS4)
+        # Antialias
+        img = cv2.resize(cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0), new_size)
+        #img = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=k).astype('uint8')
     elif config is not None:
 
         # Read image and target
@@ -264,8 +283,10 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
         img[:, :, 1] = img[:, :, 0]
         img[:, :, 2] = img[:, :, 0]
 
-        resize = (img.shape[1] * mag, img.shape[0] * mag)
-        target = cv2.resize(target, resize, interpolation=cv2.INTER_LANCZOS4)
+        new_size = (img.shape[1] * mag, img.shape[0] * mag)
+        target = cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0)
+        target = cv2.resize(target, new_size)
+        #target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=k).astype('uint8')
     else:
         raise NotImplementedError
 
@@ -314,7 +335,7 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
         new_size = (target.shape[0] // mag, target.shape[1] // mag, target.shape[2] // mag)
 
         sigma = choice([1, 2, 3, 4, 5])
-        img = resize(target, new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=sigma)
+        img = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=sigma).astype('uint8')
 
     elif config is not None:
 
@@ -325,7 +346,7 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
         # Resize the target to match input in case of a mismatch
         new_size = (int(img.shape[0] * mag), int(img.shape[1] * mag), int(img.shape[2] * mag))
         if target.shape != new_size:
-            target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True)
+            target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True).astype('uint8')
     else:
         raise NotImplementedError
 

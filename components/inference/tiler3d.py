@@ -85,14 +85,14 @@ class Tiler3D:
         ]
         return crop
 
-    def merge(self, tiles: List[np.ndarray], channels, dtype=np.float32):
+    def merge(self, tiles: List[np.ndarray], channels, dtype=np.float16):
         if len(tiles) != len(self.crops):
             raise ValueError
 
         target_shape = self.target_shape
 
-        image = np.zeros((channels, target_shape[0], target_shape[1], target_shape[2]), dtype=np.float32)
-        norm_mask = np.zeros((1, target_shape[0], target_shape[1], target_shape[2]), dtype=np.float32)
+        image = np.zeros((channels, target_shape[0], target_shape[1], target_shape[2]), dtype=dtype)
+        norm_mask = np.zeros((1, target_shape[0], target_shape[1], target_shape[2]), dtype=np.uint8)
 
         #w = np.dstack([self.weight] * channels)
         w = np.expand_dims(self.weight, axis=0)
@@ -103,7 +103,7 @@ class Tiler3D:
 
         #norm_mask = np.clip(norm_mask, a_min=np.finfo(norm_mask.dtype).eps, a_max=None)
         image = np.divide(image, norm_mask).astype(dtype)
-        image = np.moveaxis(image, 0, -1).astype('float32')
+        image = np.moveaxis(image, 0, -1).astype(dtype)
         image = self.crop_to_orignal_size(image)
         return image
 

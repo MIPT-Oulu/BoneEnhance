@@ -7,8 +7,7 @@ import solt.transforms as slt
 import solt.core as slc
 from BoneEnhance.components.transforms.custom_transforms import Crop, Pad, Brightness, Contrast, Blur, Flip, Rotate90, \
     Noise
-from BoneEnhance.components.transforms.spatial_transforms import Rotate, Translate
-
+from BoneEnhance.components.transforms.random_augmentations import return_transforms
 
 from collagen.data.utils import ApplyTransform, Compose
 
@@ -28,12 +27,16 @@ def normalize_channel_wise(tensor: torch.Tensor, mean: torch.Tensor, std: torch.
     result: torch.Tensor
     """
 
+    # Check that channel dimension is first
+    if tensor.size(0) not in [1, 3]:
+        raise Exception('Tensor in incorrect format!')
+
     # 3D
     if len(tensor.size()) == 4:
         # Modified shape
         for channel in range(tensor.size(0)):
-            tensor[:, :, :, channel] -= mean[channel]
-            tensor[:, :, :, channel] /= std[channel]
+            tensor[channel, :, :, :] -= mean[channel]
+            tensor[channel, :, :, :] /= std[channel]
 
         return tensor
     # Noncompatible
@@ -43,8 +46,8 @@ def normalize_channel_wise(tensor: torch.Tensor, mean: torch.Tensor, std: torch.
     else:
         # Modified shape
         for channel in range(tensor.size(0)):
-            tensor[:, :, channel] -= mean[channel]
-            tensor[:, :, channel] /= std[channel]
+            tensor[channel, :, :] -= mean[channel]
+            tensor[channel, :, :] /= std[channel]
 
         return tensor
 
@@ -99,56 +102,7 @@ def train_test_transforms(conf, mean=None, std=None):
     crop_large = tuple([crop * training.magnification for crop in crop_small])
     prob = trf.probability
     # Training transforms
-    train_transforms = [slc.SelectiveStream([
-        slc.Stream([
-            # slt.Projection(
-            #    slc.Stream([
-            #        slt.Rotate(angle_range=tuple(trf['rotation']), p=prob),
-            #        slt.Scale(range_x=tuple(trf['scale']),
-            #                        range_y=tuple(trf['scale']), same=False, p=prob),
-            # slt.Shear(range_x=tuple(trf['shear']),
-            #                range_y=tuple(trf['shear']), p=prob),
-            # slt.Translate(range_x=trf['translation'], range_y=trf['translation'], p=prob)
-            #    ]),
-            #    v_range=tuple(trf['v_range'])),
-
-            # Spatial
-            Rotate(angle_range=tuple(trf['rotation']), p=prob),
-            Translate(range_x=trf['translation'], range_y=trf['translation'], range_z=trf['translation'], p=prob),
-            Flip(axis=-1, p=prob),
-            slc.SelectiveStream([Rotate90(k=1, p=prob), Rotate90(k=-1, p=prob), Rotate90(k=2, p=prob)]),
-
-            # Make sure the batch is the correct size
-            Crop(training.magnification, crop_mode='r', crop_to=(crop_small, crop_large)),
-            Pad(pad_to=(crop_small, crop_large)),
-
-            # 50% Chance for Brightness & contrast adjustment
-            slc.Stream([
-                Brightness(brightness_range=tuple(trf.brightness), p=prob),
-                Contrast(contrast_range=trf.contrast, p=prob)]),
-
-            # 50% Chance for smoothing/blurring
-            slc.SelectiveStream([
-                Blur(p=prob, blur_type='g', k_size=3, gaussian_sigma=tuple(trf.sigma)),
-                Blur(p=prob, blur_type='m', k_size=3, gaussian_sigma=tuple(trf.sigma))
-                ]),
-
-            # 50% Chance for Added noise
-            slc.SelectiveStream([
-                Noise(p=prob, mode='gaussian', gain_range=trf['gain_gn']),
-                Noise(p=prob, mode='poisson', gain_range=trf['gain_gn']),
-                Noise(p=prob, mode='s&p', gain_range=trf['gain_sp']),
-                Noise(p=prob, mode='speckle', gain_range=trf['gain_sp']),
-            ])
-        ]),
-
-        # Empty stream
-        slc.Stream([
-            Crop(training.magnification, crop_mode='r', crop_to=(crop_small, crop_large)),
-            Pad(pad_to=(crop_small, crop_large)),
-        ])
-
-    ])]
+    train_transforms = [return_transforms(prob, trf, training.magnification, crop_small, len(crop_small) == 3)]
 
     # 2D or 3D?
     if len(crop_small) == 3:

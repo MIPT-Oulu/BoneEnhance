@@ -34,16 +34,16 @@ if __name__ == "__main__":
     snap = '2020_12_07_09_36_17_3D_perceptualnet_ds_20'
     snap = '2020_12_10_09_16_07_3D_perceptualnet_ds_20'  # Brightness and contrast augmentations applied
     snap = '2020_12_11_07_10_16_3D_perceptualnet_ds_16'  # Intensity augmentations applied
+    snap = '2020_12_14_07_26_07_3D_perceptualnet_ds_16'  # Intensity and spatial augs
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
     parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/{snap}')
-    parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
     parser.add_argument('--bs', type=int, default=12)
     parser.add_argument('--plot', type=bool, default=False)
     parser.add_argument('--weight', type=str, choices=['pyramid', 'mean'], default='mean')
     parser.add_argument('--completed', type=int, default=0)
-    parser.add_argument('--step', type=int, default=2, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
+    parser.add_argument('--step', type=int, default=1, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
     parser.add_argument('--avg_planes', type=bool, default=False)
     parser.add_argument('--cuda', type=bool, default=False, help='Whether to merge the inference tiles on GPU or CPU')
     parser.add_argument('--mask', type=bool, default=False, help='Whether to remove background with postprocessing')
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     mean, std = tmp['mean'], tmp['std']
 
     # List the models
-    model_list = load_models(str(args.snapshot), config, n_gpus=args_experiment.gpus)#, fold=3)
+    model_list = load_models(str(args.snapshot), config, n_gpus=args_experiment.gpus)#, fold=0)
 
     model = InferenceModel(model_list).to(device)
     model.eval()
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     # samples = [os.path.basename(x) for x in glob(str(args.dataset_root / '*XZ'))]  # Load with specific name
     samples = os.listdir(args.dataset_root)
     samples.sort()
-    samples = [samples[id] for id in [3]]  # Get intended samples from list
+    samples = [samples[id] for id in [4]]  # Get intended samples from list
 
     # Skip the completed samples
     if args.completed > 0:
@@ -122,9 +122,9 @@ if __name__ == "__main__":
         with torch.no_grad():  # Do not update gradients
             prediction = inference_3d(model, args, config, data_xy, step=args.step, cuda=args.cuda)
             #prediction, _ = load(str(args.save_dir / sample[:-3]), axis=(1, 2, 0))
-            print_orthogonal(prediction, invert=True, res=50 / 1000, title='Output', cbar=True,
-                             savepath=str(args.save_dir / 'visualizations' / (sample[:-3] + '_prediction.png')),
-                             scale_factor=10)
+            #print_orthogonal(prediction, invert=True, res=50 / 1000, title='Output', cbar=True,
+            #                 savepath=str(args.save_dir / 'visualizations' / (sample[:-3] + '_prediction.png')),
+            #                 scale_factor=10)
 
         # Scale the dynamic range
         if args.scale:

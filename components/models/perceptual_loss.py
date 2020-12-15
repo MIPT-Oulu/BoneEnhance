@@ -11,7 +11,7 @@ class Vgg16(nn.Module):
     """
     def __init__(self, vol=False):
         super().__init__()
-        # Keeping eval() mode only for consistency - it only affects BatchNorm and Dropout both of which we won't use
+        # Freeze coefficients
         vgg16 = models.vgg16(pretrained=True).eval()
         vgg_pretrained_features = vgg16.features
         self.layer_names = ['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3']

@@ -14,8 +14,11 @@ def build_meta_from_files(base_path, config):
     metadata = {'fname': [], 'target_fname': []}
 
     # Data path
-    if config.training.suffix is not None:
+    if len(config.training.crop_small) == 3:
+        suffix = '_3d'
+    else:
         suffix = config.training.suffix
+    if config.training.suffix is not None:
         target_loc = base_path / f'target{suffix}'
         input_loc = base_path / f'input{suffix}'
     else:
