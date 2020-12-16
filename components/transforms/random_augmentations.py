@@ -15,20 +15,10 @@ def return_transforms(prob, trf, magnification, crop_small, vol=False):
     if vol:
         transforms = slc.SelectiveStream([
             slc.Stream([
-                # slt.Projection(
-                #    slc.Stream([
-                #        slt.Rotate(angle_range=tuple(trf['rotation']), p=prob),
-                #        slt.Scale(range_x=tuple(trf['scale']),
-                #                        range_y=tuple(trf['scale']), same=False, p=prob),
-                # slt.Shear(range_x=tuple(trf['shear']),
-                #                range_y=tuple(trf['shear']), p=prob),
-                # slt.Translate(range_x=trf['translation'], range_y=trf['translation'], p=prob)
-                #    ]),
-                #    v_range=tuple(trf['v_range'])),
 
                 # Spatial
-                Rotate(angle_range=tuple(trf['rotation']), p=prob, vol=True),
-                Translate(range_x=trf['translation'], range_y=trf['translation'], range_z=trf['translation'], p=prob),
+                Rotate(angle_range=tuple(trf['rotation']), p=1, vol=True),
+                Translate(range_x=trf['translation'], range_y=trf['translation'], range_z=trf['translation'], p=1),
                 Flip(axis=-1, p=prob),
                 slc.SelectiveStream([Rotate90(k=1, p=prob), Rotate90(k=-1, p=prob), Rotate90(k=2, p=prob)]),
 

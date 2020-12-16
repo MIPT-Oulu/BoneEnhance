@@ -14,7 +14,7 @@ def build_meta_from_files(base_path, config):
     metadata = {'fname': [], 'target_fname': []}
 
     # Data path
-    if len(config.training.crop_small) == 3:
+    if len(config.training.crop_small) == 3 and config.training.suffix == '':
         suffix = '_3d'
     else:
         suffix = config.training.suffix
@@ -65,6 +65,8 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     # Group_ID
     #metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:-1]), 0)
     metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:1]), 0)
+    # Special case for samples with Group name separated by -
+    metadata['subj_id'] = metadata.subj_id.apply(lambda x: '_'.join(x.split('-', 4)[:1]), 0)
 
     # Mean and std
     crop = config['training']['crop_small']

@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import random
 import os
 import cv2
 from tqdm import tqdm
@@ -445,3 +446,16 @@ def print_images(images, masks=None, title=None, subtitles=None, save_path=None,
         plt.close(fig)
     else:
         plt.show()
+
+
+def transfer_3d_to_random_2d(stack):
+    axis = random.choice([0, 1, 2])
+    dim = stack.shape[axis]
+    slice = random.randint(0, dim - 1)
+
+    if axis == 0:
+        return stack[slice, :, :]
+    elif axis == 1:
+        return stack[:, slice, :]
+    else:
+        return stack[:, :, slice]

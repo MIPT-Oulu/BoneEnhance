@@ -12,7 +12,7 @@ strategy:
 training:
   # General
   calc_meanstd: True
-  suffix: ''  # Options: _curated _reduced
+  suffix: '_3d'  # Options: _curated _reduced
   parse_color: False
   crop_small: [16, 16, 16]
   crossmodality: False
@@ -31,9 +31,9 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 80
-  bs: 24
+  bs: 8
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: mse_tv
+  loss: mse
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False

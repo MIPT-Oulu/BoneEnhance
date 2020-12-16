@@ -29,7 +29,7 @@ from BoneEnhance.components.transforms import train_test_transforms
 from BoneEnhance.components.models import EnhanceNet, EncoderDecoder, \
     WGAN_VGG_generator, WGAN_VGG_discriminator, WGAN_VGG, ConvNet, PerceptualNet
 from BoneEnhance.components.training.loss import PerceptualLoss, TotalVariationLoss
-from BoneEnhance.components.utilities import print_orthogonal, print_images
+from BoneEnhance.components.utilities import print_orthogonal, print_images, transfer_3d_to_random_2d
 from BoneEnhance.components.training.initialize_weights import InitWeight, init_weight_normal
 
 
@@ -319,7 +319,6 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
 
 
 def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=None):
-
     # Load target with hdf5
     with h5py.File(entry.target_fname, 'r') as f:
         target = f['data'][:]
@@ -327,7 +326,7 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
     # Magnification
     mag = config.training.magnification
 
-    cm = choice([True, False])
+    #cm = choice([True, False])
     cm = config.training.crossmodality
 
     # Resize target to 4x magnification respect to input
@@ -337,7 +336,7 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
         # Resize target with the given magnification to provide the input image
         new_size = (target.shape[0] // mag, target.shape[1] // mag, target.shape[2] // mag)
 
-        sigma = choice([1, 2, 3, 4])
+        sigma = choice([1, 2])
         img = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=sigma).astype('uint8')
 
     elif config is not None:
@@ -374,10 +373,77 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
 
         #print_orthogonal(target[0, :, :, :].numpy(), title='Target', res=res / mag)
         dims = img.size()
-        print_images([img[0, dims[1] // 2, :, :].numpy(), img[0, :, dims[2] // 2, :].numpy(),
-                      target[0, dims[1] // 2 * mag, :, :].numpy(), target[0, :, dims[2] // 2 * mag, :].numpy()])
+        #print_images([img[0, dims[1] // 2, :, :].numpy() / 255., img[0, :, dims[2] // 2, :].numpy() / 255.,
+        #              target[0, dims[1] // 2 * mag, :, :].numpy(), target[0, :, dims[2] // 2 * mag, :].numpy()])
+        print_images([img[0, 7, :, :].numpy() / 255., img[0, :, 7, :].numpy() / 255.,
+                      target[0, 7 * mag, :, :].numpy(), target[0, :, 7 * mag, :].numpy()])
 
-    return {data_key: img[:, 7, :, :], target_key: target[:, 7, :, :]}
+    return {data_key: img[:, 7, :, :], target_key: target[:, 7 * mag, :, :]}
+
+
+def parse_3d_debug(root, entry, transform, data_key, target_key, debug=False, config=None):
+    """
+    Note! Works only in downsampling.
+    For cross-modality, transfer to 2D should be done simultaneously for img and target.
+    """
+    # Load target with hdf5
+    with h5py.File(entry.target_fname, 'r') as f:
+        target = f['data'][:]
+        target = transfer_3d_to_random_2d(target)
+
+    # Channel dimension
+    target = np.stack((target,) * 3, axis=-1)
+
+    # Magnification
+    mag = config.training.magnification
+
+    # Resize target to 4x magnification respect to input
+    k = choice([5])
+
+    # Resize target to 4x magnification respect to input
+    if config is not None and not config.training.crossmodality:
+
+        # Resize target to a relevant size (from the 3.2µm resolution to 51.2µm
+        new_size = (target.shape[1] // 16, target.shape[0] // 16)
+
+        # Antialiasing
+        target = cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0)
+
+        target = cv2.resize(target.copy(), new_size)  # .transpose(1, 0, 2)
+        #target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True).astype('uint8')
+
+        new_size = (target.shape[1] // mag, target.shape[0] // mag)
+
+        # No antialias
+        #img = cv2.resize(target, new_size, interpolation=cv2.INTER_LANCZOS4)
+        # Antialias
+        img = cv2.resize(cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0), new_size)
+    else:
+        raise NotImplementedError
+
+    # Apply random transforms
+    img, target = transform((img, target))
+
+    # Images are in the format 3xHxW
+    # and scaled to 0-1 range
+    # img = img.permute(2, 0, 1)# / 255. # TODO Experiment for the change in input scaling
+    target = target / 255.  # .permute(2, 0, 1) / 255.
+
+    # Plot a small random portion of image-target pairs during debug
+    if debug and uniform(0, 1) >= 0.99:
+        fig = plt.figure(dpi=300)
+        ax1 = fig.add_subplot(121)
+        im = ax1.imshow(np.asarray(img.permute(1, 2, 0) / 255.), cmap='gray')
+        plt.colorbar(im, orientation='horizontal')
+        plt.title('Input')
+
+        ax2 = fig.add_subplot(122)
+        im2 = ax2.imshow(np.asarray(target.permute(1, 2, 0)), cmap='gray')
+        plt.colorbar(im2, orientation='horizontal')
+        plt.title('Target')
+        plt.show()
+
+    return {data_key: img, target_key: target}
 
 
 def parse_color(root, entry, transform, data_key, target_key, debug=False):
