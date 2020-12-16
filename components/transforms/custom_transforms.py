@@ -417,6 +417,10 @@ class Flip(BaseTransform):
             raise ValueError("Incorrect Value of axis!")
 
         self.axis = axis
+        self.orientation = None
+
+    def sample_transform(self, data: DataContainer):
+        self.orientation = randint(0, 6)
 
     @ensure_valid_image(num_dims_spatial=(3,))
     def _apply_img(self, img: np.ndarray, settings: dict):
@@ -434,7 +438,7 @@ class Flip(BaseTransform):
         elif self.axis == 2:
             return np.ascontiguousarray(img[:, :, ::-1, ...])
         else:
-            orientation = randint(0, 6)
+            orientation = self.orientation
             if orientation == 0:
                 return np.ascontiguousarray(img[::-1, ...])
             elif orientation == 1:
@@ -488,11 +492,15 @@ class Rotate90(Rotate):
             raise TypeError("Argument `k` must be an integer!")
         super(Rotate90, self).__init__(p=p, angle_range=(k * 90, k * 90), ignore_fast_mode=ignore_fast_mode)
         self.k = k
+        self.axis = None
+
+    def sample_transform(self, data: DataContainer):
+        self.axis = randint(0, 2)
 
     @ensure_valid_image(num_dims_spatial=(3,))
     def _apply_img(self, img: np.ndarray, settings: dict):
         # Rotate to random axis along 3D
-        axis = randint(0, 2)
+        axis = self.axis
         if axis != 2:
             return np.ascontiguousarray(np.rot90(img, -self.k, axes=(axis, axis + 1)))
         else:
@@ -500,7 +508,7 @@ class Rotate90(Rotate):
 
     @ensure_valid_image(num_dims_total=(3,))
     def _apply_mask(self, mask: np.ndarray, settings: dict):
-        axis = randint(0, 2)
+        axis = self.axis
         if axis != 2:
             return np.ascontiguousarray(np.rot90(mask -self.k, axes=(axis, axis + 1)))
         else:

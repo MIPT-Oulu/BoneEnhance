@@ -114,6 +114,8 @@ class PerceptualLoss(nn.Module):
                     loss *= 1e-5
                 elif self.calculate_gram:
                     loss *= 1e5
+                elif self.vol:
+                    loss *= 1e-7
             else:
                 loss = self.p_criterion(pred_feature[layer], target_feature[layer])
         return loss

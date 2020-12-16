@@ -64,16 +64,14 @@ class PerceptualNet(nn.Module):
         else:
             raise Exception('Not implemented activation function!')
         # Normalization
-        if norm == 'bn':
-            if vol:
-                self.norm = nn.BatchNorm3d
-            else:
-                self.norm = nn.BatchNorm2d
+        if norm == 'bn' and vol:
+            self.norm = nn.BatchNorm3d
+        elif norm == 'bn':
+            self.norm = nn.BatchNorm2d
+        elif norm == 'in' and vol:
+            self.norm = nn.InstanceNorm3d
         elif norm == 'in':
-            if vol:
-                self.norm = nn.InstanceNorm3d
-            else:
-                self.norm = nn.InstanceNorm2d
+            self.norm = nn.InstanceNorm2d
         else:
             raise Exception('Not implemented normalization!')
 
@@ -139,7 +137,6 @@ class PerceptualNet(nn.Module):
         self.net = nn.Sequential(*layers)
 
     def forward(self, x):
-
         # Pass through the model
         x = self.net(x)  # TODO upsampling with F.upsample
 

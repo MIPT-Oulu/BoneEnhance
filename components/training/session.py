@@ -29,7 +29,7 @@ from BoneEnhance.components.transforms import train_test_transforms
 from BoneEnhance.components.models import EnhanceNet, EncoderDecoder, \
     WGAN_VGG_generator, WGAN_VGG_discriminator, WGAN_VGG, ConvNet, PerceptualNet
 from BoneEnhance.components.training.loss import PerceptualLoss, TotalVariationLoss
-from BoneEnhance.components.utilities import print_orthogonal
+from BoneEnhance.components.utilities import print_orthogonal, print_images
 from BoneEnhance.components.training.initialize_weights import InitWeight, init_weight_normal
 
 
@@ -160,8 +160,10 @@ def init_loss(loss, config, device='cuda', mean=None, std=None):
                                                     vol=vol)
                                      .to(device),
                                      nn.MSELoss().to(device),
-                                     TotalVariationLoss()],
+                                     TotalVariationLoss().to(device)],
                                     weights=[0.6, 0.2, 0.2]),
+        'mse_tv': CombinedLoss([nn.MSELoss().to(device),
+                                TotalVariationLoss().to(device)], weights=[0.8, 0.2]),
         # GAN
         # Segmentation losses
         'bce': BCEWithLogitsLoss2d(),
@@ -176,6 +178,7 @@ def init_model(config, device='cuda', gpus=1, args=None):
     config.model.magnification = config.training.magnification
     architecture = config.training.architecture
     vol = len(config.training.crop_small) == 3
+    vol = False
 
     # List available model architectures
     available_models = {
@@ -334,7 +337,7 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
         # Resize target with the given magnification to provide the input image
         new_size = (target.shape[0] // mag, target.shape[1] // mag, target.shape[2] // mag)
 
-        sigma = choice([1, 2, 3, 4, 5])
+        sigma = choice([1, 2, 3, 4])
         img = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=sigma).astype('uint8')
 
     elif config is not None:
@@ -366,12 +369,15 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
 
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.95:
-        res = 0.2  # In mm
-        print_orthogonal(img[0, :, :, :].numpy() / 255, title='Input', res=res)
+        #res = 0.2  # In mm
+        #print_orthogonal(img[0, :, :, :].numpy() / 255, title='Input', res=res)
 
-        print_orthogonal(target[0, :, :, :].numpy(), title='Target', res=res / mag)
+        #print_orthogonal(target[0, :, :, :].numpy(), title='Target', res=res / mag)
+        dims = img.size()
+        print_images([img[0, dims[1] // 2, :, :].numpy(), img[0, :, dims[2] // 2, :].numpy(),
+                      target[0, dims[1] // 2 * mag, :, :].numpy(), target[0, :, dims[2] // 2 * mag, :].numpy()])
 
-    return {data_key: img, target_key: target}
+    return {data_key: img[:, 7, :, :], target_key: target[:, 7, :, :]}
 
 
 def parse_color(root, entry, transform, data_key, target_key, debug=False):

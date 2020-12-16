@@ -320,14 +320,10 @@ class Rotate(ImageTransform):
         Range of rotation.
         If float, then (-angle_range, angle_range) will be used for transformation sampling.
         if None, then angle_range=(0,0).
-    interpolation : str or tuple or None
-        Interpolation type. Check the allowed interpolation types.
-    padding : str or tuple or None
-        Padding mode. Check the allowed padding modes.
     p : float
         Probability of using this transform
-    ignore_state : bool
-        Whether to ignore the state. See details in the docs for `MatrixTransform`.
+    vol : bool
+        Whether the rotation is applied in a 3D fashion (rotate on other than the first two dimensions)
 
     """
 
@@ -370,6 +366,11 @@ class Translate(ImageTransform):
     range_y: tuple or int or None
         Translation range along the vertical axis. If int, then range_y=(-range_y, range_y).
         If None, then range_y=(0,0).
+    range_z: tuple or int or None
+        Translation range along the depth axis. If int, then range_z=(-range_z, range_z).
+        If None, then data is assumed two-dimensional.
+    magnification: int
+        The relative size of input and target.
     p: float
         probability of applying this transform.
     """

@@ -31,9 +31,9 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 80
-  bs: 4
+  bs: 24
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: combined_tv
+  loss: mse_tv
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False
@@ -46,7 +46,7 @@ training:
 transforms:
   probability: 0.5
   scale: [0.9, 1.1]
-  translation: 30
+  translation: 10
   rotation: [-30, 30]
   shear: [-0.1, 0.1]
   gamma: [0.7, 1.5]
