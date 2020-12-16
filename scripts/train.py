@@ -38,7 +38,7 @@ if __name__ == "__main__":
         # Update arguments according to the configuration file
         if len(config.training.crop_small) == 3:
 #            parser = partial(parse_3d, config=config)
-            parser = partial(parse_3d_debug, config=config)
+            parser = partial(parse_3d_debug, config=config)  # TODO
         else:
             parser = partial(parse_grayscale, config=config)
 

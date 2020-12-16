@@ -29,7 +29,7 @@ from BoneEnhance.components.transforms import train_test_transforms
 from BoneEnhance.components.models import EnhanceNet, EncoderDecoder, \
     WGAN_VGG_generator, WGAN_VGG_discriminator, WGAN_VGG, ConvNet, PerceptualNet
 from BoneEnhance.components.training.loss import PerceptualLoss, TotalVariationLoss
-from BoneEnhance.components.utilities import print_orthogonal, print_images, transfer_3d_to_random_2d
+from BoneEnhance.components.utilities import print_orthogonal, print_images, transfer_3d_to_random_2d, blur_3d
 from BoneEnhance.components.training.initialize_weights import InitWeight, init_weight_normal
 
 
@@ -394,28 +394,17 @@ def parse_3d_debug(root, entry, transform, data_key, target_key, debug=False, co
     # Channel dimension
     target = np.stack((target,) * 3, axis=-1)
 
+
     # Magnification
     mag = config.training.magnification
 
-    # Resize target to 4x magnification respect to input
     k = choice([5])
+    target_blur = blur_3d(target, k, 1)  # TODO RGB or 3D input?
 
     # Resize target to 4x magnification respect to input
     if config is not None and not config.training.crossmodality:
-
-        # Resize target to a relevant size (from the 3.2µm resolution to 51.2µm
-        new_size = (target.shape[1] // 16, target.shape[0] // 16)
-
-        # Antialiasing
-        target = cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0)
-
-        target = cv2.resize(target.copy(), new_size)  # .transpose(1, 0, 2)
-        #target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True).astype('uint8')
-
         new_size = (target.shape[1] // mag, target.shape[0] // mag)
 
-        # No antialias
-        #img = cv2.resize(target, new_size, interpolation=cv2.INTER_LANCZOS4)
         # Antialias
         img = cv2.resize(cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0), new_size)
     else:
@@ -430,7 +419,7 @@ def parse_3d_debug(root, entry, transform, data_key, target_key, debug=False, co
     target = target / 255.  # .permute(2, 0, 1) / 255.
 
     # Plot a small random portion of image-target pairs during debug
-    if debug and uniform(0, 1) >= 0.99:
+    if debug and uniform(0, 1) >= 0.95:
         fig = plt.figure(dpi=300)
         ax1 = fig.add_subplot(121)
         im = ax1.imshow(np.asarray(img.permute(1, 2, 0) / 255.), cmap='gray')
@@ -444,31 +433,6 @@ def parse_3d_debug(root, entry, transform, data_key, target_key, debug=False, co
         plt.show()
 
     return {data_key: img, target_key: target}
-
-
-def parse_color(root, entry, transform, data_key, target_key, debug=False):
-    # Image and mask generation
-    img = cv2.imread(str(entry.fname))
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    mask = cv2.imread(str(entry.mask_fname), 0) / 255.
-
-    if img.shape[0] != mask.shape[0]:
-        img = cv2.resize(img, (mask.shape[1], mask.shape[0]))
-    elif img.shape[1] != mask.shape[1]:
-        mask = mask[:, :img.shape[1]]
-
-    img, mask = transform((img, mask))
-    img = img.permute(2, 0, 1) / 255.  # img.shape[0] is the color channel after permute
-
-    # Debugging
-    if debug:
-        plt.imshow(np.asarray(img).transpose((1, 2, 0)))
-        plt.imshow(np.asarray(mask).squeeze(), alpha=0.3)
-        plt.show()
-
-    # Images are in the format 3xHxW
-    # and scaled to 0-1 range
-    return {data_key: img, target_key: mask}
 
 
 def save_config(path, config, args):

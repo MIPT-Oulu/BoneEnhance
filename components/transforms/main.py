@@ -101,11 +101,13 @@ def train_test_transforms(conf, mean=None, std=None):
     crop_small = tuple(training.crop_small)
     crop_large = tuple([crop * training.magnification for crop in crop_small])
     prob = trf.probability
+    #vol = len(crop_small) == 3
+    vol = False  # TODO
     # Training transforms
-    train_transforms = [return_transforms(prob, trf, training.magnification, crop_small, len(crop_small) == 3)]
+    train_transforms = [return_transforms(prob, trf, training.magnification, crop_small, vol)]
 
     # 2D or 3D?
-    if len(crop_small) == 3:
+    if vol:
         axis = (0, 1, 2, 3)
     else:
         axis = (0, 1, 2)
