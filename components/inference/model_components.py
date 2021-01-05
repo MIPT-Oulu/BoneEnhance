@@ -49,7 +49,7 @@ def load_models(model_path, config, n_gpus=1, magnification=4, fold=None):
         'perceptualnet': PerceptualNet(config.training.magnification,
                                        resize_convolution=config.training.upscale_input,
                                        norm=config.training.normalization,
-                                       vol=vol),
+                                       vol=vol, rgb=config.training.rgb),
     }
 
     # List the models
@@ -61,7 +61,7 @@ def load_models(model_path, config, n_gpus=1, magnification=4, fold=None):
             model = nn.DataParallel(PerceptualNet(config.training.magnification,
                                                   resize_convolution=config.training.upscale_input,
                                                   norm=config.training.normalization,
-                                                  vol=vol))
+                                                  vol=vol, rgb=config.training.rgb))
         else:
             model = available_models[config.training.architecture]
         model.load_state_dict(torch.load(models[fold]))

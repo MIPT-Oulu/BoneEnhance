@@ -51,10 +51,13 @@ class PerceptualNet(nn.Module):
     Super resolution network used in 'Perceptual Losses for Real-Time Style Transfer and Super-Resolution'
     by Johnson et al, https://arxiv.org/abs/1603.08155
     """
-    def __init__(self, magnification, activation='relu', resize_convolution=False, norm='bn', vol=False):
+    def __init__(self, magnification, activation='relu', resize_convolution=False, norm='bn', vol=False,
+                 final_activation=False, rgb=True):
         super(PerceptualNet, self).__init__()
 
         # Variables
+        self.rgb = rgb
+        self.final_activation = final_activation
         self.magnification = magnification
         # Activation
         if activation == 'relu':
@@ -79,7 +82,7 @@ class PerceptualNet(nn.Module):
             convolution = nn.Conv3d
             convolution_t = nn.ConvTranspose3d
             #upsampling = partial(nn.Upsample, mode='trilinear')
-            upsampling = nn.Upsample  # Nearest neighbors
+            upsampling = nn.Upsample  # Nearest neighbors # TODO upsampling with F.upsample
             padding = nn.ReplicationPad3d
         else:
             convolution = nn.Conv2d
@@ -88,7 +91,10 @@ class PerceptualNet(nn.Module):
             padding = nn.ReflectionPad2d
 
         # Kernel
-        f_maps = [3, 64, 1]  # RGB
+        if rgb:
+            f_maps = [3, 64, 1]  # RGB
+        else:
+            f_maps = [1, 64, 1]  # One-channel
         kernel = 3
         pad = kernel // 2
 
@@ -138,16 +144,19 @@ class PerceptualNet(nn.Module):
 
     def forward(self, x):
         # Pass through the model
-        x = self.net(x)  # TODO upsampling with F.upsample
+        x = self.net(x)
 
         # Duplicate 1-channel image to represent RGB
-        if len(x.size()) == 5:
-            x = x.repeat(1, 3, 1, 1, 1)
-        else:
-            x = x.repeat(1, 3, 1, 1)
+        if self.rgb:
+            if len(x.size()) == 5:
+                x = x.repeat(1, 3, 1, 1, 1)
+            else:
+                x = x.repeat(1, 3, 1, 1)
 
         # Scaled Tanh activation
-        #x = x.tanh()
-        #x = x.add(1.)
-        #x = x.mul(0.5)
+        if self.final_activation:
+            x = x.tanh()
+            # No need for scaling since no negative values are obtained
+            #x = x.add(1.)
+            #x = x.mul(0.5)
         return x

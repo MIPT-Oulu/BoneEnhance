@@ -448,14 +448,57 @@ def print_images(images, masks=None, title=None, subtitles=None, save_path=None,
         plt.show()
 
 
-def transfer_3d_to_random_2d(stack):
+def convert_3d_to_random_2d(stack, mag=None):
+    """If two stacks, input smaller first!"""
     axis = random.choice([0, 1, 2])
-    dim = stack.shape[axis]
-    slice = random.randint(0, dim - 1)
 
-    if axis == 0:
-        return stack[slice, :, :]
-    elif axis == 1:
-        return stack[:, slice, :]
+    if isinstance(stack, (list, tuple)):
+        dim = stack[0].shape[axis]
+        slice = random.randint(0, dim - 1)
+        if mag is None:
+            mag = stack[1].shape[axis] // dim
+
+        if axis == 0:
+            return [stack[0][slice, :, :], stack[1][slice * mag, :, :]]
+        elif axis == 1:
+            return [stack[0][:, slice, :], stack[1][:, slice * mag, :]]
+        else:
+            return [stack[0][:, :, slice], stack[1][:, :, slice * mag]]
     else:
-        return stack[:, :, slice]
+        dim = stack.shape[axis]
+        slice = random.randint(0, dim - 1)
+
+        if axis == 0:
+            return stack[slice, :, :]
+        elif axis == 1:
+            return stack[:, slice, :]
+        else:
+            return stack[:, :, slice]
+
+
+def convert_3d_tensor_to_random_2d(stack, mag=None):
+    """If two stacks, input smaller first!"""
+    axis = random.choice([0, 1, 2])
+
+    if isinstance(stack, (list, tuple)):
+        dim = stack[0].size(axis)
+        slice = random.randint(0, dim - 1)
+        if mag is None:
+            mag = stack[1].size(axis) // dim
+
+        if axis == 0:
+            return [stack[0][:, :, slice, :, :], stack[1][:, :, slice * mag, :, :]]
+        elif axis == 1:
+            return [stack[0][:, :, :, slice, :], stack[1][:, :, :, slice * mag, :]]
+        else:
+            return [stack[0][:, :, :, :, slice], stack[1][:, :, :, :, slice * mag]]
+    else:
+        dim = stack.size(axis)
+        slice = random.randint(0, dim - 1)
+
+        if axis == 0:
+            return stack[:, :, slice, :, :]
+        elif axis == 1:
+            return stack[:, :, :, slice, :]
+        else:
+            return stack[:, :, :, :, slice]

@@ -38,12 +38,12 @@ def return_transforms(prob, trf, magnification, crop_small, vol=False):
                     ]),
 
                 # 50% Chance for Added noise
-                slc.SelectiveStream([
-                    Noise(p=prob, mode='gaussian', gain_range=trf['gain_gn']),
-                    Noise(p=prob, mode='poisson', gain_range=trf['gain_gn']),
-                    Noise(p=prob, mode='s&p', gain_range=trf['gain_sp']),
-                    Noise(p=prob, mode='speckle', gain_range=trf['gain_sp']),
-                ])
+                #slc.SelectiveStream([
+                #    Noise(p=prob, mode='gaussian', gain_range=trf['gain_gn']),
+                #    Noise(p=prob, mode='poisson', gain_range=trf['gain_gn']),
+                #    Noise(p=prob, mode='s&p', gain_range=trf['gain_sp']),
+                #    Noise(p=prob, mode='speckle', gain_range=trf['gain_sp']),
+                #])
             ]),
 
             # Empty stream

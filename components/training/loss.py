@@ -2,8 +2,9 @@ import matplotlib.pyplot as plt
 import torch
 from torch import nn, Tensor
 from BoneEnhance.components.models.wgan import WGAN_VGG_FeatureExtractor
-from BoneEnhance.components.models.perceptual_loss import Vgg16
+from BoneEnhance.components.models import Vgg16, AutoEncoder, load_models
 from BoneEnhance.components.training.initialize_weights import InitWeight, init_weight_normal
+from BoneEnhance.components.utilities import convert_3d_tensor_to_random_2d
 from random import uniform
 
 
@@ -16,12 +17,15 @@ class PerceptualLoss(nn.Module):
     """
 
     def __init__(self, criterion=nn.L1Loss(), compare_layer=None, mean=None, std=None, imagenet_normalize=True,
-                 gram=True, plot=False, vol=False):
+                 gram=True, plot=True, vol=False, zeros=True, gpus=1, rgb=True):
         super(PerceptualLoss, self).__init__()
+        # vol=False  # Test 2D loss on 3D model
         if compare_layer is None:
             self.feature_extractor = WGAN_VGG_FeatureExtractor()
+        elif isinstance(compare_layer, str):
+            self.feature_extractor = load_models(compare_layer, vol=vol, rgb=False, fold=0, gpus=gpus)
         else:
-            self.feature_extractor = Vgg16(vol=vol)
+            self.feature_extractor = Vgg16(vol=vol, zeros=zeros)
             #self.feature_extractor.train()
 
             # Weight init
@@ -38,11 +42,22 @@ class PerceptualLoss(nn.Module):
         self.calculate_gram = gram
         self.plot = plot
         self.vol = vol
+        self.rgb = rgb
 
     def forward(self, logits, targets):
 
-        #logits = logits.detach().clone()
-        #targets = targets.detach().clone()
+        # Convert to RGB
+        if logits.size(1) != 3 and self.rgb:
+            if logits.dim() == 5:
+                logits = logits.repeat(1, 3, 1, 1, 1)
+                targets = targets.repeat(1, 3, 1, 1, 1)
+            else:
+                logits = logits.repeat(1, 3, 1, 1,)
+                targets = targets.repeat(1, 3, 1, 1)
+
+        # Use 2D loss for 3D data
+        if not self.vol and logits.dim() == 5:
+            logits, targets = convert_3d_tensor_to_random_2d([logits, targets], mag=1)
 
         # Scale to imagenet mean and std
         if self.imagenet_normalize:
@@ -61,33 +76,14 @@ class PerceptualLoss(nn.Module):
             # Obtain features from different layers
             pred_feature = self.feature_extractor(logits)
             target_feature = self.feature_extractor(targets)
-            # Only 2 first layers
-            #pred_feature = {key: pred_feature[key] for key in pred_feature.keys() & {'relu1_2', 'relu2_2'}}
-            #target_feature = {key: target_feature[key] for key in target_feature.keys() & {'relu1_2', 'relu2_2'}}
+
+            if not isinstance(pred_feature, dict):
+                pred_feature = {self.compare_layer: pred_feature}
+                target_feature = {self.compare_layer: target_feature}
 
             # Plot feature maps
-            if self.plot and uniform(0, 1) >= 0.99:
-                for i in range(1):
-                    fig, axs = plt.subplots(2, 5)
-                    f_map = 24
-
-                    # Plot input
-                    axs[0, 0].imshow(logits.detach().cpu()[i, 0, :, :], cmap='gray')
-                    axs[0, 0].set_title('Prediction')
-
-                    axs[1, 0].imshow(targets.detach().cpu()[i, 0, :, :], cmap='gray')
-                    axs[1, 0].set_title('Target')
-
-                    # Plot activations
-                    for key, j in zip(pred_feature.keys(), range(1, 5)):
-                        axs[0, j].imshow(pred_feature[key].detach().cpu()[i, f_map, :, :],
-                                         cmap='gray')
-                        axs[0, j].set_title(key)
-
-                        axs[1, j].imshow(target_feature[key].detach().cpu()[i, f_map, :, :],
-                                         cmap='gray')
-                        axs[1, j].set_title(key)
-                    fig.show()
+            if self.plot and uniform(0, 1) >= 0.95:
+                self.plot_features(logits, targets, pred_feature, target_feature, num=1, f_map=24)
 
             # Calculate gram matrices
             if self.calculate_gram:
@@ -99,8 +95,6 @@ class PerceptualLoss(nn.Module):
                         pred_feature[key] = self.gram(pred_feature[key])
                         target_feature[key] = self.gram(target_feature[key])
 
-            # TODO: Compare 3D activations
-
             # Calculate loss layer by layer
             layer = self.compare_layer
             if isinstance(layer, list):
@@ -111,11 +105,11 @@ class PerceptualLoss(nn.Module):
 
                 # Weight the gram matrix loss to a reasonable range
                 if self.calculate_gram and self.vol:
-                    loss *= 1e-5
+                    loss *= 1e7
                 elif self.calculate_gram:
                     loss *= 1e5
                 elif self.vol:
-                    loss *= 1e-7
+                    loss *= 1#1e-7
             else:
                 loss = self.p_criterion(pred_feature[layer], target_feature[layer])
         return loss
@@ -135,6 +129,40 @@ class PerceptualLoss(nn.Module):
         f_T = f.transpose(1, 2)
         G = f.bmm(f_T) / (ch * d * h * w)
         return G
+
+    @staticmethod
+    def plot_features(logits, targets, pred_feature, target_feature, num=1, f_map=24):
+        for i in range(num):
+            fig, axs = plt.subplots(2, 5)
+
+            if logits.dim() == 5:
+                d = logits.size(2) // 2
+                # Plot input
+                axs[0, 0].imshow(logits.detach().cpu()[i, 0, d, :, :], cmap='gray')
+                axs[1, 0].imshow(targets.detach().cpu()[i, 0, d, :, :], cmap='gray')
+            else:
+                # Plot input
+                axs[0, 0].imshow(logits.detach().cpu()[i, 0, :, :], cmap='gray')
+                axs[1, 0].imshow(targets.detach().cpu()[i, 0, :, :], cmap='gray')
+
+            axs[0, 0].set_title('Prediction')
+            axs[1, 0].set_title('Target')
+
+            # Plot activations
+            for key, j in zip(pred_feature.keys(), range(1, 5)):
+
+                if logits.dim() == 5:
+                    d = pred_feature[key].size(2) // 2
+                    axs[0, j].imshow(pred_feature[key].detach().cpu()[i, f_map, d, :, :], cmap='gray')
+                    axs[1, j].imshow(target_feature[key].detach().cpu()[i, f_map, d, :, :], cmap='gray')
+
+                else:
+                    axs[0, j].imshow(pred_feature[key].detach().cpu()[i, f_map, :, :], cmap='gray')
+                    axs[1, j].imshow(target_feature[key].detach().cpu()[i, f_map, :, :], cmap='gray')
+
+                axs[0, j].set_title(key)
+                axs[1, j].set_title(key)
+            fig.show()
 
 
 class TotalVariationLoss(nn.Module):

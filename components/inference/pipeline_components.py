@@ -139,6 +139,7 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', weight=
             tiles_batch = (tiles_batch.float() / 255.).to(device)
 
         # Predict and move back to CPU
+        #pred_batch = inference_model(tiles_batch[:, 0, :, :].unsqueeze(1))
         pred_batch = inference_model(tiles_batch)
 
         # Plot

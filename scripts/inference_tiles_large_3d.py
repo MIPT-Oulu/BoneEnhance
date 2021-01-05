@@ -35,6 +35,7 @@ if __name__ == "__main__":
     snap = '2020_12_10_09_16_07_3D_perceptualnet_ds_20'  # Brightness and contrast augmentations applied
     snap = '2020_12_11_07_10_16_3D_perceptualnet_ds_16'  # Intensity augmentations applied
     snap = '2020_12_14_07_26_07_3D_perceptualnet_ds_16'  # Intensity and spatial augs
+    snap = '2020_12_21_12_58_39_3D_perceptualnet_ds_16'  # 2D perceptual loss, 3D model
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
@@ -90,7 +91,7 @@ if __name__ == "__main__":
     # samples = [os.path.basename(x) for x in glob(str(args.dataset_root / '*XZ'))]  # Load with specific name
     samples = os.listdir(args.dataset_root)
     samples.sort()
-    samples = [samples[id] for id in [4]]  # Get intended samples from list
+    samples = [samples[id] for id in [7]]  # Get intended samples from list
 
     # Skip the completed samples
     if args.completed > 0:

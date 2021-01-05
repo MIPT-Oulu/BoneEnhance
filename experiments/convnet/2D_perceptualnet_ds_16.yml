@@ -16,6 +16,7 @@ training:
   parse_color: False
   crop_small: [16, 16]
   crossmodality: False
+  rgb: False
   # Model
   architecture: perceptualnet
   upscale_input: True  # In PerceptualNet = resize-convolution
@@ -31,9 +32,9 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 80
-  bs: 48
+  bs: 36
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: mse_tv
+  loss: combined_tv
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False

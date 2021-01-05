@@ -5,3 +5,4 @@ from .perceptual_loss import *
 from .esrgan import *
 from .convnet import *
 from .perceptual_net import *
+from .autoencoder import *
