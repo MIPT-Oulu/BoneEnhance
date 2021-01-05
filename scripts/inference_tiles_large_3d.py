@@ -36,6 +36,7 @@ if __name__ == "__main__":
     snap = '2020_12_11_07_10_16_3D_perceptualnet_ds_16'  # Intensity augmentations applied
     snap = '2020_12_14_07_26_07_3D_perceptualnet_ds_16'  # Intensity and spatial augs
     snap = '2020_12_21_12_58_39_3D_perceptualnet_ds_16'  # 2D perceptual loss, 3D model
+    snap = '2021_01_05_09_21_06_3D_perceptualnet_ds_16'  # Autoencoder perceptual loss, 2 folds
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
@@ -91,7 +92,7 @@ if __name__ == "__main__":
     # samples = [os.path.basename(x) for x in glob(str(args.dataset_root / '*XZ'))]  # Load with specific name
     samples = os.listdir(args.dataset_root)
     samples.sort()
-    samples = [samples[id] for id in [7]]  # Get intended samples from list
+    samples = [samples[id] for id in [6]]  # Get intended samples from list
 
     # Skip the completed samples
     if args.completed > 0:
@@ -109,7 +110,7 @@ if __name__ == "__main__":
             data_xy, files = load(str(args.dataset_root / sample), rgb=True, axis=(1, 2, 0))
 
         # 3-channel
-        if len(data_xy.shape) != 4:
+        if len(data_xy.shape) != 4 and config.training.rgb:
             data_xy = np.expand_dims(data_xy, 3)
             data_xy = np.repeat(data_xy, 3, axis=3)
 

@@ -79,9 +79,9 @@ class Tiler3D:
 
     def crop_to_orignal_size(self, image):
         crop = image[
-            self.margin_begin[0]: self.out[0] + self.margin_end[0],
-            self.margin_begin[1]: self.out[1] + self.margin_end[1],
-            self.margin_begin[2]: self.out[2] + self.margin_end[2],
+            self.margin_begin[0] * self.mag: self.out[0] + self.margin_begin[0] * self.mag,
+            self.margin_begin[1] * self.mag: self.out[1] + self.margin_begin[1] * self.mag,
+            self.margin_begin[2] * self.mag: self.out[2] + self.margin_begin[2] * self.mag,
         ]
         return crop
 
