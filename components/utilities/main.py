@@ -127,7 +127,8 @@ def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False):
     if axis != (0, 1, 2) and rgb:
         return np.transpose(np.array(data), axis + (3,)), files
     elif axis != (0, 1, 2):
-        return np.transpose(np.array(data), axis), files
+        data = np.transpose(np.array(data), axis)
+        return np.expand_dims(data, -1), files
     return np.array(data), files
 
 

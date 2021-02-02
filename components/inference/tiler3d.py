@@ -101,7 +101,9 @@ class Tiler3D:
             image[:, x: x + tile_x, y: y + tile_y, z: z + tile_z] += tile * w
             norm_mask[:, x: x + tile_x, y: y + tile_y, z: z + tile_z] += w
 
-        #norm_mask = np.clip(norm_mask, a_min=np.finfo(norm_mask.dtype).eps, a_max=None)
+        # Ensure no division by 0
+        norm_mask = np.clip(norm_mask, a_min=np.finfo(norm_mask.dtype).eps, a_max=None)
+        # Account for overlapping regions
         image = np.divide(image, norm_mask).astype(dtype)
         image = np.moveaxis(image, 0, -1).astype(dtype)
         image = self.crop_to_orignal_size(image)

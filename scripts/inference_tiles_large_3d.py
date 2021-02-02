@@ -37,6 +37,7 @@ if __name__ == "__main__":
     snap = '2020_12_14_07_26_07_3D_perceptualnet_ds_16'  # Intensity and spatial augs
     snap = '2020_12_21_12_58_39_3D_perceptualnet_ds_16'  # 2D perceptual loss, 3D model
     snap = '2021_01_05_09_21_06_3D_perceptualnet_ds_16'  # Autoencoder perceptual loss, 2 folds
+    snap = '2021_01_11_05_41_47_3D_perceptualnet_ds_autoencoder_16'  # Autoencoder, 4 folds, 2 layers
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
@@ -45,7 +46,7 @@ if __name__ == "__main__":
     parser.add_argument('--plot', type=bool, default=False)
     parser.add_argument('--weight', type=str, choices=['pyramid', 'mean'], default='mean')
     parser.add_argument('--completed', type=int, default=0)
-    parser.add_argument('--step', type=int, default=1, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
+    parser.add_argument('--step', type=int, default=3, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
     parser.add_argument('--avg_planes', type=bool, default=False)
     parser.add_argument('--cuda', type=bool, default=False, help='Whether to merge the inference tiles on GPU or CPU')
     parser.add_argument('--mask', type=bool, default=False, help='Whether to remove background with postprocessing')

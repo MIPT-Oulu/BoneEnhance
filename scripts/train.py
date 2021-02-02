@@ -14,7 +14,8 @@ from collagen.callbacks import SamplingFreezer, ScalarMeterLogger, ImageSampling
 
 
 from BoneEnhance.components.training.session import create_data_provider, init_experiment, init_callbacks, \
-    save_transforms, init_loss, parse_grayscale, init_model, parse_3d, parse_3d_debug
+    save_transforms, init_loss, init_model
+from BoneEnhance.components.training import parse_grayscale, parse_3d, parse_3d_debug
 from BoneEnhance.components.splits import build_splits
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
 

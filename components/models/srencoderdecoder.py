@@ -7,11 +7,11 @@ from torch import nn
 from torch.nn import functional as F
 
 
-class EncoderDecoder(Module):
+class SREncoderDecoder(Module):
     def __init__(self, n_outputs, backbone: str or Module, decoder: str or Module,
                  decoder_normalization='BN', spatial_dropout=None, bayesian_dropout=None,
                  magnification=4):
-        super(EncoderDecoder, self).__init__()
+        super(SREncoderDecoder, self).__init__()
         if isinstance(backbone, str):
             if backbone in constants.allowed_encoders:
                 if 'resnet' in backbone:

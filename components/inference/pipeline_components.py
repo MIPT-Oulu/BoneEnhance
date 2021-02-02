@@ -21,7 +21,8 @@ from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculat
     calculate_volumetric_similarity, calculate_confusion_matrix_from_arrays as calculate_conf
 
 
-def inference(inference_model, args, config, img_full, device='cuda', weight='mean', plot=False, mean=None, std=None):
+def inference(inference_model, args, config, img_full, device='cuda', weight='mean', plot=False, mean=None, std=None,
+              tile=2):
     """
     Calculates inference on one image.
     """
@@ -34,13 +35,13 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
 
     # Cut large image into overlapping tiles
     tiler = ImageSlicer(img_full.shape, tile_size=(input_x, input_y),
-                        tile_step=(input_x // 2, input_y // 2), weight=weight)
+                        tile_step=(input_x // tile, input_y // tile), weight=weight)
                         #tile_step=(input_x, input_y), weight=weight)
 
     x_tile = np.min((input_x * mag, x_out))
     y_tile = np.min((input_y * mag, y_out))
     tiler_out = ImageSlicer((x_out, y_out, ch), tile_size=(x_tile, y_tile),
-                            tile_step=(x_tile // 2, y_tile // 2), weight=weight)
+                            tile_step=(x_tile // tile, y_tile // tile), weight=weight)
                             #tile_step=(x_tile, y_tile), weight=weight)
 
     # HCW -> CHW. Optionally, do normalization here

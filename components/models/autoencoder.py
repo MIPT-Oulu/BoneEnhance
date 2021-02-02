@@ -25,7 +25,7 @@ class AutoEncoder(nn.Module):
 
         # Construct the layers
         if vol:
-            encoder = [
+            encoder_1 = [
                 nn.Conv3d(f_maps[0], f_maps[1], kernel_size=kernel, stride=1, padding=pad, bias=True),
                 nn.ReLU(inplace=True),
                 nn.Conv3d(f_maps[1], f_maps[1], kernel_size=kernel, stride=1, padding=pad, bias=True),
@@ -37,30 +37,31 @@ class AutoEncoder(nn.Module):
                 nn.ReLU(inplace=True),
                 nn.Conv3d(f_maps[2], f_maps[2], kernel_size=kernel, stride=1, padding=pad, bias=True),
                 nn.ReLU(inplace=True),
-                
-                #nn.MaxPool3d(kernel_size=2, stride=2),
-                
-                #nn.Conv3d(f_maps[2], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
-                #nn.ReLU(inplace=True),
-                #nn.Conv3d(f_maps[3], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
-                #nn.ReLU(inplace=True),
-                #nn.Conv3d(f_maps[3], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
-                #nn.ReLU(inplace=True),
-                #nn.Conv3d(f_maps[3], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
-                #nn.ReLU(inplace=True),
+                ]
+
+            encoder_2 = [
+                nn.MaxPool3d(kernel_size=2, stride=2),
+                nn.Conv3d(f_maps[2], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
+                nn.ReLU(inplace=True),
+                nn.Conv3d(f_maps[3], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
+                nn.ReLU(inplace=True),
+                nn.Conv3d(f_maps[3], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
+                nn.ReLU(inplace=True),
+                nn.Conv3d(f_maps[3], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
+                nn.ReLU(inplace=True),
             ]
             decoder = [
-                #nn.Conv3d(f_maps[3], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
-                #nn.ReLU(inplace=True),
-                #nn.Conv3d(f_maps[3], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
-                #nn.ReLU(inplace=True),
-                #nn.Conv3d(f_maps[3], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
-                #nn.ReLU(inplace=True),
-                #nn.Conv3d(f_maps[3], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
-                #nn.ReLU(inplace=True),
+                nn.Conv3d(f_maps[3], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
+                nn.ReLU(inplace=True),
+                nn.Conv3d(f_maps[3], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
+                nn.ReLU(inplace=True),
+                nn.Conv3d(f_maps[3], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
+                nn.ReLU(inplace=True),
+                nn.Conv3d(f_maps[3], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
+                nn.ReLU(inplace=True),
                 
-                #nn.ConvTranspose3d(f_maps[3], f_maps[2], kernel_size=2, stride=2),
-                #nn.ReLU(inplace=True),
+                nn.ConvTranspose3d(f_maps[3], f_maps[2], kernel_size=2, stride=2),
+                nn.ReLU(inplace=True),
 
                 nn.Conv3d(f_maps[2], f_maps[2], kernel_size=kernel, stride=1, padding=pad, bias=True),
                 nn.ReLU(inplace=True),
@@ -76,7 +77,7 @@ class AutoEncoder(nn.Module):
                 nn.ReLU(inplace=True),
             ]
         else:
-            encoder = [
+            encoder_1 = [
                 nn.Conv2d(f_maps[0], f_maps[1], kernel_size=kernel, stride=1, padding=pad, bias=True),
                 nn.ReLU(inplace=True),
                 nn.Conv2d(f_maps[1], f_maps[1], kernel_size=kernel, stride=1, padding=pad, bias=True),
@@ -87,8 +88,8 @@ class AutoEncoder(nn.Module):
                 nn.Conv2d(f_maps[1], f_maps[2], kernel_size=kernel, stride=1, padding=pad, bias=True),
                 nn.ReLU(inplace=True),
                 nn.Conv2d(f_maps[2], f_maps[2], kernel_size=kernel, stride=1, padding=pad, bias=True),
-                nn.ReLU(inplace=True),
-
+                nn.ReLU(inplace=True),]
+            encoder_2 = [
                 nn.MaxPool2d(kernel_size=2, stride=2),
 
                 nn.Conv2d(f_maps[2], f_maps[3], kernel_size=kernel, stride=1, padding=pad, bias=True),
@@ -127,16 +128,16 @@ class AutoEncoder(nn.Module):
                 nn.ReLU(inplace=True),
             ]
             
-        layers = []
-        layers.extend(encoder)
-        layers.extend(decoder)
-
         # Compile
-        self.net = nn.Sequential(*layers)
+        self.encoder_1 = nn.Sequential(*encoder_1)
+        self.encoder_2 = nn.Sequential(*encoder_2)
+        self.decoder = nn.Sequential(*decoder)
 
     def forward(self, x):
         # Pass through the model
-        x = self.net(x)
+        x = self.encoder_1(x)
+        x = self.encoder_2(x)
+        x = self.decoder(x)
 
         # Duplicate 1-channel image to represent RGB
         if self.rgb:
@@ -149,6 +150,31 @@ class AutoEncoder(nn.Module):
         if self.final_activation:
             x = x.tanh()
         return x
+
+
+class AutoEncoderLayers(AutoEncoder):
+    def __init__(self, vol=False, final_activation=False, rgb=True):
+        super(AutoEncoderLayers, self).__init__(vol=vol, final_activation=final_activation, rgb=rgb)
+
+    def forward(self, x):
+        # Pass through the model
+        layer_1 = self.encoder_1(x)
+        layer_2 = self.encoder_2(layer_1)
+
+        # Duplicate 1-channel image to represent RGB
+        if self.rgb:
+            if len(x.size()) == 5:
+                layer_1 = layer_1.repeat(1, 3, 1, 1, 1)
+                layer_2 = layer_2.repeat(1, 3, 1, 1, 1)
+            else:
+                layer_1 = layer_1.repeat(1, 3, 1, 1)
+                layer_2 = layer_2.repeat(1, 3, 1, 1)
+
+        # Scaled Tanh activation
+        if self.final_activation:
+            layer_1 = layer_1.tanh()
+            layer_2 = layer_2.tanh()
+        return {'layer_1': layer_1, 'layer_2': layer_2}
 
 
 def load_models(model_path, vol=False, rgb=False, gpus=1, fold=None):

@@ -12,7 +12,7 @@ strategy:
 training:
   # General
   calc_meanstd: False
-  suffix: ''  # Options: _curated _reduced
+  suffix: '_3d_duplicates'  # Options: _curated _reduced
   parse_color: False
   crop_small: [16, 16, 16]
   crossmodality: False
@@ -23,6 +23,7 @@ training:
   add_residual: False
   activation: relu
   normalization: in
+  autoencoder_pretrained: 2021_01_08_11_19_18_3D_autoencoder_ds_16
   pretrain: False
   existing_model: dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit
   magnification: 4 
@@ -31,10 +32,10 @@ training:
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 80
-  bs: 4
+  epochs: 60
+  bs: 6
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: mse
+  loss: autoencoder_tv
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False

@@ -23,7 +23,7 @@ training:
   add_residual: False
   activation: relu
   normalization: in
-  autoencoder_pretrained: 2021_01_04_18_34_19_3D_autoencoder_ds_16
+  autoencoder_pretrained: 2021_01_08_11_19_18_3D_autoencoder_ds_16
   pretrain: False
   existing_model: dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit
   magnification: 4 
@@ -32,8 +32,8 @@ training:
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 80
-  bs: 4
+  epochs: 60
+  bs: 6
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: autoencoder_tv
   train_loss: True

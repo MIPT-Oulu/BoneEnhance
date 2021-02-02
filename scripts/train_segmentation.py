@@ -1,5 +1,4 @@
 from torch import optim, cuda
-import torch.nn as nn
 from time import time
 from copy import deepcopy
 import gc
@@ -16,10 +15,9 @@ from collagen.callbacks import SamplingFreezer, ScalarMeterLogger, ImageSampling
 
 from BoneEnhance.components.training.session import create_data_provider, init_experiment, init_callbacks, \
     save_transforms, init_loss, init_model
-from BoneEnhance.components.training import parse_grayscale, parse_autoencoder_2d, parse_autoencoder_3d
+from BoneEnhance.components.training import parse_grayscale, parse_3d, parse_3d_debug
 from BoneEnhance.components.splits import build_splits
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
-from BoneEnhance.components.models import AutoEncoder
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
@@ -30,7 +28,7 @@ if __name__ == "__main__":
     start = time()
 
     # Initialize experiment
-    args_base, config_list, device = init_experiment(experiments='../experiments/run_autoencoder')
+    args_base, config_list, device = init_experiment(experiments='../experiments/run_segmentation/')
 
     for experiment in range(len(config_list)):
         # Current experiment
@@ -40,9 +38,10 @@ if __name__ == "__main__":
 
         # Update arguments according to the configuration file
         if len(config.training.crop_small) == 3:
-            parser = partial(parse_autoencoder_3d, config=config)
+#            parser = partial(parse_3d, config=config)
+            parser = partial(parse_3d_debug, config=config)  # TODO Debug parser enabled
         else:
-            parser = partial(parse_autoencoder_2d, config=config)
+            parser = partial(parse_grayscale, config=config)
 
         # Split training folds
         parser_debug = partial(parser, debug=True)  # Display figures
@@ -51,30 +50,26 @@ if __name__ == "__main__":
         mean, std = splits_metadata['mean'], splits_metadata['std']
 
         # Loss
-        loss_criterion = nn.MSELoss().to(device)
+        loss_criterion = init_loss(config.training.loss, config, device=device, mean=mean, std=std, args=args)
 
         # Save transforms list
         save_transforms(args.snapshots_dir / config.training.snapshot, config, args, mean, std)
 
         # Training for separate folds
         for fold in range(config.training.n_folds):
+        #for fold in range(1):
             print(f'\nTraining fold {fold}')
             # Initialize data provider
             data_provider = create_data_provider(args, config, parser, metadata=splits_metadata[f'fold_{fold}'],
                                                  mean=mean, std=std)
 
             # Initialize model
-            vol = len(config.training.crop_small) == 3
-            if args.gpus > 1:
-                model = nn.DataParallel(AutoEncoder(vol=vol, rgb=config.training.rgb)).to(device)
-            else:
-                model = AutoEncoder(vol=vol, rgb=config.training.rgb).to(device)
+            model = init_model(config, device, args.gpus, args=args)
 
             # Optimizer
             optimizer = optim.Adam(model.parameters(),
                                    lr=config.training.lr,
-                                   #weight_decay=config.training.wd)
-                                   betas=(0.9, 0.999))
+                                   weight_decay=config.training.wd)
             # Callbacks
             train_cbs, val_cbs = init_callbacks(fold, config, args.snapshots_dir,
                                                 config.training.snapshot, model, optimizer, mean=mean, std=std)

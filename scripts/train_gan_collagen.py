@@ -13,7 +13,8 @@ from collagen.callbacks import SamplingFreezer, ScalarMeterLogger, ImageSampling
     BatchProcFreezer
 from collagen.losses import GeneratorLoss
 
-from BoneEnhance.components.training.session import init_experiment, save_transforms, parse_grayscale
+from BoneEnhance.components.training.session import init_experiment, save_transforms
+from BoneEnhance.components.training import parse_grayscale
 from BoneEnhance.components.splits import build_splits
 from BoneEnhance.components.gan.main import create_data_provider_gan, init_model_gan, DiscriminatorLoss
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner

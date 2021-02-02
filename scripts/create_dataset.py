@@ -8,17 +8,17 @@ from scipy.ndimage import zoom
 if __name__ == "__main__":
     # Initialize experiment
     args, config, device = init_experiment()
-    #images_loc = Path('/media/dios/kaappi/Sakke/Saskatoon/µCT/Recs_bone')
-    images_loc = Path('/media/santeri/data/BoneEnhance/Data/Test set (KP02)/target')
+    images_loc = Path('/media/dios/kaappi/Sakke/Saskatoon/µCT/Recs_bone')
+    #images_loc = Path('/media/santeri/data/BoneEnhance/Data/Test set (KP02)/target')
 
-    images_save = Path('/media/santeri/data/BoneEnhance/Data/external_testset')
+    images_save = Path('/media/santeri/data/BoneEnhance/Data/binary_images')
 
     images_save.mkdir(exist_ok=True)
 
-    subdir = ''
+    subdir = 'trabecular_data/Binned4x/bonemask'
     resample = True
     #factor = 200/2.75
-    factor = 64
+    factor = 4
     #n_slices = 100
 
     # Resample large number of slices
@@ -30,17 +30,19 @@ if __name__ == "__main__":
         print(f'Processing sample: {sample}')
         try:
             if resample:  # Resample slices
-                im_path = images_loc / sample
+                im_path = images_loc / sample / subdir
 
                 data, files = load(im_path, axis=(0, 1, 2))  #axis=(1, 2, 0))
+
+                (images_save / sample).mkdir(exist_ok=True)
 
                 for i in range(data.shape[0]):
                     image = data[i]
                     if factor != 1:
                         resize_target = (image.shape[1] // factor, image.shape[0] // factor)
-                        image = cv2.resize(image.copy(), resize_target, interpolation=cv2.INTER_LANCZOS4)
+                        image = cv2.resize(image.copy(), resize_target, interpolation=cv2.INTER_NEAREST)
 
-                    cv2.imwrite(str(images_save / files[i]), image)
+                    cv2.imwrite(str(images_save / sample / files[i]), image)
 
 
 
@@ -53,6 +55,6 @@ if __name__ == "__main__":
 
                     save(str(images_save / sample), sample + '_cor', data, dtype='.bmp')
 
-        except ValueError:
+        except (ValueError, FileNotFoundError):
             print(f'Error in sample {sample}')
             continue

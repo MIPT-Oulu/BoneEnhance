@@ -28,15 +28,16 @@ if __name__ == "__main__":
     snap = 'dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit'
     #snap = 'dios-erc-gpu_2020_10_19_14_09_24_3D_perceptualnet'
     #snap = 'dios-erc-gpu_2020_09_30_14_14_42_perceptualnet_noscaling_3x3_cm_curated_trainloss'
-    snap = '2020_12_15_10_28_57_2D_perceptualnet_ds_16'  # Latest 2D model with fixes, only 1 fold
     snap = '2021_01_08_09_49_45_2D_perceptualnet_ds_16'  # 2D model, 3 working folds
 
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='../../Data/target_original')
-    parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D/{snap}')
+    parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
+    #parser.add_argument('--dataset_root', type=Path, default='../../Data/Test set (KP02)/input_original')
+    parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_2D/{snap}')
     parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
     parser.add_argument('--bs', type=int, default=12)
+    parser.add_argument('--tile', type=int, default=4)
     parser.add_argument('--plot', type=bool, default=False)
     parser.add_argument('--weight', type=str, choices=['pyramid', 'mean'], default='mean')
     parser.add_argument('--completed', type=int, default=0)
@@ -45,7 +46,6 @@ if __name__ == "__main__":
                         default=f'../../Workdir/snapshots/{snap}')
     parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
     args = parser.parse_args()
-    #subdir = 'NN_prediction'  # 'NN_prediction'
 
     # Load snapshot configuration
     with open(args.snapshot / 'config.yml', 'r') as f:
@@ -75,7 +75,7 @@ if __name__ == "__main__":
     mean, std = tmp['mean'], tmp['std']
 
     # List the models
-    model_list = load_models(str(args.snapshot), config, n_gpus=args_experiment.gpus)
+    model_list = load_models(str(args.snapshot), config, n_gpus=args_experiment.gpus, fold=0)
 
     model = InferenceModel(model_list).to(device)
     model.eval()
@@ -85,7 +85,8 @@ if __name__ == "__main__":
     # samples = [os.path.basename(x) for x in glob(str(args.dataset_root / '*XZ'))]  # Load with specific name
     samples = os.listdir(args.dataset_root)
     samples.sort()
-    #samples = [samples[id] for id in [106]]  # Get intended samples from list
+
+    samples = [samples[id] for id in [6]]  # Get intended samples from list
 
     # Skip the completed samples
     if args.completed > 0:
@@ -96,65 +97,38 @@ if __name__ == "__main__":
         print(f'==> Processing sample {idx + 1} of {len(samples)}: {sample}')
 
         # Load image stacks
-        data_xy, files = load(str(args.dataset_root / sample), rgb=True, axis=(1, 2, 0))
+        data_xy, files = load(str(args.dataset_root / sample), rgb=config.training.rgb, axis=(1, 2, 0))
         x, y, z, ch = data_xy.shape
 
         print_orthogonal(data_xy[:, :, :, 0], invert=True, res=0.2, title='Input', cbar=True,
                          savepath=str(args.save_dir / 'visualizations' / (sample + '_input.png')),
                          scale_factor=1000)
 
-        data_xz = np.transpose(data_xy, (0, 2, 1, 3))  # X-Z-Y-Ch
-        data_yz = np.transpose(data_xy, (1, 2, 0, 3))  # Y-Z-X-Ch
-
-        # Interpolate 3rd dimension
-        data_xy = zoom(data_xy, zoom=(1, 1, config.training.magnification, 1))
-        data_xz = zoom(data_xz, zoom=(1, 1, config.training.magnification, 1))
-        data_yz = zoom(data_yz, zoom=(1, 1, config.training.magnification, 1))
-
         # Output shape
-        out_xy = np.zeros((x * mag, y * mag, z * mag))
-        out_xz = np.zeros((x * mag, z * mag, y * mag))
-        out_yz = np.zeros((y * mag, z * mag, x * mag))
+        out_xy = np.zeros((x * mag, y * mag, z))
 
         # Loop for image slices
         # 1st orientation
         with torch.no_grad():  # Do not update gradients
 
             for slice_idx in tqdm(range(data_xy.shape[2]), desc='Running inference, XY'):
-                out_xy[:, :, slice_idx] = inference(model, args, config, data_xy[:, :, slice_idx, :])
-
-            # 2nd and 3rd orientation
-            if args.avg_planes:
-                for slice_idx in tqdm(range(data_xz.shape[2]), desc='Running inference, XZ'):
-                    out_xz[:, :, slice_idx] = inference(model, args, config, data_xz[:, :, slice_idx, :])
-                for slice_idx in tqdm(range(data_yz.shape[2]), desc='Running inference, YZ'):
-                    out_yz[:, :, slice_idx] = inference(model, args, config, data_yz[:, :, slice_idx, :])
-
-        # Average probability maps
-        if args.avg_planes:
-            #mask_avg = ((mask_xz + np.transpose(mask_yz, (0, 2, 1))) / 2)
-            mask_avg = ((out_xy + np.transpose(out_xz, (0, 2, 1)) + np.transpose(out_yz, (2, 0, 1))) / 3)
-        else:
-            mask_avg = out_xy
-
-        # Free memory
-        del out_xz, out_yz
+                out_xy[:, :, slice_idx] = inference(model, args, config, data_xy[:, :, slice_idx, :], tile=args.tile)
 
         # Scale the dynamic range
-        mask_avg -= np.min(mask_avg)
-        mask_avg /= np.max(mask_avg)
+        out_xy -= np.min(out_xy)
+        out_xy /= np.max(out_xy)
 
-        mask_avg = (mask_avg * 255).astype('uint8')
+        out_xy = (out_xy * 255).astype('uint8')
 
         # Save predicted full mask
-        save(str(args.save_dir / sample), sample, mask_avg, dtype=args.dtype)
+        save(str(args.save_dir / sample), sample, out_xy, dtype=args.dtype)
         """
         render_volume(data_yz[:, :, :, 0] * mask_final,
                       savepath=str(args.save_dir / 'visualizations' / (sample + '_render' + args.dtype)),
                       white=True, use_outline=False)
         """
 
-        print_orthogonal(mask_avg, invert=True, res=0.2/4, title='Output', cbar=True,
+        print_orthogonal(out_xy, invert=True, res=0.2 / 4, title='Output', cbar=True,
                          savepath=str(args.save_dir / 'visualizations' / (sample + '_prediction.png')),
                          scale_factor=1000)
 

@@ -6,8 +6,8 @@ import cv2
 from functools import partial
 from torch.nn import BCEWithLogitsLoss, L1Loss, BCELoss, MSELoss
 
-from BoneEnhance.components.training.session import init_experiment, save_transforms, parse_grayscale, \
-    create_data_provider, init_loss
+from BoneEnhance.components.training.session import init_experiment, save_transforms, create_data_provider, init_loss
+from BoneEnhance.components.training import parse_grayscale
 from BoneEnhance.components.splits import build_splits
 from BoneEnhance.components.gan import init_model_gan, init_callbacks, Trainer
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
