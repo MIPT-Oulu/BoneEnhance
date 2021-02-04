@@ -9,10 +9,11 @@ from PIL import Image
 
 if __name__ == "__main__":
     # Initialize experiment
-    images_loc = Path('/media/dios/kaappi/Sakke/Saskatoon/µCT/Recs_bone')
+    #images_loc = Path('/media/dios/kaappi/Sakke/Saskatoon/µCT/Recs_bone')
+    images_loc = Path('/media/santeri/data/BoneEnhance/Data/target_binary')
     input_loc = Path('/media/santeri/data/BoneEnhance/Data/input_original')
 
-    images_save = Path('/media/santeri/data/BoneEnhance/Data/target_coronal')
+    images_save = Path('/media/santeri/data/BoneEnhance/Data/target_binary_resampled')
     images_save.mkdir(exist_ok=True)
 
     # List samples
@@ -24,8 +25,8 @@ if __name__ == "__main__":
 
     samples.sort()
     samples_input.sort()
-    samples = samples[30:]
-    samples_input = samples_input[30:]
+    #samples = samples[30:]
+    #samples_input = samples_input[30:]
     for i in range(len(samples)):
         print(f'Processing sample: {samples[i]}')
 
@@ -33,8 +34,8 @@ if __name__ == "__main__":
         im_path = images_loc / samples[i]
 
         # (1, 2, 0) = Original dimension
-        data_input, _ = load(input_path, axis=(0, 1, 2))  # axis=(1, 2, 0))
-        data, _ = load(im_path, axis=(0, 1, 2))  # axis=(1, 2, 0))
+        data_input, _ = load(input_path, axis=(1, 2, 0))  # axis=(1, 2, 0))
+        data, _ = load(im_path, axis=(1, 2, 0))  # axis=(1, 2, 0))
 
         data_resample = np.zeros((data.shape[0], data.shape[1], data_input.shape[2]))
 

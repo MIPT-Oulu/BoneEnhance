@@ -90,6 +90,78 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     return {data_key: img, target_key: target}
 
 
+def parse_segmentation(root, entry, transform, data_key, target_key, debug=False, config=None):
+
+    # Read image and target
+    if config.training.rgb:
+        img = cv2.imread(str(entry.fname), -1)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img[:, :, 1] = img[:, :, 0]
+        img[:, :, 2] = img[:, :, 0]
+    else:
+        img = cv2.imread(str(entry.fname), cv2.IMREAD_GRAYSCALE)
+
+    # Segmentation mask
+    target = cv2.imread(str(entry.target_fname), cv2.IMREAD_GRAYSCALE)
+
+    # Magnification
+    mag = config.training.magnification
+    k = choice([5])
+
+    # Binarize µCT image, then downscale
+    if not config.training.crossmodality:
+        # Get the downscaled input image
+        new_size = (img.shape[1], img.shape[0])
+        # Antialiasing and downscaling
+        img = cv2.resize(cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0), new_size)
+
+        img = np.expand_dims(img, -1)
+        if config.training.rgb:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+
+    # No modifications needed when using CBCT img
+
+    # Segmentation target
+    threshold = 90
+    target = (target > threshold).astype('uint8')
+
+    # Set target size to 4x input
+    new_size = (img.shape[1] * mag, img.shape[0] * mag)
+    target = cv2.resize(target, new_size, interpolation=cv2.INTER_NEAREST)
+
+    # Set input size to match target
+    new_size = (target.shape[1], target.shape[0])
+    img = cv2.resize(img, new_size, interpolation=cv2.INTER_CUBIC)
+
+    # Make sure that grayscale images also possess channel dimension
+    #if len(img.shape) != 3:
+
+    #if len(target.shape) != 3:
+    #    target = np.expand_dims(target, -1)
+
+    # Apply random transforms. Images are returned in format 3xHxW
+    img, target = transform((img, target))
+
+    # Target is scaled to 0-1 range
+    #target = target / 255.
+
+    # Plot a small random portion of image-target pairs during debug
+    if debug and uniform(0, 1) >= 0.99:
+        fig = plt.figure(dpi=300)
+        ax1 = fig.add_subplot(121)
+        im = ax1.imshow(np.asarray(img[0, :, :] / 255.), cmap='gray')
+        plt.colorbar(im, orientation='horizontal')
+        plt.title('Input')
+
+        ax2 = fig.add_subplot(122)
+        im2 = ax2.imshow(np.asarray(target[0, :, :]), cmap='gray')
+        plt.colorbar(im2, orientation='horizontal')
+        plt.title('Target')
+        plt.show()
+
+    return {data_key: img, target_key: target}
+
+
 def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=None):
     # Load target with hdf5
     with h5py.File(entry.target_fname, 'r') as f:

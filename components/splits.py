@@ -9,7 +9,7 @@ from tqdm import tqdm
 from BoneEnhance.components.transforms import train_test_transforms
 
 
-def build_meta_from_files(base_path, config):
+def build_meta_from_files(base_path, config, args=None):
     # Dataframe for the metadata
     metadata = {'fname': [], 'target_fname': []}
 
@@ -18,6 +18,10 @@ def build_meta_from_files(base_path, config):
         suffix = '_3d'
     else:
         suffix = config.training.suffix
+    #if args.segmentation:
+        #target_loc = base_path / f'target_binary_resampled'
+        #input_loc = base_path / f'input_original'
+
     if config.training.suffix is not None:
         target_loc = base_path / f'target{suffix}'
         input_loc = base_path / f'input{suffix}'
@@ -61,7 +65,7 @@ def build_meta_from_files(base_path, config):
 
 def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     # Metadata
-    metadata = build_meta_from_files(data_dir, config)
+    metadata = build_meta_from_files(data_dir, config, args=args)
     # Group_ID
     #metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:-1]), 0)
     metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:1]), 0)
@@ -81,7 +85,7 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
         mean, std = tmp['mean'], tmp['std']
     else:  # Calculate
         print('==> Estimating mean and std')
-        mean, std = estimate_mean_std(config, metadata, parser, args.num_threads, config['training']['bs'])
+        mean, std = estimate_mean_std(config, args, metadata, parser)
         torch.save({'mean': mean, 'std': std}, mean_std_path)
 
     print('==> Mean:', mean)
@@ -110,11 +114,11 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     return splits_metadata
 
 
-def estimate_mean_std(config, metadata, parse_item_cb, num_threads=8, bs=16):
+def estimate_mean_std(config, args, metadata, parse_item_cb):
     mean_std_loader = ItemLoader(meta_data=metadata,
-                                 transform=train_test_transforms(config)['train'],
+                                 transform=train_test_transforms(config, args)['train'],
                                  parse_item_cb=parse_item_cb,
-                                 batch_size=bs, num_workers=num_threads,
+                                 batch_size=config.training.bs, num_workers=args.num_threads,
                                  shuffle=False)
 
     mean = None

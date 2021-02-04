@@ -182,27 +182,27 @@ def init_loss(loss, config, device='cuda', mean=None, std=None, args=None):
 
 
 def init_model(config, device='cuda', gpus=1, args=None):
-    config.model.magnification = config.training.magnification
     architecture = config.training.architecture
     vol = len(config.training.crop_small) == 3
     #vol = False  # TODO compare 2D and 3D models
 
     # List available model architectures
     if architecture == 'srencoderdecoder':
+        config.model.magnification = config.training.magnification
         model = SREncoderDecoder(**config['model'])
     elif architecture == 'encoderdecoder':
         model = EncoderDecoder(**config['model'])
     elif architecture == 'enhance':
         model = EnhanceNet(config.training.crop_small, config.training.magnification,
-                          activation=config.training.activation,
-                          add_residual=config.training.add_residual,
-                          upscale_input=config.training.upscale_input)
+                           activation=config.training.activation,
+                           add_residual=config.training.add_residual,
+                           upscale_input=config.training.upscale_input)
     elif architecture == 'convnet':
         model = ConvNet(config.training.magnification,
-                       activation=config.training.activation,
-                       upscale_input=config.training.upscale_input,
-                       n_blocks=config.training.n_blocks,
-                       normalization=config.training.normalization)
+                        activation=config.training.activation,
+                        upscale_input=config.training.upscale_input,
+                        n_blocks=config.training.n_blocks,
+                        normalization=config.training.normalization)
     elif architecture == 'perceptualnet':
         model = PerceptualNet(config.training.magnification,
                               resize_convolution=config.training.upscale_input,
@@ -216,7 +216,6 @@ def init_model(config, device='cuda', gpus=1, args=None):
 
     # Check for multi-gpu
     if gpus > 1:
-        #model = nn.DataParallel(available_models[architecture])
         model = nn.DataParallel(model)
 
     # Save the model architecture
@@ -243,7 +242,7 @@ def create_data_provider(args, config, parser, metadata, mean, std):
     item_loaders = dict()
     for stage in ['train', 'eval']:
         item_loaders[f'loader_{stage}'] = ItemLoader(meta_data=metadata[stage],
-                                                     transform=train_test_transforms(config, mean, std)[stage],
+                                                     transform=train_test_transforms(config, args, mean, std)[stage],
                                                      parse_item_cb=parser,
                                                      batch_size=config.training.bs, num_workers=args.num_threads,
                                                      shuffle=True if stage == "train" else False)
@@ -269,7 +268,7 @@ def save_config(path, config, args):
 
 
 def save_transforms(path, config, args, mean, std):
-    transforms = train_test_transforms(config, mean, std)
+    transforms = train_test_transforms(config, args, mean, std)
     # Save the experiment parameters
     with open(path / 'transforms.yaml', 'w') as f:
         yaml.dump(transforms['train_list'][1].to_yaml(), f)

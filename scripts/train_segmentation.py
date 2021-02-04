@@ -15,7 +15,7 @@ from collagen.callbacks import SamplingFreezer, ScalarMeterLogger, ImageSampling
 
 from BoneEnhance.components.training.session import create_data_provider, init_experiment, init_callbacks, \
     save_transforms, init_loss, init_model
-from BoneEnhance.components.training import parse_grayscale, parse_3d, parse_3d_debug
+from BoneEnhance.components.training import parse_segmentation
 from BoneEnhance.components.splits import build_splits
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
 
@@ -29,6 +29,7 @@ if __name__ == "__main__":
 
     # Initialize experiment
     args_base, config_list, device = init_experiment(experiments='../experiments/run_segmentation/')
+    args_base.segmentation = True
 
     for experiment in range(len(config_list)):
         # Current experiment
@@ -38,10 +39,9 @@ if __name__ == "__main__":
 
         # Update arguments according to the configuration file
         if len(config.training.crop_small) == 3:
-#            parser = partial(parse_3d, config=config)
-            parser = partial(parse_3d_debug, config=config)  # TODO Debug parser enabled
+            raise Exception('No 3D segmentation supported!')
         else:
-            parser = partial(parse_grayscale, config=config)
+            parser = partial(parse_segmentation, config=config)
 
         # Split training folds
         parser_debug = partial(parser, debug=True)  # Display figures

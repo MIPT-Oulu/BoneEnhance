@@ -72,7 +72,7 @@ def init_model_gan(config, device='cuda', gpus=1):
 def create_data_provider_gan(g_network, item_loaders, args, config, parser, metadata, mean, std, device):
     # Compile ItemLoaders
     item_loaders['real'] = ItemLoader(meta_data=metadata['train'],
-                                      transform=train_test_transforms(config, mean, std)['train'],
+                                      transform=train_test_transforms(config, args, mean, std)['train'],
                                       parse_item_cb=parser,
                                       batch_size=config.training.bs, num_workers=args.num_threads,
                                       shuffle=True)
@@ -81,13 +81,13 @@ def create_data_provider_gan(g_network, item_loaders, args, config, parser, meta
     #                                           batch_size=config.training.bs,
     #                                           image_size=config.training.crop_small)
     item_loaders['fake'] = ItemLoader(meta_data=metadata['train'],
-                                      transform=train_test_transforms(config, mean, std)['train'],
+                                      transform=train_test_transforms(config, args, mean, std)['train'],
                                       parse_item_cb=parser,
                                       batch_size=config.training.bs, num_workers=args.num_threads,
                                       shuffle=True)
 
     item_loaders['noise'] = ItemLoader(meta_data=metadata['train'],
-                                       transform=train_test_transforms(config, mean, std)['train'],
+                                       transform=train_test_transforms(config, args, mean, std)['train'],
                                        parse_item_cb=parser,
                                        batch_size=config.training.bs, num_workers=args.num_threads,
                                        shuffle=True)

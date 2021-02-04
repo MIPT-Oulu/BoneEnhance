@@ -87,6 +87,10 @@ def wrap_solt_double(entry):
                                                                                     1: {'interpolation': 'bilinear'}})
 
 
+def wrap_solt_segmentation(entry):
+    return DataContainer(entry, 'IM', allow_inconsistency=False, transform_settings={0: {'interpolation': 'bilinear'},
+                                                                                     1: {'interpolation': 'nearest'}})
+
 def wrap_solt_single(entry):
     return DataContainer(entry, 'I', allow_inconsistency=False, transform_settings={0: {'interpolation': 'bilinear'}})
 
@@ -95,17 +99,16 @@ def unwrap_solt(dc):
     return dc.data
 
 
-def train_test_transforms(conf, mean=None, std=None):
+def train_test_transforms(conf, args, mean=None, std=None):
     trf = conf.transforms
     training = conf.training
     crop_small = tuple(training.crop_small)
     crop_large = tuple([crop * training.magnification for crop in crop_small])
     prob = trf.probability
     vol = len(crop_small) == 3
-    #vol = False  # TODO Compare 2D and 3D augmentations
 
     # Training transforms
-    train_transforms = [return_transforms(prob, trf, training.magnification, crop_small, vol)]
+    train_transforms, val_transforms = return_transforms(prob, trf, training.magnification, crop_small, args, vol)
 
     # 2D or 3D?
     if vol:
@@ -113,9 +116,15 @@ def train_test_transforms(conf, mean=None, std=None):
     else:
         axis = (0, 1, 2)
 
+    # SR or segmentation?
+    if args.segmentation:
+        wrap = wrap_solt_segmentation
+    else:
+        wrap = wrap_solt_double
+
     # Training transforms
     random_trf = [
-        wrap_solt_double,
+        wrap,
         slc.Stream(train_transforms),
         unwrap_solt,
         ApplyTransform(numpy2tens, axis)
@@ -123,11 +132,8 @@ def train_test_transforms(conf, mean=None, std=None):
 
     # Validation transforms
     val_trf = [
-        wrap_solt_double,
-        slc.Stream([
-            Pad(pad_to=(crop_small, crop_large)),
-            Crop(training['magnification'], crop_mode='r', crop_to=(crop_small, crop_large))
-        ]),
+        wrap,
+        val_transforms,
         unwrap_solt,
         ApplyTransform(numpy2tens, axis)
     ]
