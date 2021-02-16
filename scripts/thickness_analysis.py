@@ -21,8 +21,8 @@ if __name__ == '__main__':
     save_path = Path('../../Data/predictions_3D')
     base_path = Path('/media/dios/kaappi/Sakke/Saskatoon/Verity/Registration')
     #snap = 'dios-erc-gpu_2020_11_04_14_10_25_3D_perceptualnet_scratch_bestfold'
-    snap = 'dios-erc-gpu_2020_11_04_14_10_25_3D_perceptualnet_scratch'
-    ds = False
+    snap = 'thickness_dios-erc-gpu_2020_11_04_14_10_25_3D_perceptualnet_scratch'
+    ds = True
     mag = 4
     #filter_size = 12
     parser = argparse.ArgumentParser()
@@ -94,9 +94,13 @@ if __name__ == '__main__':
         voi_input, _ = load(str(args.masks / sample / 'ROI'), axis=(1, 2, 0,))
 
         # Tricubic interpolation for the CBCT data
-        input = zoom(input, (4, 4, 4), order=3)
+        input = zoom(input.squeeze(), (4, 4, 4), order=3)
         # Upscale VOI (nearest-neighbor)
-        voi = zoom(voi_input, (4, 4, 4), order=0)
+        voi = zoom(voi_input.squeeze(), (4, 4, 4), order=0)
+
+        save(str(args.th_maps / 'Verity_TCI' / sample), sample, input, dtype='.bmp')
+        save(str(args.th_maps / 'VOI_upscaled' / sample), sample, voi, dtype='.bmp')
+        pred = pred.squeeze()
 
         if args.plot:
             print_orthogonal(input, savepath=str(args.th_maps / 'visualization' / (sample + '_input.png')), res=args.resolution[0]/1000)

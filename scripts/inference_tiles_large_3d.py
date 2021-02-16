@@ -46,11 +46,12 @@ if __name__ == "__main__":
     parser.add_argument('--plot', type=bool, default=False)
     parser.add_argument('--weight', type=str, choices=['pyramid', 'mean'], default='mean')
     parser.add_argument('--completed', type=int, default=0)
-    parser.add_argument('--step', type=int, default=3, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
+    parser.add_argument('--step', type=int, default=1, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
     parser.add_argument('--avg_planes', type=bool, default=False)
     parser.add_argument('--cuda', type=bool, default=False, help='Whether to merge the inference tiles on GPU or CPU')
     parser.add_argument('--mask', type=bool, default=False, help='Whether to remove background with postprocessing')
     parser.add_argument('--scale', type=bool, default=True, help='Whether to scale prediction to full dynamic range')
+    parser.add_argument('--calculate_mean_std', type=bool, default=True, help='Whether to calculate individual mean and std')
     parser.add_argument('--snapshot', type=Path, default=f'../../Workdir/snapshots/{snap}')
     parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
     args = parser.parse_args()
@@ -93,7 +94,7 @@ if __name__ == "__main__":
     # samples = [os.path.basename(x) for x in glob(str(args.dataset_root / '*XZ'))]  # Load with specific name
     samples = os.listdir(args.dataset_root)
     samples.sort()
-    samples = [samples[id] for id in [6]]  # Get intended samples from list
+    samples = [samples[id] for id in [2]]  # Get intended samples from list
 
     # Skip the completed samples
     if args.completed > 0:
@@ -120,10 +121,15 @@ if __name__ == "__main__":
         print_orthogonal(data_xy[:, :, :, 0], invert=True, res=0.2, title='Input', cbar=True,
                          savepath=str(args.save_dir / 'visualizations' / (sample[:-3] + '_input.png')), scale_factor=10)
 
+        # Calculate mean and std from the sample
+        if args.calculate_mean_std:
+            mean = [np.mean(data_xy) / 255]
+            std = [np.std(data_xy) / 255]
+
         # Loop for image slices
         # 1st orientation
         with torch.no_grad():  # Do not update gradients
-            prediction = inference_3d(model, args, config, data_xy, step=args.step, cuda=args.cuda)
+            prediction = inference_3d(model, args, config, data_xy, step=args.step, cuda=args.cuda, mean=mean, std=std)
             #prediction, _ = load(str(args.save_dir / sample[:-3]), axis=(1, 2, 0))
             #print_orthogonal(prediction, invert=True, res=50 / 1000, title='Output', cbar=True,
             #                 savepath=str(args.save_dir / 'visualizations' / (sample[:-3] + '_prediction.png')),

@@ -27,22 +27,29 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     Calculates inference on one image.
     """
 
-    mag = config.training.magnification
-    input_x = config['training']['crop_small'][0]
-    input_y = config['training']['crop_small'][1]
+    # Input variables
+    input_x = config.training.crop_small[0]
+    input_y = config.training.crop_small[1]
     x, y, ch = img_full.shape
-    x_out, y_out = x * mag, y * mag
+
+    # Segmentation model does not upscale the image
+    if config.training.architecture == 'encoderdecoder':
+        mag = 1
+        x_out, y_out = x, y
+        input_x *= config.training.magnification
+        input_y *= config.training.magnification
+    else:
+        mag = config.training.magnification
+        x_out, y_out = x * mag, y * mag
 
     # Cut large image into overlapping tiles
     tiler = ImageSlicer(img_full.shape, tile_size=(input_x, input_y),
                         tile_step=(input_x // tile, input_y // tile), weight=weight)
-                        #tile_step=(input_x, input_y), weight=weight)
 
     x_tile = np.min((input_x * mag, x_out))
     y_tile = np.min((input_y * mag, y_out))
     tiler_out = ImageSlicer((x_out, y_out, ch), tile_size=(x_tile, y_tile),
                             tile_step=(x_tile // tile, y_tile // tile), weight=weight)
-                            #tile_step=(x_tile, y_tile), weight=weight)
 
     # HCW -> CHW. Optionally, do normalization here
     tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]
@@ -68,9 +75,9 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
         if plot:
             for i in range(args.bs):
                 if args.bs != 1 and pred_batch.shape[0] != 1:
-                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').transpose(0, 2, 3, 1)[i, :, :])
+                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').transpose(0, 2, 3, 1)[i, :, :].squeeze())
                 else:
-                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').squeeze().transpose(1, 2, 0))
+                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').squeeze().transpose(1, 2, 0).squeeze())
                 plt.show()
 
         # Check for inconsistencies
@@ -133,8 +140,8 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', weight=
         # Move tile to GPU
         if mean is not None and std is not None:
             tiles_batch = tiles_batch.float()
-            for ch in range(len(mean)):
-                tiles_batch[:, ch, :, :] = ((tiles_batch[:, ch, :, :] - mean[ch]) / std[ch])
+            for c in range(len(mean)):
+                tiles_batch[:, c, :, :] = (((tiles_batch[:, c, :, :] / 255.) - mean[c]) / std[c])
             tiles_batch = tiles_batch.to(device)
         else:
             tiles_batch = (tiles_batch.float() / 255.).to(device)

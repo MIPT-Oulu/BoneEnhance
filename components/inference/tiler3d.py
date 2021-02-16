@@ -92,7 +92,7 @@ class Tiler3D:
         target_shape = self.target_shape
 
         image = np.zeros((channels, target_shape[0], target_shape[1], target_shape[2]), dtype=dtype)
-        norm_mask = np.zeros((1, target_shape[0], target_shape[1], target_shape[2]), dtype=dtype    )
+        norm_mask = np.zeros((1, target_shape[0], target_shape[1], target_shape[2]), dtype=dtype)
 
         #w = np.dstack([self.weight] * channels)
         w = np.expand_dims(self.weight, axis=0)

@@ -29,10 +29,11 @@ if __name__ == "__main__":
 
     # snap = 'dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit'
     #snap = 'dios-erc-gpu_2020_11_04_15_58_20_3D_perceptualnet_ds'
-    snap = 'dios-erc-gpu_2020_11_04_14_10_25_3D_perceptualnet_scratch'  # Perceptual scratch
+    snap = 'dios-erc-gpu_2020_11_04_14_10_25_3D_perceptualnet_scratch'  # Perceptual scratch, abstract
     # snap = 'dios-erc-gpu_2020_09_30_14_14_42_perceptualnet_noscaling_3x3_cm_curated_trainloss'
-    snap = '2020_12_11_07_10_16_3D_perceptualnet_ds_16'  # Intensity augmentations applied
-    ds = False
+    #snap = '2020_12_11_07_10_16_3D_perceptualnet_ds_16'  # Intensity augmentations applied
+    #snap = '2021_01_11_05_41_47_3D_perceptualnet_ds_autoencoder_16'  # Autoencoder, 4 folds, 2 layers
+    ds = True
 
     parser = argparse.ArgumentParser()
     if ds:
@@ -117,7 +118,7 @@ if __name__ == "__main__":
         # Loop for image slices
         # 1st orientation
         with torch.no_grad():  # Do not update gradients
-            out_xy = inference_3d(model, args, config, data_xy, step=args.step)
+            out_xy = inference_3d(model, args, config, data_xy, step=args.step, mean=mean, std=std)
 
         # Average probability maps
         mask_avg = out_xy

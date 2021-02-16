@@ -12,6 +12,7 @@ from time import time
 from tqdm import tqdm
 from glob import glob
 from scipy.ndimage import zoom
+from skimage.transform import resize
 from omegaconf import OmegaConf
 
 from BoneEnhance.components.utilities import load, save, print_orthogonal, render_volume
@@ -29,11 +30,15 @@ if __name__ == "__main__":
     #snap = 'dios-erc-gpu_2020_10_19_14_09_24_3D_perceptualnet'
     #snap = 'dios-erc-gpu_2020_09_30_14_14_42_perceptualnet_noscaling_3x3_cm_curated_trainloss'
     snap = '2021_01_08_09_49_45_2D_perceptualnet_ds_16'  # 2D model, 3 working folds
+    snap = '2021_02_04_13_02_05_rn18_fpn'  # Segmentation model
+    snap = '2021_02_10_05_29_09_rn50_UNet'
+    snap = '2021_02_10_05_29_09_rn50_fpn'
+    #snap = '2021_02_04_13_02_05_rn34_fpn'  # Gives error
 
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
-    #parser.add_argument('--dataset_root', type=Path, default='../../Data/Test set (KP02)/input_original')
+    #parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
+    parser.add_argument('--dataset_root', type=Path, default='../../Data/Test set (KP02)/input_original')
     parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_2D/{snap}')
     parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
     parser.add_argument('--bs', type=int, default=12)
@@ -60,6 +65,8 @@ if __name__ == "__main__":
     args.save_dir.mkdir(exist_ok=True)
     (args.save_dir / 'visualizations').mkdir(exist_ok=True)
 
+    segmentation = config.training.architecture == 'encoderdecoder'
+
     # Load models
     models = glob(str(args.snapshot) + '/*fold_[0-9]_*.pth')
     #models = glob(str(args.snapshot) + '/*fold_3_*.pth')
@@ -75,9 +82,9 @@ if __name__ == "__main__":
     mean, std = tmp['mean'], tmp['std']
 
     # List the models
-    model_list = load_models(str(args.snapshot), config, n_gpus=args_experiment.gpus, fold=0)
+    model_list = load_models(str(args.snapshot), config, n_gpus=args_experiment.gpus, fold=None)
 
-    model = InferenceModel(model_list).to(device)
+    model = InferenceModel(model_list, sigmoid=segmentation).to(device)
     model.eval()
     print(f'Found {len(model_list)} models.')
 
@@ -86,7 +93,7 @@ if __name__ == "__main__":
     samples = os.listdir(args.dataset_root)
     samples.sort()
 
-    samples = [samples[id] for id in [6]]  # Get intended samples from list
+    #samples = [samples[id] for id in [6]]  # Get intended samples from list
 
     # Skip the completed samples
     if args.completed > 0:
@@ -100,19 +107,28 @@ if __name__ == "__main__":
         data_xy, files = load(str(args.dataset_root / sample), rgb=config.training.rgb, axis=(1, 2, 0))
         x, y, z, ch = data_xy.shape
 
+        # Interpolate image size for segmentation
+        if segmentation:
+            new_size = (data_xy.shape[0] * mag, data_xy.shape[1] * mag, data_xy.shape[2] * mag, 3)
+            data_xy = resize(data_xy, new_size, order=3, preserve_range=True) / 255.
+
+            # Output shape
+            out_xy = np.zeros((x * mag, y * mag, z * mag))
+        else:
+            # Output shape
+            out_xy = np.zeros((x * mag, y * mag, z))
+
         print_orthogonal(data_xy[:, :, :, 0], invert=True, res=0.2, title='Input', cbar=True,
                          savepath=str(args.save_dir / 'visualizations' / (sample + '_input.png')),
                          scale_factor=1000)
-
-        # Output shape
-        out_xy = np.zeros((x * mag, y * mag, z))
 
         # Loop for image slices
         # 1st orientation
         with torch.no_grad():  # Do not update gradients
 
             for slice_idx in tqdm(range(data_xy.shape[2]), desc='Running inference, XY'):
-                out_xy[:, :, slice_idx] = inference(model, args, config, data_xy[:, :, slice_idx, :], tile=args.tile)
+                out_xy[:, :, slice_idx] = inference(model, args, config, data_xy[:, :, slice_idx, :], tile=args.tile,
+                                                    mean=mean, std=std)
 
         # Scale the dynamic range
         out_xy -= np.min(out_xy)
