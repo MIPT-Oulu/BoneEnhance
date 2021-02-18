@@ -107,7 +107,7 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     return merged_pred.squeeze()[:, :, 0]
 
 
-def inference_3d(inference_model, args, config, img_full, device='cuda', weight='mean', plot=False,
+def inference_3d(inference_model, args, config, img_full, device='cuda', plot=False,
                  mean=None, std=None, step=2, cuda=True):
     """
     Calculates inference on one image.
@@ -120,7 +120,7 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', weight=
     out = (x * mag, y * mag, z * mag)
 
     # Cut large image into overlapping tiles
-    tiler = Tiler3D(img_full.shape, tile=tile, out=out, step=step, mag=mag)
+    tiler = Tiler3D(img_full.shape, tile=tile, out=out, step=step, mag=mag, weight=args.weight)
 
     #tiler_out = ImageSlicer((out[0], out[1], out[2], ch), tile_size=tile,
     #                        tile_step=step, weight=weight)

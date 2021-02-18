@@ -32,7 +32,7 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 60
-  bs: 12
+  bs: 18
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: mse
   train_loss: True
@@ -68,6 +68,7 @@ model:
   bayesian_dropout: 0.5
   backbone: resnet34
   decoder: enhance
+  autoencoder: shallow
 data_sampling:
   train:
     data_provider:

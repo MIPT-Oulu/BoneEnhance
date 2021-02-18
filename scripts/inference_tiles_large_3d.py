@@ -44,9 +44,9 @@ if __name__ == "__main__":
     parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/{snap}')
     parser.add_argument('--bs', type=int, default=12)
     parser.add_argument('--plot', type=bool, default=False)
-    parser.add_argument('--weight', type=str, choices=['pyramid', 'mean'], default='mean')
+    parser.add_argument('--weight', type=str, choices=['gaussian', 'mean'], default='gaussian')
     parser.add_argument('--completed', type=int, default=0)
-    parser.add_argument('--step', type=int, default=1, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
+    parser.add_argument('--step', type=int, default=3, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
     parser.add_argument('--avg_planes', type=bool, default=False)
     parser.add_argument('--cuda', type=bool, default=False, help='Whether to merge the inference tiles on GPU or CPU')
     parser.add_argument('--mask', type=bool, default=False, help='Whether to remove background with postprocessing')
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     # samples = [os.path.basename(x) for x in glob(str(args.dataset_root / '*XZ'))]  # Load with specific name
     samples = os.listdir(args.dataset_root)
     samples.sort()
-    samples = [samples[id] for id in [2]]  # Get intended samples from list
+    samples = [samples[id] for id in [6]]  # Get intended samples from list
 
     # Skip the completed samples
     if args.completed > 0:

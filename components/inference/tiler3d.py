@@ -3,10 +3,11 @@ import torch
 import cv2
 from typing import List
 import math
+from scipy.ndimage import gaussian_filter
 
 
 class Tiler3D:
-    def __init__(self, image_shape, tile, step, out, mag=4):
+    def __init__(self, image_shape, tile, step, out, mag=4, weight='mean'):
 
         tile_out = tuple([s * mag for s in tile])
         dim = len(tile)
@@ -23,7 +24,12 @@ class Tiler3D:
 
         overlap = [(self.tile[x] - self.step[x]) for x in range(dim)]
 
-        self.weight = self._mean(self.tile_out)
+        if weight == 'mean':
+            self.weight = self._mean(self.tile_out)
+        elif weight == 'gaussian':
+            self.weight = self._gaussian(self.tile_out, step)
+        else:
+            raise Exception('Weight not implemented!')
 
         # Margins
         n_tiles = [max(1, math.ceil((self.input[x] - overlap[x]) / self.step[x])) for x in range(dim)]
@@ -116,6 +122,12 @@ class Tiler3D:
 
     def _mean(self, tile_size):
         return np.ones(tile_size, dtype=np.float32)
+
+    def _gaussian(self, tile_size, step):
+        m = np.zeros(tile_size, dtype=np.float32)
+        dim = np.array(m.shape) // 2
+        m[dim[0], dim[1], dim[2]] = 1
+        return gaussian_filter(m, sigma=dim[0] // step)
 
 
 class CudaTileMerger3D:

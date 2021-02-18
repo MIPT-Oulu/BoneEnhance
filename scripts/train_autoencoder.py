@@ -65,10 +65,11 @@ if __name__ == "__main__":
 
             # Initialize model
             vol = len(config.training.crop_small) == 3
+            crop_size = tuple([crop * config.training.magnification for crop in config.training.crop_small])
             if args.gpus > 1:
-                model = nn.DataParallel(AutoEncoder(vol=vol, rgb=config.training.rgb)).to(device)
+                model = nn.DataParallel(AutoEncoder(crop_size, vol=vol, rgb=config.training.rgb)).to(device)
             else:
-                model = AutoEncoder(vol=vol, rgb=config.training.rgb).to(device)
+                model = AutoEncoder(crop_size, vol=vol, rgb=config.training.rgb).to(device)
 
             # Optimizer
             optimizer = optim.Adam(model.parameters(),

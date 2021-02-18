@@ -34,6 +34,7 @@ def init_experiment(experiments='../experiments/run'):
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--num_threads', type=int, default=16)
     parser.add_argument('--gpus', type=int, default=2)
+    parser.add_argument('--segmentation', type=bool, default=False)
     args = parser.parse_args()
 
     # Initialize working directories
@@ -177,6 +178,8 @@ def init_loss(loss, config, device='cuda', mean=None, std=None, args=None):
     elif loss == 'bce_combined':
         return CombinedLoss([BCEWithLogitsLoss2d(),
                              SoftJaccardLoss(use_log=config['training']['log_jaccard'])]).to(device)
+    elif loss == 'bce':
+        return nn.BCELoss().to(device)
     else:
         raise Exception('Loss not implememnted!')
 
