@@ -17,13 +17,14 @@ class PerceptualLoss(nn.Module):
     """
 
     def __init__(self, criterion=nn.L1Loss(), compare_layer=None, mean=None, std=None, imagenet_normalize=True,
-                 gram=True, plot=True, vol=False, zeros=True, gpus=1, rgb=True):
+                 gram=True, plot=True, vol=False, zeros=True, gpus=1, rgb=True, crop=None):
         super(PerceptualLoss, self).__init__()
         # vol=False  # Test 2D loss on 3D model
         if compare_layer is None:
             self.feature_extractor = WGAN_VGG_FeatureExtractor()
         elif isinstance(compare_layer, str):
-            self.feature_extractor = load_models(compare_layer, vol=vol, rgb=False, fold=0, gpus=gpus)
+            # Load first fold of the trained autoencoder
+            self.feature_extractor = load_models(compare_layer, crop, vol=vol, rgb=False, fold=0, gpus=gpus)
         else:
             self.feature_extractor = Vgg16(vol=vol, zeros=zeros)
 
@@ -96,21 +97,18 @@ class PerceptualLoss(nn.Module):
 
             # Calculate loss layer by layer
             layer = self.compare_layer
-            if isinstance(layer, list):
-                loss = 0
-                for l in layer:
-                    loss += self.p_criterion(pred_feature[l], target_feature[l])
-                loss /= len(layer)
+            loss = 0
+            for key in pred_feature:
+                loss += self.p_criterion(pred_feature[key], target_feature[key])
+            loss /= len(layer)
 
-                # Weight the gram matrix loss to a reasonable range
-                if self.calculate_gram and self.vol:
-                    loss *= 1e7
-                elif self.calculate_gram:
-                    loss *= 1e5
-                elif self.vol:
-                    loss *= 1#1e-7
-            else:
-                loss = self.p_criterion(pred_feature[layer], target_feature[layer])
+            # Weight the gram matrix loss to a reasonable range
+            if self.calculate_gram and self.vol:
+                loss *= 1e7
+            elif self.calculate_gram:
+                loss *= 1e5
+            elif self.vol:
+                loss *= 1#1e-7
         return loss
 
     @staticmethod

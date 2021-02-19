@@ -166,11 +166,12 @@ def init_loss(loss, config, device='cuda', mean=None, std=None, args=None):
         return CombinedLoss([nn.MSELoss().to(device),
                             TotalVariationLoss().to(device)], weights=[0.8, 0.2]).to(device)
     elif loss == 'autoencoder_tv':
+        crop_size = tuple([crop * config.training.magnification for crop in config.training.crop_small])
         return CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
                                             compare_layer=model_path,
                                             mean=mean, std=std,
                                             imagenet_normalize=config.training.imagenet_normalize_loss,
-                                            gram=config.training.gram, plot=False,
+                                            gram=config.training.gram, plot=False, crop=crop_size,
                                             vol=vol, gpus=args.gpus, rgb=config.training.rgb).to(device),
                             nn.L1Loss().to(device),
                             TotalVariationLoss().to(device)],

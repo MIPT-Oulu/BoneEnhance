@@ -56,8 +56,9 @@ if __name__ == "__main__":
         # Save transforms list
         save_transforms(args.snapshots_dir / config.training.snapshot, config, args, mean, std)
 
-        # Training for separate folds
-        for fold in range(config.training.n_folds):
+        # Training for one fold
+        for fold in range(1):
+        #for fold in range(config.training.n_folds):
             print(f'\nTraining fold {fold}')
             # Initialize data provider
             data_provider = create_data_provider(args, config, parser, metadata=splits_metadata[f'fold_{fold}'],
