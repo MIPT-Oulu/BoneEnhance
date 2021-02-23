@@ -44,7 +44,7 @@ if __name__ == "__main__":
     parser.add_argument('--bs', type=int, default=12)
     parser.add_argument('--step', type=int, default=4)
     parser.add_argument('--plot', type=bool, default=False)
-    parser.add_argument('--weight', type=str, choices=['pyramid', 'mean'], default='mean')
+    parser.add_argument('--weight', type=str, choices=['gaussian', 'mean'], default='mean')
     parser.add_argument('--completed', type=int, default=0)
     parser.add_argument('--avg_planes', type=bool, default=False)
     parser.add_argument('--snapshot', type=Path,
@@ -99,45 +99,43 @@ if __name__ == "__main__":
         # Load image stacks
         #data_xy, files = load(str(args.dataset_root / sample), rgb=True, axis=(1, 2, 0))
         with h5py.File(str(args.dataset_root / sample), 'r') as f:
-            data_xy = f['data'][:]
+            data = f['data'][:]
 
         if ds:
             # Resize target with the given magnification to provide the input image
-            factor = (data_xy.shape[0] // mag, data_xy.shape[1] // mag, data_xy.shape[2] // mag)
-            data_xy = resize(data_xy, factor, order=0, anti_aliasing=True, preserve_range=True)
+            factor = (data.shape[0] // mag, data.shape[1] // mag, data.shape[2] // mag)
+            data = resize(data, factor, order=0, anti_aliasing=True, preserve_range=True)
         # 3-channel
-        data_xy = np.expand_dims(data_xy, 3)
-        data_xy = np.repeat(data_xy, 3, axis=3)
+        data = np.expand_dims(data, 3)
+        data = np.repeat(data, 3, axis=3)
 
-        x, y, z, ch = data_xy.shape
+        x, y, z, ch = data.shape
 
-        print_orthogonal(data_xy[:, :, :, 0], invert=True, res=0.2, title='Input', cbar=True,
+        print_orthogonal(data[:, :, :, 0], invert=True, res=0.2, title='Input', cbar=True,
                          savepath=str(args.save_dir / 'visualizations' / (sample[:-3] + '_input.png')),
                          scale_factor=1000)
 
         # Loop for image slices
         # 1st orientation
         with torch.no_grad():  # Do not update gradients
-            out_xy = inference_3d(model, args, config, data_xy, step=args.step, mean=mean, std=std)
-
-        # Average probability maps
-        mask_avg = out_xy
+            out_xy = inference_3d(model, args, config, data, step=args.step, mean=mean, std=std)
 
         # Scale the dynamic range
-        mask_avg -= np.min(mask_avg)
-        mask_avg /= np.max(mask_avg)
+        data -= np.min(data)
+        data /= np.max(data)
 
-        mask_avg = (mask_avg * 255).astype('uint8')
+        # Convert to uint8
+        data = (data * 255).astype('uint8')
 
         # Save predicted full mask
-        save(str(args.save_dir / sample[:-3]), sample, mask_avg, dtype=args.dtype)
+        save(str(args.save_dir / sample[:-3]), sample, data, dtype=args.dtype)
         """
         render_volume(data_yz[:, :, :, 0] * mask_final,
                       savepath=str(args.save_dir / 'visualizations' / (sample + '_render' + args.dtype)),
                       white=True, use_outline=False)
         """
 
-        print_orthogonal(mask_avg, invert=True, res=0.2/4, title='Output', cbar=True,
+        print_orthogonal(data, invert=True, res=0.2 / 4, title='Output', cbar=True,
                          savepath=str(args.save_dir / 'visualizations' / (sample[:-3] + '_prediction.png')),
                          scale_factor=1000)
 

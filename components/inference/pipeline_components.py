@@ -5,18 +5,22 @@ import torch
 import gc
 import os
 import cv2
+import h5py
 
 from time import time
+from skimage.transform import resize
 from copy import deepcopy
 from tqdm import tqdm
+from scipy.ndimage import zoom
 from skimage import measure
+from skimage.metrics import mean_squared_error, peak_signal_noise_ratio, structural_similarity
 from torch.utils.data import DataLoader
 from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
 from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
 
 from BoneEnhance.components.inference.tiler3d import Tiler3D, CudaTileMerger3D
 from BoneEnhance.components.inference.model_components import InferenceModel, load_models
-from BoneEnhance.components.utilities.main import load, print_orthogonal, print_images
+from BoneEnhance.components.utilities import load, save, print_orthogonal, print_images, threshold, calculate_bvtv
 from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculate_dice, \
     calculate_volumetric_similarity, calculate_confusion_matrix_from_arrays as calculate_conf
 
@@ -196,7 +200,7 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
     torch.cuda.empty_cache()
     gc.collect()
 
-    return merged_pred.squeeze()[:, :, :, 0]
+    return merged_pred[:, :, :, 0]
 
 
 def inference_runner_oof(args, config, split_config, device, plot=False, weight='mean'):
@@ -214,63 +218,85 @@ def inference_runner_oof(args, config, split_config, device, plot=False, weight=
     start_inf = time()
 
     # Inference arguments
-    args.images = args.data_location / 'images'
-    args.save_dir = args.data_location / 'predictions'
-    threshold = config['inference']['threshold']
+    args.save_dir = args.data_location / 'predictions_oof'
+    args.step = 2
+    args.weight = 'gaussian'
+    sigma = 0.5  # Antialiasing filter for downscaling
 
     # Create save directories
-    args.save_dir.mkdir(exist_ok=True)
-    if type(threshold) is list:
-        len_th = len(threshold)
-        save_dir = []
-        for th in threshold:
-            save_dir.append(args.save_dir / str(config['training']['snapshot'] + f'_{th}_oof'))
-            save_dir[-1].mkdir(exist_ok=True)
-    else:
-        len_th = 1
-        save_dir = args.save_dir / str(config['training']['snapshot'] + '_oof')
-        save_dir.mkdir(exist_ok=True)
+    save_dir = args.save_dir / str(config['training']['snapshot'] + '_oof')
+    save_dir.mkdir(exist_ok=True)
+    (save_dir / 'visualizations').mkdir(exist_ok=True)
 
     # Load models
-    unet = config['model']['decoder'].lower() == 'unet'
-    model_list = load_models(str(args.snapshots_dir / config['training']['snapshot']), config, unet=unet, n_gpus=args.gpus)
+    crop = config.training.crop_small
+    ds = not config.training.crossmodality
+    mag = config.training.magnification
+    mean_std_path = args.snapshots_dir / f"mean_std_{crop[0]}x{crop[1]}.pth"
+    ms = torch.load(mean_std_path)
+    mean, std = ms['mean'], ms['std']
+
+    # List the models
+    model_list = load_models(str(args.snapshots_dir / config.training.snapshot), config, n_gpus=args.gpus)
     print(f'Found {len(model_list)} models.')
 
     # Loop for all images
     for fold in range(len(model_list)):
-        # List validation images
-        validation_files = split_config[f'fold_{fold}']['val'].fname.values
 
-        # Model without validation fold
+        # List validation images
+        if ds:
+            validation_files = split_config[f'fold_{fold}']['eval'].target_fname.values
+        else:
+            validation_files = split_config[f'fold_{fold}']['eval'].fname.values
+
+        # Model corresponding to the validation fold images
         model = InferenceModel([model_list[fold]]).to(device)
         model.eval()
 
-        for file in tqdm(validation_files, desc=f'Running inference for fold {fold}'):
-            img_full = cv2.imread(str(file))
+        for sample in tqdm(validation_files, desc=f'Running inference for fold {fold}'):
 
+            # Do not calculate inference for data copies
+            if 'copy' in str(sample):
+                continue
+
+            # Load image stacks
+            with h5py.File(str(sample), 'r') as f:
+                data = f['data'][:]
+
+            # Resize target with the given magnification to provide the input image
+            if ds:
+                factor = (data.shape[0] // mag, data.shape[1] // mag, data.shape[2] // mag)
+                data = resize(data, factor, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=sigma)
+
+            # 3-channel or 1-channel
+            if config.training.rgb:
+                data = np.stack((data,) * 3, axis=-1)
+            else:
+                data = np.expand_dims(data, axis=-1)
+
+            print_orthogonal(data[:, :, :, 0], invert=True, res=0.2, title='Input', cbar=True,
+                             savepath=str(save_dir / 'visualizations' / (str(sample.stem) + '_input.png')),
+                             scale_factor=1000)
+
+            # Loop for image slices
+            # 1st orientation
             with torch.no_grad():  # Do not update gradients
-                merged_mask = inference(model, args, config, img_full, weight=weight, device=device, plot=plot)
+                data = inference_3d(model, args, config, data, step=args.step, mean=mean, std=std)
 
-            # Copy list of thresholds
-            th = deepcopy(threshold)
-            for ind in range(len_th):
-                # Save multiple thresholds
-                if len_th > 1:
-                    save_dir = save_dir[ind]
-                    threshold = th[ind]
+            # Scale the dynamic range
+            data -= np.min(data)
+            data /= np.max(data)
 
-                mask_final = (merged_mask >= threshold).astype('uint8') * 255
+            # Convert to uint8
+            data = (data * 255).astype('uint8')
 
-                # Save largest mask
-                largest_mask = largest_object(mask_final)
+            # Save predicted full mask
+            (save_dir / sample.stem).mkdir(exist_ok=True)
+            save(str(save_dir / sample.stem), str(sample.stem), data, dtype='.png')
 
-                if config['training']['experiment'] == '3D':
-                    # When saving 3D stacks, file structure should be preserved
-                    (save_dir / file.parent.stem).mkdir(exist_ok=True)
-                    cv2.imwrite(str(save_dir / file.parent.stem / file.stem) + '.bmp', largest_mask)
-                else:
-                    # Otherwise, save images directly
-                    cv2.imwrite(str(save_dir / file.stem) + '.bmp', largest_mask)
+            print_orthogonal(data, invert=True, res=0.2 / 4, title='Output', cbar=True,
+                             savepath=str(save_dir / 'visualizations' / (str(sample.stem) + '_prediction.png')),
+                             scale_factor=1000)
 
             # Free memory
             torch.cuda.empty_cache()
@@ -286,11 +312,11 @@ def evaluation_runner(args, config, save_dir):
 
     # Evaluation arguments
     args.image_path = args.data_location / 'images'
-    args.mask_path = args.data_location / 'masks'
-    args.pred_path = args.data_location / 'predictions'
-    args.save_dir = args.data_location / 'evaluation'
+    args.target_path = args.data_location / 'target_mag4'
+    args.pred_path = args.data_location / 'predictions_oof'
+    args.save_dir = args.data_location / 'evaluation_oof'
     args.save_dir.mkdir(exist_ok=True)
-    args.n_labels = 2
+    ds = not config.training.crossmodality
 
     # Snapshots to be evaluated
     if type(save_dir) != list:
@@ -299,72 +325,73 @@ def evaluation_runner(args, config, save_dir):
     # Iterate through snapshots
     for snap in save_dir:
 
-        # Initialize results
-        results = {'Sample': [], 'Dice': [], 'IoU': [], 'Similarity': []}
+        snap = args.data_location / 'predictions_3D' / '2021_01_11_05_41_47_3D_perceptualnet_ds_autoencoder_16_cm' # TODO debug
 
-        # Loop for samples
-        (args.save_dir / ('visualizations_' + snap.name)).mkdir(exist_ok=True)
-        samples = os.listdir(str(args.mask_path))
+        # Initialize results
+        results = {'Sample': [], 'MSE': [], 'PSNR': [], 'SSIM': [], 'BVTV': []}
+
+        # Sample list
+        all_samples = os.listdir(snap)
+        samples = []
+        for i in range(len(all_samples)):
+            if os.path.isdir(str(snap / all_samples[i])):
+                samples.append(all_samples[i])
         samples.sort()
+        if 'visualizations' in samples:
+            samples.remove('visualizations')
+        # List the µCT target
+        samples_target = os.listdir(args.target_path)
+        samples_target.sort()
+
         try:
+            # Loop for samples
             for idx, sample in enumerate(samples):
 
                 print(f'==> Processing sample {idx + 1} of {len(samples)}: {sample}')
 
                 # Load image stacks
-                if config['training']['experiment'] == '3D':
-                    mask, files_mask = load(str(args.mask_path / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
+                with h5py.File(str(args.target_path / samples_target), 'r') as f:
+                    target = f['data'][:]
 
-                    pred, files_pred = load(str(args.pred_path / snap.name / sample), axis=(0, 2, 1), rgb=False,
-                                            n_jobs=args.n_threads)
-                    data, files_data = load(str(args.image_path / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
+                pred, files_pred = load(str(args.pred_path / snap.name / sample), axis=(0, 2, 1), rgb=False,
+                                        n_jobs=args.n_threads)
 
-                    # Crop in case of inconsistency
-                    crop = min(pred.shape, mask.shape)
-                    mask = mask[:crop[0], :crop[1], :crop[2]]
-                    pred = pred[:crop[0], :crop[1], :crop[2]]
+                voi, _ = load(str(args.masks / sample / 'ROI'), axis=(1, 2, 0,))
+                voi = zoom(voi.squeeze(), (4, 4, 4), order=0)
 
-                else:
-                    data = cv2.imread(str(args.image_path / sample))
-                    mask = cv2.imread(str(args.mask_path / sample), cv2.IMREAD_GRAYSCALE)
-                    pred = cv2.imread(str(args.pred_path / snap.name / sample), cv2.IMREAD_GRAYSCALE)
-                    if pred is None:
-                        sample = sample[:-4] + '.bmp'
-                        pred = cv2.imread(str(args.pred_path / snap.name / sample), cv2.IMREAD_GRAYSCALE)
-                    elif mask is None:
-                        mask = cv2.imread(str(args.mask_path / sample), cv2.IMREAD_GRAYSCALE)
-
-                    # Crop in case of inconsistency
-                    crop = min(pred.shape, mask.shape)
-                    mask = mask[:crop[0], :crop[1]]
-                    pred = pred[:crop[0], :crop[1]]
+                # Crop in case of inconsistency
+                crop = min(pred.shape, target.shape)
+                target = target[:crop[0], :crop[1], :crop[2]]
+                pred = pred[:crop[0], :crop[1], :crop[2]]
 
                 # Evaluate metrics
-                conf_matrix = calculate_conf(pred.astype(np.bool), mask.astype(np.bool), args.n_labels)
-                dice = calculate_dice(conf_matrix)[1]
-                iou = calculate_iou(conf_matrix)[1]
-                sim = calculate_volumetric_similarity(conf_matrix)[1]
+                mse = mean_squared_error(target, pred)
+                psnr = peak_signal_noise_ratio(target, pred)
+                ssim = structural_similarity(target, pred)
 
-                print(f'Sample {sample}: dice = {dice}, IoU = {iou}, similarity = {sim}')
+                # Calculate BVTV
 
-                # Save predicted full mask
-                if config['training']['experiment'] == '3D':
-                    print_orthogonal(data, invert=False, res=3.2, cbar=True,
-                                     savepath=str(args.save_dir / ('visualizations_' + snap.name) / (sample + '_input.png')),
-                                     scale_factor=1500)
-                    print_orthogonal(data, mask=mask, invert=False, res=3.2, cbar=True,
-                                     savepath=str(args.save_dir / ('visualizations_' + snap.name) / (sample + '_reference.png')),
-                                     scale_factor=1500)
-                    print_orthogonal(data, mask=pred, invert=False, res=3.2, cbar=True,
-                                     savepath=str(
-                                         args.save_dir / ('visualizations_' + snap.name) / (sample + '_prediction.png')),
-                                     scale_factor=1500)
+                # Otsu thresholding
+                if len(np.unique(pred)) != 2:
+                    pred, _ = threshold(pred, method='mean')
+
+                # Fix size mismatch
+                size = np.min((voi.shape, pred.shape), axis=0)
+                # Apply VOI
+                pred = np.logical_and(pred[:size[0], :size[1], :size[2]],
+                                      voi[:size[0], :size[1], :size[2]])
+
+                # Calculate BVTV
+                bvtv = calculate_bvtv(pred, voi)
+
+                print(f'Sample {sample}: MSE = {mse}, PSNR = {psnr}, SSIM = {ssim}, BVTV: {bvtv}')
 
                 # Update results
                 results['Sample'].append(sample)
-                results['Dice'].append(dice)
-                results['IoU'].append(iou)
-                results['Similarity'].append(sim)
+                results['MSE'].append(mse)
+                results['PSNR'].append(psnr)
+                results['SSIM'].append(ssim)
+                results['BVTV'].append(bvtv)
 
         except AttributeError:
             print(f'Sample {sample} failing. Skipping to next one.')
@@ -372,9 +399,10 @@ def evaluation_runner(args, config, save_dir):
 
         # Add average value to
         results['Sample'].append('Average values')
-        results['Dice'].append(np.average(results['Dice']))
-        results['IoU'].append(np.average(results['IoU']))
-        results['Similarity'].append(np.average(results['Similarity']))
+        results['MSE'].append(np.average(results['MSE']))
+        results['PSNR'].append(np.average(results['PSNR']))
+        results['SSIM'].append(np.average(results['SSIM']))
+        results['BVTV'].append(np.average(results['BVTV']))
 
         # Write to excel
         writer = pd.ExcelWriter(str(args.save_dir / ('metrics_' + str(snap.name))) + '.xlsx')

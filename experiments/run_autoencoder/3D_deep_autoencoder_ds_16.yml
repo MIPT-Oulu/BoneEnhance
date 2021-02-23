@@ -31,10 +31,10 @@ training:
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 60
+  epochs: 100
   bs: 8
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: mse
+  loss: l1
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False

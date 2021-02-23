@@ -28,9 +28,6 @@ if __name__ == "__main__":
     start = time()
 
     #snap = 'dios-erc-gpu_2020_11_04_14_10_25_3D_perceptualnet_scratch'  # Perceptual scratch
-    #snap = '2020_11_27_12_06_12_3D_perceptualnet_ds'
-    #snap = '2020_12_01_10_52_00_3D_perceptualnet_ds'
-    #snap = '2020_12_01_13_39_52_3D_perceptualnet_ds'
     snap = '2020_12_07_09_36_17_3D_perceptualnet_ds_20'
     snap = '2020_12_10_09_16_07_3D_perceptualnet_ds_20'  # Brightness and contrast augmentations applied
     snap = '2020_12_11_07_10_16_3D_perceptualnet_ds_16'  # Intensity augmentations applied
@@ -38,6 +35,7 @@ if __name__ == "__main__":
     snap = '2020_12_21_12_58_39_3D_perceptualnet_ds_16'  # 2D perceptual loss, 3D model
     snap = '2021_01_05_09_21_06_3D_perceptualnet_ds_16'  # Autoencoder perceptual loss, 2 folds
     snap = '2021_01_11_05_41_47_3D_perceptualnet_ds_autoencoder_16'  # Autoencoder, 4 folds, 2 layers
+    snap = '2021_02_21_11_12_11_3D_perceptualnet_ds_mse_tv'  # No perceptual loss
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
@@ -150,9 +148,6 @@ if __name__ == "__main__":
             #mask, _ = threshold(mask, method='otsu', block=51)
             mask = largest_object(np.invert(data_xy > 120), area_limit=10000).astype('bool')
             #print_orthogonal(mask)
-            #contour, hier = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-            #for cnt in contour:
-            #    cv2.drawContours(mask, [cnt], 0, 255, -1)
             # Set BG to 0
             prediction[mask] = 0
             # Set BG = TCI

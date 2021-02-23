@@ -26,15 +26,23 @@ from collagen.modelzoo.segmentation import EncoderDecoder
 
 
 def init_experiment(experiments='../experiments/run'):
+    """
+    Initialize general parameters that do not need to be specified in the experiment config file.
+    Returns a list of experiments to be conducted.
+
+    :param experiments: Path to the run_experiments folder.
+    :return: List of DL experiments
+    """
+
     # Input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_location', type=Path, default='../../Data')
-    parser.add_argument('--workdir', type=Path, default='../../Workdir/')
-    parser.add_argument('--experiment', type=Path, default=experiments)
-    parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--num_threads', type=int, default=16)
-    parser.add_argument('--gpus', type=int, default=2)
-    parser.add_argument('--segmentation', type=bool, default=False)
+    parser.add_argument('--data_location', type=Path, default='../../Data', help='Location of input and target images')
+    parser.add_argument('--workdir', type=Path, default='../../Workdir/', help='Location of snapshots folder')
+    parser.add_argument('--experiment', type=Path, default=experiments, help='Location of the experiments folder')
+    parser.add_argument('--seed', type=int, default=42, help='Random seed')
+    parser.add_argument('--num_threads', type=int, default=16, help='Number of CPUs')
+    parser.add_argument('--gpus', type=int, default=2, help='Number of GPUs')
+    parser.add_argument('--segmentation', type=bool, default=False, help='Super-resolution or segmentation pipeline?')
     args = parser.parse_args()
 
     # Initialize working directories
@@ -49,17 +57,12 @@ def init_experiment(experiments='../experiments/run'):
     config_list = []
     for config_path in config_paths:
         if config_path[-4:] == '.yml':
+            # Load file
             with open(args.experiment / config_path, 'r') as f:
                 config = yaml.load(f, Loader=yaml.FullLoader)
                 config_list.append(config)
 
-        loss = config['training']['loss']
-        architecture = config['training']['architecture']
-        lr = config['training']['lr']
-        mag = config['training']['magnification']
-
         # Snapshot directory
-        #snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{architecture}_{loss}_{lr}_mag{mag}')
         snapshot_name = time.strftime(f'%Y_%m_%d_%H_%M_%S_{config_path[:-4]}')
         (args.snapshots_dir / snapshot_name).mkdir(exist_ok=True, parents=True)
         config['training']['snapshot'] = snapshot_name
@@ -99,10 +102,12 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
                  ScalarMeterLogger(writer, comment='training', log_dir=str(log_dir)))
 
     val_cbs = (RunningAverageMeter(prefix="eval", name="loss"),
+               # Save model with lowest evaluation loss
                ModelSaver(metric_names='eval/loss',
                           prefix=prefix,
                           save_dir=str(current_snapshot_dir),
                           conditions='min', model=model),
+               # Visualize result images (best and worst minibatch)
                ImagePairVisualizer(writer, log_dir=str(log_dir), comment='visualize', mean=mean, std=std,
                                    scale=None,
                                    plot_interp=True,
@@ -122,18 +127,33 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
 
 
 def init_loss(loss, config, device='cuda', mean=None, std=None, args=None):
+    """
+    Initialize the loss function (or functions).
+    """
+
     vol = len(config.training.crop_small) == 3
     model_path = str(args.snapshots_dir / config.training.autoencoder_pretrained)
+
+    # Mean squared error
     if loss == 'mse':
         return nn.MSELoss().to(device)
+    # Mean absolute error
     elif loss == 'L1' or loss == 'l1':
         return nn.L1Loss().to(device)
+    # Total variation
     elif loss == 'tv':
         return TotalVariationLoss().to(device)
+    # Peak signal-to-noise ratio
     elif loss == 'psnr':
         return PSNRLoss().to(device)
+    # Combined mean squared error and total variation (good baseline for perceptual loss)
+    elif loss == 'mse_tv':
+        return CombinedLoss([nn.MSELoss().to(device),
+                             TotalVariationLoss().to(device)], weights=[0.8, 0.2]).to(device)
+    # Perceptual loss (default mode)
     elif loss == 'perceptual':
         return PerceptualLoss().to(device)
+    # Perceptual loss (compare activations from different layers)
     elif loss == 'perceptual_layers':
         return PerceptualLoss(criterion=nn.MSELoss(),
                               compare_layer=['relu1_2', 'relu2_2'],  #['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],
@@ -141,8 +161,10 @@ def init_loss(loss, config, device='cuda', mean=None, std=None, args=None):
                               imagenet_normalize=config.training.imagenet_normalize_loss,
                               gram=config.training.gram,
                               vol=vol).to(device)
+    # Combine L1 and Perceptual loss (default)
     elif loss == 'combined':
         return CombinedLoss([PerceptualLoss().to(device), nn.L1Loss().to(device)], weights=[0.8, 0.2]).to(device)
+    # Combine L1 and Perceptual loss (different layers)
     elif loss == 'combined_layers':
         return CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
                                             compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],  #['relu1_2', 'relu2_2'],
@@ -152,6 +174,7 @@ def init_loss(loss, config, device='cuda', mean=None, std=None, args=None):
                                             vol=vol).to(device),
                             nn.L1Loss().to(device)],
                             weights=[0.8, 0.2]).to(device)
+    # Perceptual loss (layers), L1 and total variation
     elif loss == 'combined_tv':
         return CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
                                             compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],
@@ -162,9 +185,7 @@ def init_loss(loss, config, device='cuda', mean=None, std=None, args=None):
                              nn.L1Loss().to(device),
                              TotalVariationLoss().to(device)],
                             weights=[0.1, 1, 1]).to(device)
-    elif loss == 'mse_tv':
-        return CombinedLoss([nn.MSELoss().to(device),
-                            TotalVariationLoss().to(device)], weights=[0.8, 0.2]).to(device)
+    # Autoencoder loss and total variation
     elif loss == 'autoencoder_tv':
         crop_size = tuple([crop * config.training.magnification for crop in config.training.crop_small])
         return CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
@@ -176,9 +197,11 @@ def init_loss(loss, config, device='cuda', mean=None, std=None, args=None):
                             nn.L1Loss().to(device),
                             TotalVariationLoss().to(device)],
                             weights=[0.5, 1, 1]).to(device)
+    # Binary cross-entropy and soft Jaccard
     elif loss == 'bce_combined':
         return CombinedLoss([BCEWithLogitsLoss2d(),
                              SoftJaccardLoss(use_log=config['training']['log_jaccard'])]).to(device)
+    # Binary cross-entropy
     elif loss == 'bce':
         return nn.BCELoss().to(device)
     else:
@@ -186,27 +209,40 @@ def init_loss(loss, config, device='cuda', mean=None, std=None, args=None):
 
 
 def init_model(config, device='cuda', gpus=1, args=None):
+    """
+
+    :param config:
+    :param device:
+    :param gpus:
+    :param args:
+    :return:
+    """
     architecture = config.training.architecture
     vol = len(config.training.crop_small) == 3
-    #vol = False  # TODO compare 2D and 3D models
 
     # List available model architectures
+
+    # Collagen encoderdecoder for super-resolution
     if architecture == 'srencoderdecoder':
         config.model.magnification = config.training.magnification
         model = SREncoderDecoder(**config['model'])
+    # Collagen encoderdecoder for segmentation
     elif architecture == 'encoderdecoder':
         model = EncoderDecoder(**config['model'])
+    # Architecture inspired from the reconstruction paper
     elif architecture == 'enhance':
         model = EnhanceNet(config.training.crop_small, config.training.magnification,
                            activation=config.training.activation,
                            add_residual=config.training.add_residual,
                            upscale_input=config.training.upscale_input)
+    # Simple CNN architecture
     elif architecture == 'convnet':
         model = ConvNet(config.training.magnification,
                         activation=config.training.activation,
                         upscale_input=config.training.upscale_input,
                         n_blocks=config.training.n_blocks,
                         normalization=config.training.normalization)
+    # Architecture used by Johnson et al. in the Perceptual loss paper
     elif architecture == 'perceptualnet':
         model = PerceptualNet(config.training.magnification,
                               resize_convolution=config.training.upscale_input,
@@ -214,9 +250,6 @@ def init_model(config, device='cuda', gpus=1, args=None):
                               vol=vol, rgb=config.training.rgb)
     else:
         raise Exception('Model architecture unavailable.')
-        #'wgan': WGAN_VGG(input_size=config.training.crop_small[0]),
-        #'wgan_g': WGAN_VGG_generator(),
-        #'wgan_d': WGAN_VGG_discriminator(config.training.crop_small[0]),
 
     # Check for multi-gpu
     if gpus > 1:
@@ -234,6 +267,7 @@ def init_model(config, device='cuda', gpus=1, args=None):
         model_path.sort()
         # Load weights
         model.load_state_dict(torch.load(model_path[0]))
+    # Randomly initialized weights (from Gaussian distribution)
     else:
         init = InitWeight(init_weight_normal, [0.0, 0.02], type='conv')
         model.apply(init)
@@ -242,6 +276,9 @@ def init_model(config, device='cuda', gpus=1, args=None):
 
 
 def create_data_provider(args, config, parser, metadata, mean, std):
+    """
+    Creates the dataloader object (for Collagen framework)
+    """
     # Compile ItemLoaders
     item_loaders = dict()
     for stage in ['train', 'eval']:
@@ -272,6 +309,12 @@ def save_config(path, config, args):
 
 
 def save_transforms(path, config, args, mean, std):
+    """
+    Save used augmentations.
+    :param path: Path for the augmentation list.
+    :return:
+    """
+    # Build the augmentations
     transforms = train_test_transforms(config, args, mean, std)
     # Save the experiment parameters
     with open(path / 'transforms.yaml', 'w') as f:

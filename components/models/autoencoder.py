@@ -7,7 +7,7 @@ from torch.autograd import Variable
 
 class AutoEncoder(nn.Module):
     """
-    Autoencoder, as used in the paper: http://doi.org/10.1109/TMI.2020.2968472
+    Autoencoder, inspired from the paper: http://doi.org/10.1109/TMI.2020.2968472
     """
     def __init__(self, crop_size, vol=False,
                  final_activation=False, rgb=True):
@@ -33,11 +33,10 @@ class AutoEncoder(nn.Module):
         self.encoder1 = nn.Sequential(*self._layer([f_maps, 64], kernel=kernel, use_3d=vol, encoder=True))
         self.encoder2 = nn.Sequential(*self._layer([64, 128], kernel=kernel, use_3d=vol, encoder=True))  # 128 to 16
         self.encoder3 = nn.Sequential(*self._layer([128, 256], kernel=kernel, use_3d=vol, encoder=True))  # 16 to 8
-        #self.encoder4 = nn.Sequential(*self._layer([16, 8], kernel=kernel, use_3d=vol, encoder=True))  # 8 to 4
 
         # 4x4x4 cube at the bottleneck. Calculate the total feature size
-        #self.output_size = self.encoder4(self.encoder3(
-        self.output_size = self.encoder3(self.encoder2(self.encoder1(Variable(torch.ones(1, *self.input_size)))))
+        self.output_size = self.encoder3(
+            self.encoder2(self.encoder1(Variable(torch.ones(1, *self.input_size)))))
         self.bottleneck_fts = int(np.prod(self.output_size.size()[1:]))
 
         # Linear layer at bottleneck
@@ -65,7 +64,6 @@ class AutoEncoder(nn.Module):
         
         # Mirror the encoder
         decoder = list()
-        #decoder.extend(self._layer([8, 16], kernel=kernel, use_3d=vol, encoder=False))
         decoder.extend(self._layer([256, 128], kernel=kernel, use_3d=vol, encoder=False))
         decoder.extend(self._layer([128, 64], kernel=kernel, use_3d=vol, encoder=False))
         # Last upscaling layer
@@ -83,7 +81,6 @@ class AutoEncoder(nn.Module):
         x = self.encoder1(x)
         x = self.encoder2(x)
         x = self.encoder3(x)
-        #x = self.encoder4(x)
 
         #x = self.linear(x.view(-1, self.bottleneck_fts))
         x = self.linear(x)
@@ -147,7 +144,6 @@ class AutoEncoderLayers(AutoEncoder):
         layer_1 = self.encoder1(x)
         layer_2 = self.encoder2(layer_1)
         layer_3 = self.encoder3(layer_2)
-        #layer_4 = self.encoder4(layer_3)
 
         # Duplicate 1-channel image to represent RGB
         if self.rgb:
@@ -155,20 +151,17 @@ class AutoEncoderLayers(AutoEncoder):
                 layer_1 = layer_1.repeat(1, 3, 1, 1, 1)
                 layer_2 = layer_2.repeat(1, 3, 1, 1, 1)
                 layer_3 = layer_3.repeat(1, 3, 1, 1, 1)
-                #layer_4 = layer_4.repeat(1, 3, 1, 1, 1)
             else:
                 layer_1 = layer_1.repeat(1, 3, 1, 1)
                 layer_2 = layer_2.repeat(1, 3, 1, 1)
                 layer_3 = layer_3.repeat(1, 3, 1, 1)
-                #layer_4 = layer_4.repeat(1, 3, 1, 1)
 
         # Scaled Tanh activation
         if self.final_activation:
             layer_1 = layer_1.tanh()
             layer_2 = layer_2.tanh()
             layer_3 = layer_3.tanh()
-            #layer_4 = layer_4.tanh()
-        return {'layer_1': layer_1, 'layer_2': layer_2, 'layer_3': layer_3}#, 'layer_4': layer_4}
+        return {'layer_1': layer_1, 'layer_2': layer_2, 'layer_3': layer_3}
 
 
 def load_models(model_path, crop, vol=False, rgb=False, gpus=1, fold=None):

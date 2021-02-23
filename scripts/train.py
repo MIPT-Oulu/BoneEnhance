@@ -30,8 +30,9 @@ if __name__ == "__main__":
     # Initialize experiment
     args_base, config_list, device = init_experiment()
 
+    # Loop for experiment configurations
     for experiment in range(len(config_list)):
-        # Current experiment
+        # Time of the current experiment
         start_exp = time()
         args = deepcopy(args_base)  # Copy args so that they can be updated
         config = OmegaConf.create(config_list[experiment])
@@ -57,7 +58,6 @@ if __name__ == "__main__":
 
         # Training for separate folds
         for fold in range(config.training.n_folds):
-        #for fold in range(1):
             print(f'\nTraining fold {fold}')
             # Initialize data provider
             data_provider = create_data_provider(args, config, parser, metadata=splits_metadata[f'fold_{fold}'],
@@ -98,13 +98,16 @@ if __name__ == "__main__":
             cuda.empty_cache()
             gc.collect()
 
+        # Duration of the current experiment
         dur = time() - start_exp
         print(f'Model {experiment + 1} trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
 
+        # Calculate out-of-fold inference and evaluate metrics
         if config.inference.calc_inference:
             save_dir = inference_runner_oof(args, config, splits_metadata, device)
 
             evaluation_runner(args, config, save_dir)
 
+    # Duration of the whole script
     dur = time() - start
     print(f'Models trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')

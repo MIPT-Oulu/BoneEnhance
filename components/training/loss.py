@@ -100,7 +100,7 @@ class PerceptualLoss(nn.Module):
             loss = 0
             for key in pred_feature:
                 loss += self.p_criterion(pred_feature[key], target_feature[key])
-            loss /= len(layer)
+            loss /= len(pred_feature)
 
             # Weight the gram matrix loss to a reasonable range
             if self.calculate_gram and self.vol:
