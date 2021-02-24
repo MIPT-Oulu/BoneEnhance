@@ -30,7 +30,7 @@ dependencies:
   - tqdm=4.47.0=py_0
   - yaml=0.2.5=h7b6447c_0
   - pip:
-    #- collagen==0.0.1
+    - git+https://github.com/MIPT-Oulu/Collagen.git
     - deep-pipeline==0.2.5
     - h5py==2.10.0
     - omegaconf==2.0.0
