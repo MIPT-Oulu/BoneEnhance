@@ -16,15 +16,23 @@ class PerceptualLoss(nn.Module):
     A single layer can be provided or a list in which case all losses are added together.
     """
 
-    def __init__(self, criterion=nn.L1Loss(), compare_layer=None, mean=None, std=None, imagenet_normalize=True,
-                 gram=True, plot=True, vol=False, zeros=True, gpus=1, rgb=True, crop=None):
+    def __init__(self, config,
+                 criterion=nn.L1Loss(), compare_layer=None, mean=None, std=None,
+                 plot=True, zeros=True, gpus=1):
         super(PerceptualLoss, self).__init__()
-        # vol=False  # Test 2D loss on 3D model
+
+        vol = len(config.training.crop_small) == 3
+        imagenet_normalize = config.training.imagenet_normalize_loss
+        gram = config.training.gram
+        rgb = config.training.rgb
+        crop = tuple([crop * config.training.magnification for crop in config.training.crop_small])
+
         if compare_layer is None:
             self.feature_extractor = WGAN_VGG_FeatureExtractor()
         elif isinstance(compare_layer, str):
             # Load first fold of the trained autoencoder
-            self.feature_extractor = load_models(compare_layer, crop, vol=vol, rgb=False, fold=0, gpus=gpus)
+            self.feature_extractor = load_models(compare_layer, crop, vol=vol, rgb=False, fold=0, gpus=gpus,
+                                                 use_layers=config.training.autoencoder_layers)
         else:
             self.feature_extractor = Vgg16(vol=vol, zeros=zeros)
 

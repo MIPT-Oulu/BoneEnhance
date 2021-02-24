@@ -213,7 +213,7 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
     target /= 255.
 
     # Plot a small random portion of image-target pairs during debug
-    if debug and uniform(0, 1) >= 0.95:
+    if debug and uniform(0, 1) >= 0.98:
         #res = 0.2  # In mm
         #print_orthogonal(img[0, :, :, :].numpy() / 255, title='Input', res=res)
 
@@ -224,7 +224,7 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
         print_images([img[0, 7, :, :].numpy() / 255., img[0, :, 7, :].numpy() / 255.,
                       target[0, 7 * mag, :, :].numpy(), target[0, :, 7 * mag, :].numpy()])
 
-    return {data_key: img[:, 7, :, :], target_key: target[:, 7 * mag, :, :]}
+    return {data_key: img, target_key: target}
 
 
 def parse_3d_debug(root, entry, transform, data_key, target_key, debug=False, config=None):
@@ -254,6 +254,18 @@ def parse_3d_debug(root, entry, transform, data_key, target_key, debug=False, co
         #img = cv2.resize(blur_2d(target, k, 0.5), new_size)
         #img = resize(blur_3d(target, k, 0.5), new_size, order=1, preserve_range=True).astype(np.uint8)
         img = resize(target, new_size, order=1, preserve_range=True).astype(np.uint8)
+
+    elif config is not None:
+
+        # Load input with hdf5
+        with h5py.File(entry.fname, 'r') as f:
+            img = f['data'][:]
+
+        # Resize the target to match input in case of a mismatch
+        new_size = (int(img.shape[0] * mag), int(img.shape[1] * mag), int(img.shape[2] * mag))
+        if target.shape != new_size:
+            target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True,
+                            preserve_range=True).astype('uint8')
 
     else:
         raise NotImplementedError

@@ -8,6 +8,7 @@ import cv2
 import h5py
 
 from time import time
+from pathlib import Path
 from skimage.transform import resize
 from copy import deepcopy
 from tqdm import tqdm
@@ -117,11 +118,17 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
     Calculates inference on one image.
     """
 
+    # Input variables
     mag = config.training.magnification
     tile = list(config['training']['crop_small'])
 
     x, y, z, ch = img_full.shape
     out = (x * mag, y * mag, z * mag)
+
+    # Scale mean and std to appropriate range (float instead of uint8)
+    if mean.mean() > 1 or std.mean() > 1:
+        mean /= 255.
+        std /= 255.
 
     # Cut large image into overlapping tiles
     tiler = Tiler3D(img_full.shape, tile=tile, out=out, step=step, mag=mag, weight=args.weight)
@@ -266,7 +273,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False, weight=
             # Resize target with the given magnification to provide the input image
             if ds:
                 factor = (data.shape[0] // mag, data.shape[1] // mag, data.shape[2] // mag)
-                data = resize(data, factor, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=sigma)
+                data = resize(data.astype('float64'), factor, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=sigma)
 
             # 3-channel or 1-channel
             if config.training.rgb:
@@ -292,7 +299,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False, weight=
 
             # Save predicted full mask
             (save_dir / sample.stem).mkdir(exist_ok=True)
-            save(str(save_dir / sample.stem), str(sample.stem), data, dtype='.png')
+            save(str(save_dir / sample.stem), str(sample.stem), data, dtype='.png', verbose=False)
 
             print_orthogonal(data, invert=True, res=0.2 / 4, title='Output', cbar=True,
                              savepath=str(save_dir / 'visualizations' / (str(sample.stem) + '_prediction.png')),
@@ -311,8 +318,9 @@ def evaluation_runner(args, config, save_dir):
     start_eval = time()
 
     # Evaluation arguments
-    args.image_path = args.data_location / 'images'
-    args.target_path = args.data_location / 'target_mag4'
+    args.image_path = args.data_location / 'input'
+    args.target_path = args.data_location / 'target_3d'
+    args.masks = Path('/media/dios/kaappi/Sakke/Saskatoon/Verity/Registration')
     args.pred_path = args.data_location / 'predictions_oof'
     args.save_dir = args.data_location / 'evaluation_oof'
     args.save_dir.mkdir(exist_ok=True)
@@ -325,7 +333,7 @@ def evaluation_runner(args, config, save_dir):
     # Iterate through snapshots
     for snap in save_dir:
 
-        snap = args.data_location / 'predictions_3D' / '2021_01_11_05_41_47_3D_perceptualnet_ds_autoencoder_16_cm' # TODO debug
+        #snap = args.data_location / 'predictions_3D' / '2021_01_11_05_41_47_3D_perceptualnet_ds_autoencoder_16_uCT' # TODO debug
 
         # Initialize results
         results = {'Sample': [], 'MSE': [], 'PSNR': [], 'SSIM': [], 'BVTV': []}
@@ -342,34 +350,35 @@ def evaluation_runner(args, config, save_dir):
         # List the µCT target
         samples_target = os.listdir(args.target_path)
         samples_target.sort()
+        # List VOI
+        samples_voi = os.listdir(args.image_path)
+        samples_voi.sort()
 
         try:
             # Loop for samples
             for idx, sample in enumerate(samples):
 
-                print(f'==> Processing sample {idx + 1} of {len(samples)}: {sample}')
-
                 # Load image stacks
-                with h5py.File(str(args.target_path / samples_target), 'r') as f:
+                with h5py.File(str(args.target_path / samples_target[idx]), 'r') as f:
                     target = f['data'][:]
 
-                pred, files_pred = load(str(args.pred_path / snap.name / sample), axis=(0, 2, 1), rgb=False,
-                                        n_jobs=args.n_threads)
+                pred, files_pred = load(str(args.pred_path / snap.name / sample), axis=(1, 2, 0), rgb=False,
+                                        n_jobs=args.num_threads)
 
-                voi, _ = load(str(args.masks / sample / 'ROI'), axis=(1, 2, 0,))
+                voi, _ = load(str(args.masks / samples_voi[idx] / 'ROI'), axis=(1, 2, 0))
                 voi = zoom(voi.squeeze(), (4, 4, 4), order=0)
 
                 # Crop in case of inconsistency
                 crop = min(pred.shape, target.shape)
                 target = target[:crop[0], :crop[1], :crop[2]]
-                pred = pred[:crop[0], :crop[1], :crop[2]]
+                pred = pred[:crop[0], :crop[1], :crop[2]].squeeze()
 
                 # Evaluate metrics
                 mse = mean_squared_error(target, pred)
                 psnr = peak_signal_noise_ratio(target, pred)
                 ssim = structural_similarity(target, pred)
 
-                # Calculate BVTV
+                # Binarize and calculate BVTV
 
                 # Otsu thresholding
                 if len(np.unique(pred)) != 2:

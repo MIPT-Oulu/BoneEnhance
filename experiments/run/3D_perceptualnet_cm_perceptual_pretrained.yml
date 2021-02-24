@@ -11,11 +11,11 @@ strategy:
     SR: 0
 training:
   # General
-  calc_meanstd: False
+  calc_meanstd: True
   suffix: '_3d_duplicates'  # Options: _curated _reduced
   parse_color: False
   crop_small: [16, 16, 16]
-  crossmodality: False
+  crossmodality: True
   rgb: False
   # Model
   architecture: perceptualnet
@@ -23,7 +23,7 @@ training:
   add_residual: False
   activation: relu
   normalization: in
-  autoencoder_pretrained: 2021_01_08_11_19_18_3D_autoencoder_ds_16
+  autoencoder_pretrained: 2021_02_23_05_48_32_3D_deep_autoencoder_ds_16
   pretrain: True
   existing_model: 2021_02_21_11_12_11_3D_perceptualnet_ds_mse_tv
   magnification: 4 

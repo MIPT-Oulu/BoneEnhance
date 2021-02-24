@@ -164,7 +164,7 @@ class AutoEncoderLayers(AutoEncoder):
         return {'layer_1': layer_1, 'layer_2': layer_2, 'layer_3': layer_3}
 
 
-def load_models(model_path, crop, vol=False, rgb=False, gpus=1, fold=None):
+def load_models(model_path, crop, vol=False, rgb=False, gpus=1, fold=None, use_layers=True):
     # Load models
     if fold is not None:
         models = glob(model_path + f'/*fold_{fold}*.pth')
@@ -172,13 +172,18 @@ def load_models(model_path, crop, vol=False, rgb=False, gpus=1, fold=None):
         models = glob(model_path + '/*fold_*.pth')
     models.sort()
 
+    if use_layers:
+        architecture = AutoEncoderLayers
+    else:
+        architecture = AutoEncoder
+
     # List the models
     model_list = []
     for fold in range(len(models)):
         if gpus > 1:
-            model = nn.DataParallel(AutoEncoderLayers(crop, vol=vol, rgb=rgb)).eval()
+            model = nn.DataParallel(architecture(crop, vol=vol, rgb=rgb)).eval()
         else:
-            model = AutoEncoderLayers(crop, vol=vol, rgb=rgb).eval()
+            model = architecture(crop, vol=vol, rgb=rgb).eval()
         model.load_state_dict(torch.load(models[fold]))
         model_list.append(model)
 

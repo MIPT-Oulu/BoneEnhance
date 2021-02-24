@@ -150,7 +150,7 @@ def read_image_rgb(path, file):
     return image
 
 
-def save(path, file_name, data, n_jobs=12, dtype='.png'):
+def save(path, file_name, data, n_jobs=12, dtype='.png', verbose=True):
     """
     Save a volumetric 3D dataset in given directory.
 
@@ -164,6 +164,10 @@ def save(path, file_name, data, n_jobs=12, dtype='.png'):
         Volumetric data to be saved.
     n_jobs : int
         Number of parallel workers. Check N of CPU cores.
+    dtype : str
+        File name extension.
+    verbose : bool
+        Whether to show progress bar during saving.
     """
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
@@ -177,13 +181,13 @@ def save(path, file_name, data, n_jobs=12, dtype='.png'):
         Parallel(n_jobs=n_jobs)(delayed(cv2.imwrite)
                                 (path + '/' + file_name[k][:-4] + dtype,
                                  data[:, :, k].astype('uint8'))
-                                for k in tqdm(range(nfiles), 'Saving dataset'))
+                                for k in tqdm(range(nfiles), 'Saving dataset', disable=not verbose))
 
     else:
         Parallel(n_jobs=n_jobs)(delayed(cv2.imwrite)
                                 (path + '/' + file_name + '_' + str(k).zfill(8) + dtype,
                                  data[:, :, k].astype('uint8'))
-                                for k in tqdm(range(nfiles), 'Saving dataset'))
+                                for k in tqdm(range(nfiles), 'Saving dataset', disable=not verbose))
 
 
 def save_images(path, file_names, data, n_jobs=12, crop=False):

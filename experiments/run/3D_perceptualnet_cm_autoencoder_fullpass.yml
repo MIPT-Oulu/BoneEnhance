@@ -11,11 +11,11 @@ strategy:
     SR: 0
 training:
   # General
-  calc_meanstd: False
+  calc_meanstd: True
   suffix: '_3d_duplicates'  # Options: _curated _reduced
   parse_color: False
   crop_small: [16, 16, 16]
-  crossmodality: False
+  crossmodality: True
   rgb: False
   # Model
   architecture: perceptualnet
@@ -23,12 +23,12 @@ training:
   add_residual: False
   activation: relu
   normalization: in
-  autoencoder_pretrained: 2021_01_08_11_19_18_3D_autoencoder_ds_16
-  pretrain: True
-  existing_model: 2021_02_21_11_12_11_3D_perceptualnet_ds_mse_tv
+  autoencoder_pretrained: 2021_02_23_05_48_32_3D_deep_autoencoder_ds_16
+  autoencoder_layers: False
+  pretrain: False
+  existing_model: dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit
   magnification: 4 
   n_blocks: 15
-  preceptual_criterion: l1
   # Training
   wd: 0.0001
   lr: 0.0001
@@ -36,7 +36,7 @@ training:
   epochs: 60
   bs: 6
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: perceptual_layers
+  loss: autoencoder_tv
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False
@@ -61,7 +61,7 @@ transforms:
   contrast: 0.4
   v_range: [0.000001, 0.0009]
 inference:
-  calc_inference: False
+  calc_inference: True
   threshold: 0.8
 model:
   decoder_normalization: IN

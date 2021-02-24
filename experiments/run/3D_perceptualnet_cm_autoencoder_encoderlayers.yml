@@ -11,11 +11,11 @@ strategy:
     SR: 0
 training:
   # General
-  calc_meanstd: False
+  calc_meanstd: True
   suffix: '_3d_duplicates'  # Options: _curated _reduced
   parse_color: False
   crop_small: [16, 16, 16]
-  crossmodality: False
+  crossmodality: True
   rgb: False
   # Model
   architecture: perceptualnet
@@ -24,6 +24,7 @@ training:
   activation: relu
   normalization: in
   autoencoder_pretrained: 2021_02_23_05_48_32_3D_deep_autoencoder_ds_16
+  autoencoder_layers: True
   pretrain: False
   existing_model: dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit
   magnification: 4 

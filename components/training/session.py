@@ -152,48 +152,36 @@ def init_loss(loss, config, device='cuda', mean=None, std=None, args=None):
                              TotalVariationLoss().to(device)], weights=[0.8, 0.2]).to(device)
     # Perceptual loss (default mode)
     elif loss == 'perceptual':
-        return PerceptualLoss().to(device)
+        return PerceptualLoss(config=config).to(device)
     # Perceptual loss (compare activations from different layers)
     elif loss == 'perceptual_layers':
-        return PerceptualLoss(criterion=nn.MSELoss(),
+        return PerceptualLoss(criterion=nn.MSELoss(), config=config,
                               compare_layer=['relu1_2', 'relu2_2'],  #['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],
-                              mean=mean, std=std,
-                              imagenet_normalize=config.training.imagenet_normalize_loss,
-                              gram=config.training.gram,
-                              vol=vol).to(device)
+                              mean=mean, std=std).to(device)
     # Combine L1 and Perceptual loss (default)
     elif loss == 'combined':
-        return CombinedLoss([PerceptualLoss().to(device), nn.L1Loss().to(device)], weights=[0.8, 0.2]).to(device)
+        return CombinedLoss([PerceptualLoss(config=config).to(device), nn.L1Loss().to(device)], weights=[0.8, 0.2]).to(device)
     # Combine L1 and Perceptual loss (different layers)
     elif loss == 'combined_layers':
-        return CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
+        return CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(), config=config,
                                             compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],  #['relu1_2', 'relu2_2'],
-                                            mean=mean, std=std,
-                                            imagenet_normalize=config.training.imagenet_normalize_loss,
-                                            gram=config.training.gram,
-                                            vol=vol).to(device),
+                                            mean=mean, std=std).to(device),
                             nn.L1Loss().to(device)],
                             weights=[0.8, 0.2]).to(device)
     # Perceptual loss (layers), L1 and total variation
     elif loss == 'combined_tv':
-        return CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
+        return CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(), config=config,
                                             compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],
-                                            mean=mean, std=std,
-                                            imagenet_normalize=config.training.imagenet_normalize_loss,
-                                            gram=config.training.gram,
-                                            vol=vol).to(device),
+                                            mean=mean, std=std).to(device),
                              nn.L1Loss().to(device),
                              TotalVariationLoss().to(device)],
                             weights=[0.1, 1, 1]).to(device)
     # Autoencoder loss and total variation
     elif loss == 'autoencoder_tv':
         crop_size = tuple([crop * config.training.magnification for crop in config.training.crop_small])
-        return CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(),
+        return CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(), config=config,
                                             compare_layer=model_path,
-                                            mean=mean, std=std,
-                                            imagenet_normalize=config.training.imagenet_normalize_loss,
-                                            gram=config.training.gram, plot=False, crop=crop_size,
-                                            vol=vol, gpus=args.gpus, rgb=config.training.rgb).to(device),
+                                            mean=mean, std=std, plot=False, gpus=args.gpus).to(device),
                             nn.L1Loss().to(device),
                             TotalVariationLoss().to(device)],
                             weights=[0.5, 1, 1]).to(device)
