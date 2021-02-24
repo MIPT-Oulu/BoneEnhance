@@ -1,4 +1,4 @@
-collagen==0.0.1
+#collagen==0.0.1
 cudatoolkit==10.1
 deep-pipeline==0.2.5
 dill

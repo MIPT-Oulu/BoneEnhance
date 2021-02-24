@@ -401,7 +401,7 @@ def evaluation_runner(args, config, save_dir):
                 results['SSIM'].append(ssim)
                 results['BVTV'].append(bvtv)
 
-            except AttributeError:
+            except (AttributeError, ValueError):
                 print(f'Sample {sample} failing. Skipping to next one.')
                 continue
 

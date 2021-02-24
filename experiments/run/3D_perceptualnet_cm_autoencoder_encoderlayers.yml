@@ -33,7 +33,7 @@ training:
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 1
+  epochs: 60
   bs: 6
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: autoencoder_tv
