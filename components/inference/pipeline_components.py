@@ -354,10 +354,9 @@ def evaluation_runner(args, config, save_dir):
         samples_voi = os.listdir(args.image_path)
         samples_voi.sort()
 
-        try:
-            # Loop for samples
-            for idx, sample in enumerate(samples):
-
+        # Loop for samples
+        for idx, sample in enumerate(samples):
+            try:
                 # Load image stacks
                 with h5py.File(str(args.target_path / samples_target[idx]), 'r') as f:
                     target = f['data'][:]
@@ -402,9 +401,9 @@ def evaluation_runner(args, config, save_dir):
                 results['SSIM'].append(ssim)
                 results['BVTV'].append(bvtv)
 
-        except AttributeError:
-            print(f'Sample {sample} failing. Skipping to next one.')
-            continue
+            except AttributeError:
+                print(f'Sample {sample} failing. Skipping to next one.')
+                continue
 
         # Add average value to
         results['Sample'].append('Average values')
