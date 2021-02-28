@@ -18,7 +18,7 @@ class PerceptualLoss(nn.Module):
 
     def __init__(self, config,
                  criterion=nn.L1Loss(), compare_layer=None, mean=None, std=None,
-                 plot=True, zeros=True, gpus=1):
+                 plot=False, zeros=True, gpus=1):
         super(PerceptualLoss, self).__init__()
 
         vol = len(config.training.crop_small) == 3
@@ -31,7 +31,7 @@ class PerceptualLoss(nn.Module):
             self.feature_extractor = WGAN_VGG_FeatureExtractor()
         elif isinstance(compare_layer, str):
             # Load first fold of the trained autoencoder
-            self.feature_extractor = load_models(compare_layer, crop, vol=vol, rgb=False, fold=0, gpus=gpus,
+            self.feature_extractor = load_models(compare_layer, crop, vol=vol, rgb=rgb, fold=0, gpus=gpus,
                                                  use_layers=config.training.autoencoder_layers)
         else:
             self.feature_extractor = Vgg16(vol=vol, zeros=zeros)

@@ -6,6 +6,7 @@ import os
 import cv2
 from tqdm import tqdm
 from joblib import Parallel, delayed
+from glob import glob
 #from skimage import measure
 
 
@@ -41,6 +42,54 @@ def threshold(data, method='otsu', block=11):
                                                                adaptiveMethod=th, thresholdType=cv2.THRESH_BINARY,
                                                                blockSize=block, C=0)
         return mask1.astype('bool'), 0
+
+
+def load_logfile(path: str, first=True) -> dict:
+    """
+    Read and return logfile with extension .log
+    :param path: Path to the log file
+    :param first: Return only first log file obtained
+    :return: Log file as dict
+    """
+
+    # Return a list of log files
+    log = glob(path + '/**.log')
+
+    # Read the first log file in list
+    if first:
+        log = log[0]
+        with open(log) as f:
+            # Read and split along newline (\n)
+            log_file = f.read().splitlines()
+    # Concatenate all log files into one list
+    else:
+        log_file = []
+        for l in log:
+            with open(l) as f:
+                log_file.append(f.read().splitlines())
+
+    # Remove titles (lines without equality sign)
+    extras = []
+    # Find extra lines
+    for line in range(len(log_file)):
+        if '=' not in log_file[line]:
+            extras.append(log_file[line])
+    # Remove extra lines
+    for e in extras:
+        log_file.remove(e)
+
+    # Split from the first "=" sign
+    parameter, value = [], []
+    for line in log_file:
+        parts = line.split('=', 1)
+        parameter.append(parts[0])
+        value.append(parts[1:][0])
+
+    # Compile dictionary
+    log_file = dict(zip(parameter, value))
+
+    return log_file
+
 
 
 def load_images(path, n_jobs=12, rgb=False, uCT=False):
@@ -128,7 +177,7 @@ def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False):
         return np.transpose(np.array(data), axis + (3,)), files
     elif axis != (0, 1, 2):
         data = np.transpose(np.array(data), axis)
-        return np.expand_dims(data, -1), files
+        return data, files
     return np.array(data), files
 
 

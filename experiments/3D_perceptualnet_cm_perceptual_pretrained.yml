@@ -15,7 +15,7 @@ training:
   suffix: '_3d_duplicates'  # Options: _curated _reduced
   parse_color: False
   crop_small: [16, 16, 16]
-  crossmodality: False
+  crossmodality: True
   rgb: False
   # Model
   architecture: perceptualnet

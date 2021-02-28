@@ -37,6 +37,8 @@ class Tiler3D:
 
         self.margin_begin = [residuals[x] // 2 for x in range(dim)]
         self.margin_end = [residuals[x] - self.margin_begin[x] for x in range(dim)]
+        self.margin_begin_out = [(residuals[x] * mag) // 2 for x in range(dim)]
+        self.margin_end_out = [residuals[x] * mag - self.margin_begin_out[x] for x in range(dim)]
 
         crops = []
         crops_out = []
@@ -84,11 +86,21 @@ class Tiler3D:
         return tiles
 
     def crop_to_orignal_size(self, image):
+        """
         crop = image[
-            self.margin_begin[0] * self.mag: self.out[0] + self.margin_begin[0] * self.mag,
-            self.margin_begin[1] * self.mag: self.out[1] + self.margin_begin[1] * self.mag,
-            self.margin_begin[2] * self.mag: self.out[2] + self.margin_begin[2] * self.mag,
+            self.margin_begin_out[0]: self.out[0] + self.margin_begin_out[0],
+            self.margin_begin_out[1]: self.out[1] + self.margin_begin_out[1],
+            self.margin_begin_out[2]: self.out[2] + self.margin_begin_out[2],
+            :self.out[0],
+           :self.out[1],
+           :self.out[2],
         ]
+        """
+        crop = image[
+               :self.out[0],
+               :self.out[1],
+               :self.out[2],
+               ]
         return crop
 
     def merge(self, tiles: List[np.ndarray], channels, dtype=np.float16):

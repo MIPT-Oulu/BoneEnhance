@@ -29,6 +29,9 @@ def build_meta_from_files(base_path, config, args=None):
         target_loc = base_path / 'target'
         input_loc = base_path / 'input'
 
+    if config.autoencoder:
+        input_loc = target_loc
+
     # 3D metadata
     if len(config.training.crop_small) == 3:
         input_stacks = list(map(lambda x: pathlib.Path(x), input_loc.glob('*.h5')))
@@ -68,7 +71,7 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     metadata = build_meta_from_files(data_dir, config, args=args)
     # Group_ID
     #metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:-1]), 0)
-    metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:1]), 0)
+    metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:2]), 0)
     # Special case for samples with Group name separated by -
     metadata['subj_id'] = metadata.subj_id.apply(lambda x: '_'.join(x.split('-', 4)[:1]), 0)
 

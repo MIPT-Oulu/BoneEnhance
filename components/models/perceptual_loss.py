@@ -118,6 +118,13 @@ class Vgg16(nn.Module):
             param.requires_grad = False
 
     def forward(self, x):
+
+        if x.size(1) != 3:
+            if len(x.size()) == 5:
+                x = x.repeat(1, 3, 1, 1, 1)
+            else:
+                x = x.repeat(1, 3, 1, 1)
+
         x = self.slice1(x)
         relu1_2 = x
         x = self.slice2(x)

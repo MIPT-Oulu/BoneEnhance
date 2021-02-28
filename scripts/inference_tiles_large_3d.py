@@ -121,8 +121,8 @@ if __name__ == "__main__":
 
         # Calculate mean and std from the sample
         if args.calculate_mean_std:
-            mean = [np.mean(data_xy) / 255]
-            std = [np.std(data_xy) / 255]
+            mean = torch.Tensor([np.mean(data_xy) / 255])
+            std = torch.Tensor([np.std(data_xy) / 255])
 
         # Loop for image slices
         # 1st orientation

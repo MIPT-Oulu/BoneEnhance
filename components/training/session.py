@@ -253,7 +253,7 @@ def init_model(config, device='cuda', gpus=1, args=None):
         model_path = args.snapshots_dir / config.training.existing_model
         model_path = glob(str(model_path) + '/*fold_*.pth')
         model_path.sort()
-        # Load weights
+        # Load weights from first fold
         model.load_state_dict(torch.load(model_path[0]))
     # Randomly initialized weights (from Gaussian distribution)
     else:

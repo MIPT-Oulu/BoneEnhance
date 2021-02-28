@@ -130,13 +130,17 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
         mean /= 255.
         std /= 255.
 
+    # Check the number of channels
+    if ch == 3 and not config.training.rgb:
+        img_full = np.expand_dims(np.mean(img_full, axis=-1), axis=-1)
+        ch = 1
+    elif ch == 1 and config.training.rgb:
+        img_full = np.repeat(img_full, 3, axis=-1)
+
     # Cut large image into overlapping tiles
     tiler = Tiler3D(img_full.shape, tile=tile, out=out, step=step, mag=mag, weight=args.weight)
 
-    #tiler_out = ImageSlicer((out[0], out[1], out[2], ch), tile_size=tile,
-    #                        tile_step=step, weight=weight)
-
-    # HCW -> CHW. Optionally, do normalization here
+    # HWZC -> CHWZ. Optionally, do normalization here
     tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]
 
     # Allocate a CUDA buffer for holding entire mask
@@ -158,10 +162,7 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
             tiles_batch = (tiles_batch.float() / 255.).to(device)
 
         # Predict and move back to CPU
-        if config.training.rgb:
-            pred_batch = inference_model(tiles_batch)
-        else:
-            pred_batch = inference_model(tiles_batch[:, 0, :, :].unsqueeze(1))
+        pred_batch = inference_model(tiles_batch)
 
         # Plot
         if plot:
@@ -373,9 +374,9 @@ def evaluation_runner(args, config, save_dir):
                 pred = pred[:crop[0], :crop[1], :crop[2]].squeeze()
 
                 # Evaluate metrics
-                mse = mean_squared_error(target, pred)
-                psnr = peak_signal_noise_ratio(target, pred)
-                ssim = structural_similarity(target, pred)
+                mse = mean_squared_error(target / 255., pred / 255.)
+                psnr = peak_signal_noise_ratio(target / 255., pred / 255.)
+                ssim = structural_similarity(target / 255., pred / 255.)
 
                 # Binarize and calculate BVTV
 
