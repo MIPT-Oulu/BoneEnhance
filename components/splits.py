@@ -5,6 +5,7 @@ import dill
 from collagen import ItemLoader
 from sklearn import model_selection
 from tqdm import tqdm
+from pathlib import Path
 
 from BoneEnhance.components.transforms import train_test_transforms
 
@@ -31,6 +32,9 @@ def build_meta_from_files(base_path, config, args=None):
 
     if config.autoencoder:
         input_loc = target_loc
+
+    if not config.training.crossmodality:
+        input_loc = Path(str(input_loc) + '_ds')
 
     # 3D metadata
     if len(config.training.crop_small) == 3:

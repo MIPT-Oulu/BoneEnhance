@@ -12,7 +12,7 @@ strategy:
 training:
   # General
   calc_meanstd: True
-  suffix: '_1176'  # Options: _curated _reduced
+  suffix: '_1176_HR'  # Options: _curated _reduced
   parse_color: False
   crop_small: [16, 16, 16]
   crossmodality: False
@@ -23,18 +23,21 @@ training:
   add_residual: False
   activation: relu
   normalization: in
-  pretrain: False
-  existing_model: dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit
+  autoencoder_pretrained: 2021_02_28_10_03_55_3D_deep_autoencoder_ds_1176_HR
+  autoencoder_layers: False
+  pretrain: True
+  existing_model: 2021_02_25_05_51_33_1_3D_perceptualnet_ds_mse_tv
   magnification: 4 
   n_blocks: 15
+  preceptual_criterion: l1
   # Training
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 100
-  bs: 8
+  epochs: 60
+  bs: 6
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: l1
+  loss: autoencoder_tv
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False
@@ -68,7 +71,6 @@ model:
   bayesian_dropout: 0.5
   backbone: resnet34
   decoder: enhance
-  autoencoder: deep
 data_sampling:
   train:
     data_provider:

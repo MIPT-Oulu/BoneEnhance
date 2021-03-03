@@ -116,7 +116,7 @@ class AutoEncoder(nn.Module):
             if encoder:
                 layers.append(nn.MaxPool3d(kernel_size=2, stride=2))
             else:
-                layers.append(nn.ConvTranspose3d(f_maps[1], f_maps[1], kernel_size=2, stride=2))
+                layers.append(nn.ConvTranspose3d(f_maps[1], f_maps[1], kernel_size=4, stride=2, padding=1))
         else:
             layers = [
                 nn.Conv2d(f_maps[0], f_maps[1], kernel_size=kernel, stride=1, padding=pad, bias=True),
@@ -130,7 +130,7 @@ class AutoEncoder(nn.Module):
             if encoder:
                 layers.append(nn.MaxPool2d(kernel_size=2, stride=2))
             else:
-                layers.append(nn.ConvTranspose2d(f_maps[1], f_maps[1], kernel_size=2, stride=2))
+                layers.append(nn.ConvTranspose2d(f_maps[1], f_maps[1], kernel_size=4, stride=2, padding=1))
 
         return layers
 

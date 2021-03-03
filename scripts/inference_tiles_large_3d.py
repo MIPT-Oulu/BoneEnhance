@@ -35,7 +35,9 @@ if __name__ == "__main__":
     snap = '2020_12_21_12_58_39_3D_perceptualnet_ds_16'  # 2D perceptual loss, 3D model
     snap = '2021_01_05_09_21_06_3D_perceptualnet_ds_16'  # Autoencoder perceptual loss, 2 folds
     snap = '2021_01_11_05_41_47_3D_perceptualnet_ds_autoencoder_16'  # Autoencoder, 4 folds, 2 layers
-    snap = '2021_02_21_11_12_11_3D_perceptualnet_ds_mse_tv'  # No perceptual loss
+    #snap = '2021_02_21_11_12_11_3D_perceptualnet_ds_mse_tv'  # No perceptual loss
+    #snap = '2021_03_02_14_55_25_1_3D_perceptualnet_ds_autoencoder_fullpass'  # Trained with 1176 data, 200µm resolution
+    #snap = '2021_03_03_07_00_39_1_3D_perceptualnet_ds_autoencoder_fullpass'
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
