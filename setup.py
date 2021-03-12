@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='bone-enhance',
+    name='BoneEnhance',
     version='0.1',
     author='Santeri Rytky',
     author_email='santeri.rytky@oulu.fi',

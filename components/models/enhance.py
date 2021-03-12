@@ -1,5 +1,5 @@
-from BoneEnhance.components.models.model_blocks import *
-from BoneEnhance.components.models.model_initialization import *
+from .model_blocks import *
+from .model_initialization import *
 from torch.nn import functional as F
 from warnings import warn
 

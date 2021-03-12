@@ -33,7 +33,7 @@ def build_meta_from_files(base_path, config, args=None):
     if config.autoencoder:
         input_loc = target_loc
 
-    if not config.training.crossmodality:
+    if not config.training.crossmodality and len(config.training.crop_small) == 3:
         input_loc = Path(str(input_loc) + '_ds')
 
     # 3D metadata

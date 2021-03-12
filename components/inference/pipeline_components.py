@@ -19,9 +19,9 @@ from torch.utils.data import DataLoader
 from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
 from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
 
-from BoneEnhance.components.inference.tiler3d import Tiler3D, CudaTileMerger3D
-from BoneEnhance.components.inference.model_components import InferenceModel, load_models
-from BoneEnhance.components.utilities import load, save, print_orthogonal, print_images, threshold, calculate_bvtv
+from .tiler3d import Tiler3D, TileMerger3D
+from .model_components import InferenceModel, load_models
+from ..utilities import load, save, print_orthogonal, print_images, threshold, calculate_bvtv
 from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculate_dice, \
     calculate_volumetric_similarity, calculate_confusion_matrix_from_arrays as calculate_conf
 
@@ -144,14 +144,12 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
     tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]
 
     # Allocate a CUDA buffer for holding entire mask
-    if cuda:
-        merger = CudaTileMerger3D(tiler.target_shape, channels=ch, weight=tiler.weight)
-    else:
-        tile_list = None
+    merger = TileMerger3D(tiler.target_shape, channels=ch, weight=tiler.weight, cuda=cuda)
 
     # Run predictions for tiles and accumulate them
     for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler.crops_out)), batch_size=config['training']['bs'],
-                                                pin_memory=True):
+                                                #pin_memory=True,
+                                                num_workers=16):
         # Move tile to GPU
         if mean is not None and std is not None:
             tiles_batch = tiles_batch.float()
@@ -179,22 +177,15 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
         #if pred_batch.shape[3] > y_out:
         #pred_batch = pred_batch[:, :, :, :y_tile]
 
+        if not cuda:
+            pred_batch = pred_batch.cpu()
+
         # Merge on GPU
-        if cuda:
-            merger.integrate_batch(pred_batch, coords_batch)
-        else:  # List patches, merge later
-            if tile_list is None:
-                tile_list = pred_batch.cpu().numpy()
-            else:
-                tile_list = np.concatenate((tile_list, pred_batch.cpu().numpy().astype(np.float16)), axis=0)
+        merger.integrate_batch(pred_batch, coords_batch)
 
     # Normalize accumulated mask and convert back to numpy
-    if cuda:
-        merged_pred = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
-        merged_pred = tiler.crop_to_orignal_size(merged_pred)
-    else:
-        del tiles
-        merged_pred = tiler.merge(tile_list, channels=ch)
+    merged_pred = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
+    merged_pred = tiler.crop_to_orignal_size(merged_pred)
 
     # Plot
     if plot:
@@ -211,7 +202,7 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
     return merged_pred[:, :, :, 0]
 
 
-def inference_runner_oof(args, config, split_config, device, plot=False, weight='mean'):
+def inference_runner_oof(args, config, split_config, device, plot=False):
     """
     Runs inference on a dataset.
     :param args: Training arguments (paths, etc.)
@@ -289,7 +280,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False, weight=
             # Loop for image slices
             # 1st orientation
             with torch.no_grad():  # Do not update gradients
-                data = inference_3d(model, args, config, data, step=args.step, mean=mean, std=std)
+                data = inference_3d(model, args, config, data, step=args.step, mean=mean, std=std, plot=plot)
 
             # Scale the dynamic range
             data -= np.min(data)
@@ -315,12 +306,12 @@ def inference_runner_oof(args, config, split_config, device, plot=False, weight=
     return save_dir
 
 
-def evaluation_runner(args, config, save_dir):
+def evaluation_runner(args, config, save_dir, masks=True, suffix='_3d'):
     start_eval = time()
 
     # Evaluation arguments
     args.image_path = args.data_location / 'input'
-    args.target_path = args.data_location / 'target_3d'
+    args.target_path = args.data_location / f'target{suffix}'
     args.masks = Path('/media/dios/kaappi/Sakke/Saskatoon/Verity/Registration')
     args.pred_path = args.data_location / 'predictions_oof'
     args.save_dir = args.data_location / 'evaluation_oof'
@@ -365,8 +356,7 @@ def evaluation_runner(args, config, save_dir):
                 pred, files_pred = load(str(args.pred_path / snap.name / sample), axis=(1, 2, 0), rgb=False,
                                         n_jobs=args.num_threads)
 
-                voi, _ = load(str(args.masks / samples_voi[idx] / 'ROI'), axis=(1, 2, 0))
-                voi = zoom(voi.squeeze(), (4, 4, 4), order=0)
+
 
                 # Crop in case of inconsistency
                 crop = min(pred.shape, target.shape)
@@ -384,14 +374,20 @@ def evaluation_runner(args, config, save_dir):
                 if len(np.unique(pred)) != 2:
                     pred, _ = threshold(pred, method='mean')
 
-                # Fix size mismatch
-                size = np.min((voi.shape, pred.shape), axis=0)
-                # Apply VOI
-                pred = np.logical_and(pred[:size[0], :size[1], :size[2]],
-                                      voi[:size[0], :size[1], :size[2]])
+                if masks:
+                    # Apply VOI
+                    voi, _ = load(str(args.masks / samples_voi[idx] / 'ROI'), axis=(1, 2, 0))
+                    voi = zoom(voi.squeeze(), (4, 4, 4), order=0)
+                    # Fix size mismatch
+                    size = np.min((voi.shape, pred.shape), axis=0)
+                    pred = np.logical_and(pred[:size[0], :size[1], :size[2]],
+                                          voi[:size[0], :size[1], :size[2]])
 
-                # Calculate BVTV
-                bvtv = calculate_bvtv(pred, voi)
+                    # Calculate BVTV
+                    bvtv = calculate_bvtv(pred, voi)
+                else:
+                    # Cannot calculate bvtv without reference VOI
+                    bvtv = 0
 
                 print(f'Sample {sample}: MSE = {mse}, PSNR = {psnr}, SSIM = {ssim}, BVTV: {bvtv}')
 

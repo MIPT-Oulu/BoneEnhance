@@ -1,4 +1,3 @@
-autoencoder: True
 strategy:
   # Support for 'train' or 'eval' stages only
   stage_names:
@@ -13,7 +12,7 @@ strategy:
 training:
   # General
   calc_meanstd: True
-  suffix: '_1176'  # Options: _curated _reduced
+  suffix: '_3d_duplicates'  # Options: _curated _reduced
   parse_color: False
   crop_small: [16, 16, 16]
   crossmodality: False
@@ -24,8 +23,8 @@ training:
   add_residual: False
   activation: relu
   normalization: in
-  autoencoder_pretrained: 2021_02_28_10_03_55_3D_deep_autoencoder_ds_1176
-  autoencoder_layers: False
+  autoencoder_pretrained: 2021_03_02_13_44_12_3D_deep_autoencoder_ds_16
+  autoencoder_layers: True
   pretrain: False
   existing_model: dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit
   magnification: 4 
@@ -35,7 +34,7 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 60
-  bs: 12
+  bs: 6
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: autoencoder_tv
   train_loss: True

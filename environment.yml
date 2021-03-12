@@ -1,4 +1,4 @@
-name: bone-enhance-env
+#name: bone-enhance-env
 channels:
   - pytorch
   - anaconda

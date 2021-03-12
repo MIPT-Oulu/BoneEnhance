@@ -1,23 +1,35 @@
 #!/bin/bash
-#SBATCH --job-name=RabbitThickness
+#SBATCH --job-name=BoneEnhance
 #SBATCH --account=project_2002147
-#SBATCH --partition=small
-#SBATCH --time=6:00:00
+#SBATCH --mail-type=BEGIN,END #Send email when job starts
+#SBATCH --partition=gpu
+#SBATCH --time=9:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=20
-#SBATCH --mem-per-cpu=16000
-#SBATCH --array=1-28
+#SBATCH --mem=350G
+#SBATCH --cpus-per-task=16
+#SBATCH --gres=gpu:v100:2
 
+# Set up environment
+export PROJAPPL=/projappl/project_2002147
+csc-workspaces set project_2002147
 module load gcc/8.3.0 cuda/10.1.168
-module load pytorch/1.4
+module load pytorch/1.7
 module load bioconda
 
+# Paths
 #ARCHIVED_DATA=/scratch/project_2002147/data.tar.gz
 #DATA_DIR=${LOCAL_SCRATCH}/data
 DATA_DIR=../../data
+ENV_FILE=/scratch/project_2002147/rytkysan/BoneEnhance/BoneEnhance/requirements.txt
 
-#conda env create -n rabbit_ccs -f requirements_short.txt
-#source activate rabbit_ccs
+# Conda environment
+source /projappl/project_2002147/miniconda3/etc/profile.d/conda.sh
+conda activate bone-enhance-env
+conda info --envs
+#conda env create -f /scratch/project_2002147/rytkysan/BoneEnhance/BoneEnhance/environment.yml
+echo $CONDA_EXE
+
+
 
 #mkdir -p ${DATA_DIR}
 #echo "Copying data to the node..."
@@ -29,5 +41,6 @@ DATA_DIR=../../data
 #echo "Done!"
 
 echo "Start the job..."
-srun ./exp_csc.sh ${SLURM_ARRAY_TASK_ID} ${DATA_DIR}/data
+#srun ./exp_csc.sh ${SLURM_ARRAY_TASK_ID} ${DATA_DIR}/data
+srun ./exp_csc.sh #${DATA_DIR} ${BS} ${SNAP} ${SAMPLE_ID}
 echo "Done the job!"

@@ -11,10 +11,10 @@ strategy:
     SR: 0
 training:
   # General
-  calc_meanstd: False
+  calc_meanstd: True
   suffix: '_3d_duplicates'  # Options: _curated _reduced
   parse_color: False
-  crop_small: [16, 16, 16]
+  crop_small: [8, 8, 8]
   crossmodality: False
   rgb: False
   # Model
@@ -32,7 +32,7 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 100
-  bs: 8
+  bs: 64
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: l1
   train_loss: True

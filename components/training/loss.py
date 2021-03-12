@@ -112,7 +112,7 @@ class PerceptualLoss(nn.Module):
 
             # Weight the gram matrix loss to a reasonable range
             if self.calculate_gram and self.vol:
-                loss *= 1e7
+                loss *= 1e3
             elif self.calculate_gram:
                 loss *= 1e5
             elif self.vol:

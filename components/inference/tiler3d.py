@@ -142,12 +142,12 @@ class Tiler3D:
         return gaussian_filter(m, sigma=dim[0] // step)
 
 
-class CudaTileMerger3D:
+class TileMerger3D:
     """
     Helper class to merge final image on GPU. This generally faster than moving individual tiles to CPU.
     """
 
-    def __init__(self, image_shape, channels, weight):
+    def __init__(self, image_shape, channels, weight, cuda=True):
         """
 
         :param image_shape: Shape of the source image
@@ -155,9 +155,13 @@ class CudaTileMerger3D:
         :param weight: Weighting matrix
         """
 
-        self.weight = torch.from_numpy(np.expand_dims(weight, axis=0)).float().cuda()
-        self.image = torch.zeros((channels, image_shape[0], image_shape[1], image_shape[2])).cuda()
-        self.norm_mask = torch.zeros((1, image_shape[0], image_shape[1], image_shape[2])).cuda()
+        self.weight = torch.from_numpy(np.expand_dims(weight, axis=0)).float()
+        self.image = torch.zeros((channels, image_shape[0], image_shape[1], image_shape[2]))
+        self.norm_mask = torch.zeros((1, image_shape[0], image_shape[1], image_shape[2]))
+        if cuda:
+            self.weight = self.weight.cuda()
+            self.image = self.image.cuda()
+            self.norm_mask = self.norm_mask.cuda()
 
     def integrate_batch(self, batch: torch.Tensor, crop_coords):
         """
@@ -169,10 +173,7 @@ class CudaTileMerger3D:
             raise ValueError("Number of images in batch does not correspond to number of coordinates")
 
         for tile, (x, y, z, tile_x, tile_y, tile_z) in zip(batch, crop_coords):
-            try:
-                self.image[:, x: x + tile_x, y: y + tile_y, z: z + tile_z] += tile * self.weight
-            except RuntimeError:
-                print()
+            self.image[:, x: x + tile_x, y: y + tile_y, z: z + tile_z] += tile * self.weight
             self.norm_mask[:, x: x + tile_x, y: y + tile_y, z: z + tile_z] += self.weight
 
     def merge(self) -> torch.Tensor:

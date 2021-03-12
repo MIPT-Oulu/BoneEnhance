@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 from glob import glob
 
-from BoneEnhance.components.models import EnhanceNet, ConvNet, PerceptualNet, SREncoderDecoder
-from collagen.modelzoo.segmentation import EncoderDecoder
+from ..models import EnhanceNet, ConvNet, PerceptualNet#, SREncoderDecoder
+#from collagen.modelzoo.segmentation import EncoderDecoder
 
 
 class InferenceModel(nn.Module):

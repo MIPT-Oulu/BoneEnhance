@@ -2,8 +2,6 @@ import torch.nn as nn
 import numpy as np
 from torch.nn import functional as F
 
-from BoneEnhance.components.models import make_layers
-
 
 class ConvNet(nn.Module):
     def __init__(self, magnification, n_blocks=18, upscale_input=False, activation='relu', normalization=None):

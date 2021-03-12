@@ -37,7 +37,7 @@ if __name__ == "__main__":
         start_exp = time()
         args = deepcopy(args_base)  # Copy args so that they can be updated
         config = OmegaConf.create(config_list[experiment])
-        config.autoencoder = True
+        #config.autoencoder = True
 
         # Update arguments according to the configuration file
         if len(config.training.crop_small) == 3:

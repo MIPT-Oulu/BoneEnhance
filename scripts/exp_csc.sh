@@ -1,5 +1,11 @@
 #!/bin/bash
-DATA_DIR=/scratch/project_2002147/rytkysan/data
-python -m scripts.thickness_analysis_EP --batch_id ${SLURM_ARRAY_TASK_ID} \
-                                        --masks ${DATA_DIR}/Predictions_FPN_Resnet18\
-                                        --th_maps ${DATA_DIR}/Thickness_cluster
+
+# Input variables
+DATA_DIR=/scratch/project_2002147/rytkysan/BoneEnhance/Data
+declare -i BS=64
+SNAP=../../Workdir/snapshots/2021_03_03_11_52_07_1_3D_mse_tv_1176_HR
+#SNAP=../../Workdir/snapshots/2021_03_04_10_11_34_1_3D_mse_tv_1176
+declare -i SAMPLE_ID=2
+declare -i STEP=3
+
+python -m inference_cluster --dataset_root ${DATA_DIR}/Clinical_data --save_dir ${DATA_DIR}/Results --bs ${BS} --snapshot ${SNAP} --sample_id ${SAMPLE_ID} --step ${STEP}
