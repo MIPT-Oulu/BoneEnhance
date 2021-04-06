@@ -6,6 +6,7 @@ import gc
 import os
 import cv2
 import h5py
+import random
 
 from time import time
 from pathlib import Path
@@ -163,12 +164,14 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
         pred_batch = inference_model(tiles_batch)
 
         # Plot
-        if plot:
+        if plot and random.uniform(0, 1) > 0.98:
             for i in range(args.bs):
                 if args.bs != 1 and pred_batch.shape[0] != 1:
-                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').transpose(0, 2, 3, 1)[i, :, :])
+                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32')[i, 0, 0, :, :])
+                    plt.show()
+                    plt.imshow(tiles_batch.cpu().detach().numpy().astype('float32')[i, 0, 0, :, :])
                 else:
-                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').squeeze().transpose(1, 2, 0))
+                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').squeeze()[i, 0, 0, :, :])
                 plt.show()
 
         # Check for inconsistencies

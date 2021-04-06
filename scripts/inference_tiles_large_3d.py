@@ -39,7 +39,7 @@ if __name__ == "__main__":
     #snap = '2021_03_02_14_55_25_1_3D_perceptualnet_ds_autoencoder_fullpass'  # Trained with 1176 data, 200µm resolution
     #snap = '2021_03_03_07_00_39_1_3D_perceptualnet_ds_autoencoder_fullpass'
     snap = '2021_03_03_11_52_07_1_3D_mse_tv_1176_HR'  # High resolution 1176 model (mse+tv)
-    snap = '2021_03_04_10_11_34_1_3D_mse_tv_1176'  # Low resolution 1176 model (mse+tv)
+    #snap = '2021_03_04_10_11_34_1_3D_mse_tv_1176'  # Low resolution 1176 model (mse+tv)
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
@@ -96,7 +96,7 @@ if __name__ == "__main__":
     # samples = [os.path.basename(x) for x in glob(str(args.dataset_root / '*XZ'))]  # Load with specific name
     samples = os.listdir(args.dataset_root)
     samples.sort()
-    samples = [samples[id] for id in [3]]  # Get intended samples from list
+    samples = [samples[id] for id in [5]]  # Get intended samples from list
 
     # Skip the completed samples
     if args.completed > 0:

@@ -35,7 +35,7 @@ training:
   epochs: 60
   bs: 64
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: bce_combined
+  loss: mse_tv
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False

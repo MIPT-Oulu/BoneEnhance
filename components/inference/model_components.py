@@ -3,7 +3,7 @@ import torch.nn as nn
 from glob import glob
 
 from ..models import EnhanceNet, ConvNet, PerceptualNet#, SREncoderDecoder
-#from collagen.modelzoo.segmentation import EncoderDecoder
+from collagen.modelzoo.segmentation import EncoderDecoder
 
 
 class InferenceModel(nn.Module):

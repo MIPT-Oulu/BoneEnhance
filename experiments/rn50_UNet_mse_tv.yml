@@ -35,7 +35,7 @@ training:
   epochs: 60
   bs: 64
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: bce_combined
+  loss: mse_tv
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False
@@ -68,7 +68,7 @@ model:
   spatial_dropout: 0.1
   bayesian_dropout: 0.5
   backbone: resnet50
-  decoder: FPN
+  decoder: UNet
 data_sampling:
   train:
     data_provider:

@@ -32,7 +32,7 @@ training:
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 100
+  epochs: 60
   bs: 64
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: bce_combined

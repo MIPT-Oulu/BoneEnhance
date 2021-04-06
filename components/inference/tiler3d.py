@@ -96,10 +96,11 @@ class Tiler3D:
            :self.out[2],
         ]
         """
+        n = 5
         crop = image[
-               :self.out[0],
-               :self.out[1],
-               :self.out[2],
+               n:self.out[0] + n,
+               n:self.out[1] + n,
+               n:self.out[2] + n,
                ]
         return crop
 
@@ -156,8 +157,8 @@ class TileMerger3D:
         """
 
         self.weight = torch.from_numpy(np.expand_dims(weight, axis=0)).float()
-        self.image = torch.zeros((channels, image_shape[0], image_shape[1], image_shape[2]))
-        self.norm_mask = torch.zeros((1, image_shape[0], image_shape[1], image_shape[2]))
+        self.image = torch.zeros((channels, image_shape[0], image_shape[1], image_shape[2]), dtype=torch.float32)
+        self.norm_mask = torch.zeros((1, image_shape[0], image_shape[1], image_shape[2]), dtype=torch.float32)
         if cuda:
             self.weight = self.weight.cuda()
             self.image = self.image.cuda()
