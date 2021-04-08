@@ -42,7 +42,8 @@ def init_experiment(experiments='../experiments/run'):
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     parser.add_argument('--num_threads', type=int, default=16, help='Number of CPUs')
     parser.add_argument('--gpus', type=int, default=2, help='Number of GPUs')
-    parser.add_argument('--segmentation', type=bool, default=False, help='Super-resolution or segmentation pipeline?')
+    #parser.add_argument('--segmentation', type=bool, default=False, help='Super-resolution or segmentation pipeline?')  # TODO Debug
+    parser.add_argument('--exp_idx', type=int, default=None, help='Index for the corresponding training experiment')
     args = parser.parse_args()
 
     # Initialize working directories
@@ -83,6 +84,9 @@ def init_experiment(experiments='../experiments/run'):
     device = auto_detect_device()
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.enabled = True
+
+    if args.exp_idx is not None:
+        print(f'Running experiment: {config_paths[args.exp_idx][:-4]}')
 
     return args, config_list, device
 

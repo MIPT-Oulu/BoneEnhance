@@ -127,9 +127,11 @@ if __name__ == "__main__":
             print(f'==> Processing sample {idx + 1} of {len(samples)}: {sample}')
 
             # Load image stacks
-            #data_xy, files = load(str(args.dataset_root / sample), rgb=True, axis=(1, 2, 0))
-            with h5py.File(str(args.dataset_root / sample), 'r') as f:
-                data_original = f['data'][:]
+            if sample.endswith('.h5'):
+                with h5py.File(str(args.dataset_root / sample), 'r') as f:
+                    data_original = f['data'][:]
+            else:
+                data_original, files = load(str(args.dataset_root / sample), rgb=True, axis=(1, 2, 0))
 
             if ds:
                 # Resize target with the given magnification to provide the input image
@@ -164,11 +166,12 @@ if __name__ == "__main__":
                     out = np.zeros((data.shape[0], data.shape[1], data.shape[2]))
                     for slice_idx in tqdm(range(data.shape[2]), desc='Running inference, XY'):
                         out[:, :, slice_idx] = inference(model, args, config, data[:, :, slice_idx, :],
-                                                         tile=args.step,
+                                                         tile=args.step, weight=args.weight,
                                                          mean=mean, std=std)
                     data = out
                 else:
-                    data = inference_3d(model, args, config, data, step=args.step, mean=mean, std=std, plot=args.plot)
+                    data = inference_3d(model, args, config, data, step=args.step, mean=mean, std=std, plot=args.plot,
+                                        weight=args.weight)
 
 
             if ds:

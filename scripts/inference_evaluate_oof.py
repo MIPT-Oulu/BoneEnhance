@@ -71,7 +71,7 @@ if __name__ == "__main__":
         save_d = inference_runner_oof(args_experiment, config, split_config, device, plot=args.plot)
 
         masks = snap == '2021_02_26_05_52_47_3D_perceptualnet_ds_mse_tv'
-        evaluation_runner(args_experiment, config, save_d, masks=masks, suffix=suffixes[idx])
+        evaluation_runner(args_experiment, config, save_d, calculate_bvtv=masks, suffix=suffixes[idx])
 
         dur = time() - start
         print(f'Inference completed in {(dur % 3600) // 60} minutes, {dur % 60} seconds.')

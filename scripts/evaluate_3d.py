@@ -63,7 +63,7 @@ def evaluation_runner(args, save_dir, masks=True, suffix='_3d'):
             with h5py.File(str(args.target_path / samples_target[idx]), 'r') as f:
                 target = f['data'][:]
 
-            pred, files_pred = load(str(args.pred_path / snap.name / sample), axis=(1, 2, 0), rgb=False,
+            pred, files_pred = load(str(args.pred_path / snap.name / sample / 'conventional_segmentation_gray'), axis=(1, 2, 0), rgb=False,
                                     n_jobs=args.num_threads)
 
             # Crop in case of inconsistency
@@ -142,9 +142,9 @@ def evaluation_runner(args, save_dir, masks=True, suffix='_3d'):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_root', type=Path, default=f'../../Data/Test set (KP02)')
-    parser.add_argument('--pred_path', type=Path, default=#f'../../Data/Test set (KP02)/predictions')
-    '/media/dios/kaappi/Santeri/BoneEnhance/upscaled_images/Verity_TCI')
-    parser.add_argument('--save_dir', type=Path, default='../../Data/Test set (KP02)/evaluation')
+    parser.add_argument('--pred_path', type=Path, default=#f'../../Data/Test set (KP02)/predictions_cbct')
+                        '/media/dios/kaappi/Santeri/BoneEnhance/upscaled_images')
+    parser.add_argument('--save_dir', type=Path, default='../../Data/Test set (KP02)/evaluation_cbct')
     parser.add_argument('--bvtv_path', type=Path, default='../../Data/BVTV_test.csv')
     parser.add_argument('--bs', type=int, default=4)
     parser.add_argument('--magnification', type=int, default=4)
@@ -169,6 +169,7 @@ if __name__ == "__main__":
              '2021_03_31_22_06_00_2D_perceptualnet_cm',
              '2021_01_08_09_49_45_2D_perceptualnet_ds_16'
              ]
+    snaps = ['Verity_TCI_test']
     suffixes = ['_3d'] * len(snaps)
     snaps = [args.snapshots / snap for snap in snaps]
 

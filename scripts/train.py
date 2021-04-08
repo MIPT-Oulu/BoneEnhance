@@ -41,7 +41,10 @@ if __name__ == "__main__":
         if len(config.training.crop_small) == 3:
             parser = partial(parse_3d, config=config)
         else:
-            parser = partial(parse_grayscale, config=config)
+            if config.training.segmentation:
+                parser = partial(parse_segmentation, config=config)
+            else:
+                parser = partial(parse_grayscale, config=config)
 
         # Split training folds
         parser_debug = partial(parser, debug=True)  # Display figures
@@ -105,7 +108,7 @@ if __name__ == "__main__":
         if config.inference.calc_inference:
             save_dir = inference_runner_oof(args, config, splits_metadata, device)
 
-            evaluation_runner(args, config, save_dir)
+            evaluation_runner(args, config, save_dir, suffix=config.training.suffix)
 
     # Duration of the whole script
     dur = time() - start

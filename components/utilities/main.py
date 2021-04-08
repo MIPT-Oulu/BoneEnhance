@@ -172,13 +172,20 @@ def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False):
         data = Parallel(n_jobs=n_jobs)(delayed(read_image_rgb)(path, file) for file in files)
     else:
         data = Parallel(n_jobs=n_jobs)(delayed(read_image_gray)(path, file) for file in files)
+
+    data = np.array(data)
+
+    if len(data.shape) == 1:
+        Warning('Image dimensions are not consistent! Returning a list of images.')
+        return data, files
+
     # Transpose array
     if axis != (0, 1, 2) and rgb:
-        return np.transpose(np.array(data), axis + (3,)), files
+        return np.transpose(data, axis + (3,)), files
     elif axis != (0, 1, 2):
-        data = np.transpose(np.array(data), axis)
+        data = np.transpose(data, axis)
         return data, files
-    return np.array(data), files
+    return data, files
 
 
 def read_image_gray(path, file):

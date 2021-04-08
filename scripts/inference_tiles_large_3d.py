@@ -131,7 +131,8 @@ if __name__ == "__main__":
         # Loop for image slices
         # 1st orientation
         with torch.no_grad():  # Do not update gradients
-            prediction = inference_3d(model, args, config, data_xy, step=args.step, cuda=args.cuda, mean=mean, std=std)
+            prediction = inference_3d(model, args, config, data_xy, step=args.step, cuda=args.cuda, mean=mean, std=std,
+                                      weight=args.weight)
             #prediction, _ = load(str(args.save_dir / sample[:-3]), axis=(1, 2, 0))
             #print_orthogonal(prediction, invert=True, res=50 / 1000, title='Output', cbar=True,
             #                 savepath=str(args.save_dir / 'visualizations' / (sample[:-3] + '_prediction.png')),

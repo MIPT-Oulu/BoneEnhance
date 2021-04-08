@@ -108,7 +108,7 @@ def train_test_transforms(conf, args, mean=None, std=None):
     vol = len(crop_small) == 3
 
     # Training transforms
-    train_transforms, val_transforms = return_transforms(prob, trf, training.magnification, crop_small, args, vol)
+    train_transforms, val_transforms = return_transforms(prob, trf, training.magnification, crop_small, conf, vol)
 
     # 2D or 3D?
     if vol:
@@ -117,7 +117,7 @@ def train_test_transforms(conf, args, mean=None, std=None):
         axis = (0, 1, 2)
 
     # SR or segmentation?
-    if args.segmentation:
+    if conf.training.segmentation:
         wrap = wrap_solt_segmentation
     else:
         wrap = wrap_solt_double

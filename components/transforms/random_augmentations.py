@@ -9,7 +9,7 @@ from BoneEnhance.components.transforms.spatial_transforms import Rotate, Transla
 from collagen.data.utils import ApplyTransform, Compose
 
 
-def return_transforms(prob, trf, magnification, crop_small, args, vol=False):
+def return_transforms(prob, trf, magnification, crop_small, config, vol=False):
     crop_large = tuple([crop * magnification for crop in crop_small])
 
     if vol:
@@ -58,7 +58,7 @@ def return_transforms(prob, trf, magnification, crop_small, args, vol=False):
             Crop(magnification, crop_mode='r', crop_to=(crop_small, crop_large))
         ])
 
-    elif args.segmentation:
+    elif config.training.segmentation:
         transforms = slc.SelectiveStream([
             slc.Stream([
 

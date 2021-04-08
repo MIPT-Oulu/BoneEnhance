@@ -12,6 +12,7 @@ strategy:
 training:
   # General
   calc_meanstd: True
+  segmentation: True
   suffix: ''  # Options: _curated _reduced
   parse_color: False
   crop_small: [32, 32]

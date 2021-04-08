@@ -8,17 +8,18 @@ from scipy.ndimage import zoom
 if __name__ == "__main__":
     # Initialize experiment
     args, config, device = init_experiment()
-    images_loc = Path('/media/dios/kaappi/Sakke/Saskatoon/µCT/Recs_bone')
+    images_loc = Path('/media/santeri/data/BoneEnhance/Data/target')
     #images_loc = Path('/media/santeri/data/BoneEnhance/Data/Test set (KP02)/target')
 
-    images_save = Path('/media/santeri/data/BoneEnhance/Data/binary_images')
+    images_save = Path('/media/santeri/data/BoneEnhance/Data/target_ds')
 
     images_save.mkdir(exist_ok=True)
 
-    subdir = 'trabecular_data/Binned4x/bonemask'
+    #subdir = 'trabecular_data/Binned4x/bonemask'
     resample = True
     #factor = 200/2.75
-    factor = 4
+    factor = 16
+    k = 5
     #n_slices = 100
 
     # Resample large number of slices
@@ -30,7 +31,7 @@ if __name__ == "__main__":
         print(f'Processing sample: {sample}')
         try:
             if resample:  # Resample slices
-                im_path = images_loc / sample / subdir
+                im_path = images_loc / sample #/ subdir
 
                 data, files = load(im_path, axis=(0, 1, 2))  #axis=(1, 2, 0))
 
@@ -40,6 +41,9 @@ if __name__ == "__main__":
                     image = data[i]
                     if factor != 1:
                         resize_target = (image.shape[1] // factor, image.shape[0] // factor)
+
+                        # Antialiasing
+                        image = cv2.GaussianBlur(image, ksize=(k, k), sigmaX=0)
                         image = cv2.resize(image.copy(), resize_target, interpolation=cv2.INTER_NEAREST)
 
                     cv2.imwrite(str(images_save / sample / files[i]), image)

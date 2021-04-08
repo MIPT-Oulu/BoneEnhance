@@ -19,9 +19,6 @@ def build_meta_from_files(base_path, config, args=None):
         suffix = '_3d'
     else:
         suffix = config.training.suffix
-    #if args.segmentation:
-        #target_loc = base_path / f'target_binary_resampled'
-        #input_loc = base_path / f'input_original'
 
     if config.training.suffix is not None:
         target_loc = base_path / f'target{suffix}'
@@ -38,34 +35,26 @@ def build_meta_from_files(base_path, config, args=None):
 
     # 3D metadata
     if len(config.training.crop_small) == 3:
-        input_stacks = list(map(lambda x: pathlib.Path(x), input_loc.glob('*.h5')))
-        target_stacks = list(map(lambda x: pathlib.Path(x), target_loc.glob('*.h5')))
-        input_stacks.sort()
-        target_stacks.sort()
-
-        # Check for data consistency
-        assert len(input_stacks), len(target_stacks)
-
-        # Dataframe
-        [metadata['fname'].append((input_loc / img_name.name)) for img_name in input_stacks]
-        [metadata['target_fname'].append(target_loc / img_name.name) for img_name in target_stacks]
-
-        return pd.DataFrame(data=metadata)
-
-    # 2D metadata
-
-    # List files
-    input_images = list(map(lambda x: pathlib.Path(x), input_loc.glob('**/*[0-9].[pb][nm][gp]')))
-    target_images = list(map(lambda x: pathlib.Path(x), target_loc.glob('**/*[0-9].[pb][nm][gp]')))
+        input_images = list(map(lambda x: pathlib.Path(x), input_loc.glob('*.h5')))
+        target_images = list(map(lambda x: pathlib.Path(x), target_loc.glob('*.h5')))
+    else:
+        # List files
+        input_images = list(map(lambda x: pathlib.Path(x), input_loc.glob('**/*[0-9].[pb][nm][gp]')))
+        target_images = list(map(lambda x: pathlib.Path(x), target_loc.glob('**/*[0-9].[pb][nm][gp]')))
     input_images.sort()
     target_images.sort()
 
     # Check for data consistency
     assert len(input_images), len(target_images)
 
-    # Creating the dataframe
-    [metadata['fname'].append((input_loc / img_name.parent / img_name.name)) for img_name in input_images]
-    [metadata['target_fname'].append(target_loc / img_name.parent / img_name.name) for img_name in target_images]
+    # Dataframe
+    if len(config.training.crop_small) == 3:
+        [metadata['fname'].append((input_loc / img_name.name)) for img_name in input_images]
+        [metadata['target_fname'].append(target_loc / img_name.name) for img_name in target_images]
+    else:
+        # Folders arranged in subfolders based on sample
+        [metadata['fname'].append((input_loc / img_name.parent / img_name.name)) for img_name in input_images]
+        [metadata['target_fname'].append(target_loc / img_name.parent / img_name.name) for img_name in target_images]
 
     return pd.DataFrame(data=metadata)
 

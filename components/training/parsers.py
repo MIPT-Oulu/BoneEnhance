@@ -27,12 +27,12 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     if config is not None and not config.training.crossmodality:
 
         # Resize target to a relevant size (from the 3.2µm resolution to 51.2µm
-        new_size = (target.shape[1] // 16, target.shape[0] // 16)
+        #new_size = (target.shape[1] // 16, target.shape[0] // 16)
 
         # Antialiasing
-        target = cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0)
+        #target = cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0)
 
-        target = cv2.resize(target.copy(), new_size)  # .transpose(1, 0, 2)
+        #target = cv2.resize(target.copy(), new_size)  # .transpose(1, 0, 2)
         #target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True).astype('uint8')
 
         new_size = (target.shape[1] // mag, target.shape[0] // mag)

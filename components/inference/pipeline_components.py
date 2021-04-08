@@ -114,7 +114,7 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
 
 
 def inference_3d(inference_model, args, config, img_full, device='cuda', plot=False,
-                 mean=None, std=None, step=2, cuda=True):
+                 mean=None, std=None, step=2, cuda=True, weight='mean'):
     """
     Calculates inference on one image.
     """
@@ -139,7 +139,7 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
         img_full = np.repeat(img_full, 3, axis=-1)
 
     # Cut large image into overlapping tiles
-    tiler = Tiler3D(img_full.shape, tile=tile, out=out, step=step, mag=mag, weight=args.weight)
+    tiler = Tiler3D(img_full.shape, tile=tile, out=out, step=step, mag=mag, weight=weight)
 
     # HWZC -> CHWZ. Optionally, do normalization here
     tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]
@@ -262,13 +262,26 @@ def inference_runner_oof(args, config, split_config, device, plot=False):
                 continue
 
             # Load image stacks
-            with h5py.File(str(sample), 'r') as f:
-                data = f['data'][:]
+            if str(sample).endswith('.h5'):
+                with h5py.File(str(sample), 'r') as f:
+                    data = f['data'][:]
 
-            # Resize target with the given magnification to provide the input image
-            if ds:
-                factor = (data.shape[0] // mag, data.shape[1] // mag, data.shape[2] // mag)
-                data = resize(data.astype('float64'), factor, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=sigma)
+                # Resize target with the given magnification to provide the input image
+                if ds:
+                    factor = (data.shape[0] // mag, data.shape[1] // mag, data.shape[2] // mag)
+                    data = resize(data.astype('float64'), factor, order=0, anti_aliasing=True, preserve_range=True,
+                                  anti_aliasing_sigma=sigma)
+
+            else:
+                data = cv2.imread(str(sample), cv2.IMREAD_GRAYSCALE)
+
+                if ds:
+                    # Get the downscaled input image
+                    k = 5
+
+                    # Antialiasing and downscaling to input size
+                    new_size = (data.shape[1] // mag, data.shape[0] // mag)
+                    data = cv2.resize(cv2.GaussianBlur(data, ksize=(k, k), sigmaX=0), new_size)
 
             # 3-channel or 1-channel
             if config.training.rgb:
@@ -276,29 +289,44 @@ def inference_runner_oof(args, config, split_config, device, plot=False):
             else:
                 data = np.expand_dims(data, axis=-1)
 
-            print_orthogonal(data[:, :, :, 0], invert=True, res=0.2, title='Input', cbar=True,
-                             savepath=str(save_dir / 'visualizations' / (str(sample.stem) + '_input.png')),
-                             scale_factor=1000)
+            if len(data.shape) == 4:
+                print_orthogonal(data[:, :, :, 0], invert=True, res=0.2, title='Input', cbar=True,
+                                 savepath=str(save_dir / 'visualizations' / (str(sample.stem) + '_input.png')),
+                                 scale_factor=1000)
+
+            if config.inference.weight is not None:
+                weight = config.inference.weight
+            else:
+                weight = 'mean'
 
             # Loop for image slices
             # 1st orientation
             with torch.no_grad():  # Do not update gradients
-                data = inference_3d(model, args, config, data, step=args.step, mean=mean, std=std, plot=plot)
+                if len(data.shape) == 4:
+                    data = inference_3d(model, args, config, data, step=args.step, mean=mean, std=std, plot=plot,
+                                        weight=weight)
+                else:
+                    data = inference(model, args, config, data, tile=args.step, mean=mean, std=std, plot=plot,
+                                     weight=weight)
 
             # Scale the dynamic range
-            data -= np.min(data)
-            data /= np.max(data)
+            #data -= np.min(data)
+            #data /= np.max(data)
 
             # Convert to uint8
             data = (data * 255).astype('uint8')
 
             # Save predicted full mask
-            (save_dir / sample.stem).mkdir(exist_ok=True)
-            save(str(save_dir / sample.stem), str(sample.stem), data, dtype='.png', verbose=False)
+            if len(data.shape) == 3:
+                (save_dir / sample.stem).mkdir(exist_ok=True)
+                save(str(save_dir / sample.stem), str(sample.stem), data, dtype='.png', verbose=False)
 
-            print_orthogonal(data, invert=True, res=0.2 / 4, title='Output', cbar=True,
-                             savepath=str(save_dir / 'visualizations' / (str(sample.stem) + '_prediction.png')),
-                             scale_factor=1000)
+                print_orthogonal(data, invert=True, res=0.2 / 4, title='Output', cbar=True,
+                                 savepath=str(save_dir / 'visualizations' / (str(sample.stem) + '_prediction.png')),
+                                 scale_factor=1000)
+            else:
+                (save_dir / sample.parent.stem).mkdir(exist_ok=True)
+                cv2.imwrite(str(save_dir / sample.parent.stem / sample.name), data)
 
             # Free memory
             torch.cuda.empty_cache()
@@ -309,7 +337,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False):
     return save_dir
 
 
-def evaluation_runner(args, config, save_dir, masks=True, suffix='_3d'):
+def evaluation_runner(args, config, save_dir, calculate_bvtv=True, suffix='_3d'):
     start_eval = time()
 
     # Evaluation arguments
@@ -319,7 +347,6 @@ def evaluation_runner(args, config, save_dir, masks=True, suffix='_3d'):
     args.pred_path = args.data_location / 'predictions_oof'
     args.save_dir = args.data_location / 'evaluation_oof'
     args.save_dir.mkdir(exist_ok=True)
-    ds = not config.training.crossmodality
 
     # Snapshots to be evaluated
     if type(save_dir) != list:
@@ -327,8 +354,6 @@ def evaluation_runner(args, config, save_dir, masks=True, suffix='_3d'):
 
     # Iterate through snapshots
     for snap in save_dir:
-
-        #snap = args.data_location / 'predictions_3D' / '2021_01_11_05_41_47_3D_perceptualnet_ds_autoencoder_16_uCT' # TODO debug
 
         # Initialize results
         results = {'Sample': [], 'MSE': [], 'PSNR': [], 'SSIM': [], 'BVTV': []}
@@ -349,35 +374,58 @@ def evaluation_runner(args, config, save_dir, masks=True, suffix='_3d'):
         samples_voi = os.listdir(args.image_path)
         samples_voi.sort()
 
+        # Do not calculate BV/TV if VOI is not defined for the dataset
+        if len(samples_voi) != len(samples_target):
+            calculate_bvtv = False
+
         # Loop for samples
         for idx, sample in enumerate(samples):
             try:
                 # Load image stacks
-                with h5py.File(str(args.target_path / samples_target[idx]), 'r') as f:
-                    target = f['data'][:]
+                if samples_target[idx].endswith('.h5'):
+                    with h5py.File(str(args.target_path / samples_target[idx]), 'r') as f:
+                        target = f['data'][:]
+                else:
+                    target, files = load(str(args.target_path / samples_target[idx]), rgb=False, axis=(1, 2, 0))
 
-                pred, files_pred = load(str(args.pred_path / snap.name / sample), axis=(1, 2, 0), rgb=False,
-                                        n_jobs=args.num_threads)
+                pred, files_pred = load(str(args.pred_path / snap.name / sample), axis=(1, 2, 0), rgb=False)
 
+                # Comparison for consistent array size
+                if len(pred.shape) != 1:
+                    # Crop in case of inconsistency
+                    crop = min(pred.shape, target.shape)
+                    target = target[:crop[0], :crop[1], :crop[2]]
+                    pred = pred[:crop[0], :crop[1], :crop[2]].squeeze()
 
-
-                # Crop in case of inconsistency
-                crop = min(pred.shape, target.shape)
-                target = target[:crop[0], :crop[1], :crop[2]]
-                pred = pred[:crop[0], :crop[1], :crop[2]].squeeze()
-
-                # Evaluate metrics
-                mse = mean_squared_error(target / 255., pred / 255.)
-                psnr = peak_signal_noise_ratio(target / 255., pred / 255.)
-                ssim = structural_similarity(target / 255., pred / 255.)
+                    # Evaluate metrics
+                    mse = mean_squared_error(target / 255., pred / 255.)
+                    psnr = peak_signal_noise_ratio(target / 255., pred / 255.)
+                    ssim = structural_similarity(target / 255., pred / 255.)
+                # In case image size changes, following pipeline is used
+                else:
+                    # Do not calculate BV/TV for inconsistent arrays
+                    calculate_bvtv = False
+                    mse, psnr, ssim = 0, 0, 0
+                    for i in range(pred.shape[0]):
+                        crop = min(pred[i].shape, target[i].shape)
+                        # Run slice-by-slice comparisons, accounting for inconsistency
+                        mse += mean_squared_error(target[i][:crop[0], :crop[1]] / 255.,
+                                                  pred[i][:crop[0], :crop[1]] / 255.)
+                        psnr += peak_signal_noise_ratio(target[i][:crop[0], :crop[1]] / 255.,
+                                                        pred[i][:crop[0], :crop[1]] / 255.)
+                        ssim += structural_similarity(target[i][:crop[0], :crop[1]] / 255.,
+                                                     pred[i][:crop[0], :crop[1]] / 255.)
+                    mse /= pred.shape[0]
+                    psnr /= pred.shape[0]
+                    ssim /= pred.shape[0]
 
                 # Binarize and calculate BVTV
+                if calculate_bvtv:
 
-                # Otsu thresholding
-                if len(np.unique(pred)) != 2:
-                    pred, _ = threshold(pred, method='mean')
+                    # Otsu thresholding
+                    if len(np.unique(pred)) != 2:
+                        pred, _ = threshold(pred, method='otsu')
 
-                if masks:
                     # Apply VOI
                     voi, _ = load(str(args.masks / samples_voi[idx] / 'ROI'), axis=(1, 2, 0))
                     voi = zoom(voi.squeeze(), (4, 4, 4), order=0)
