@@ -8,6 +8,10 @@ Possible types of experiments:
 - 2D super-resolution (2 parameters in crop_small)
 - 2D segmentation
 """
+# Set up paths for proper referencing of packages on cluster
+import sys
+sys.path.append('/scratch/project_2002147/rytkysan/BoneEnhance')
+sys.path.append('/projappl/project_2002147/miniconda3/lib/python3.7/site-packages')
 
 from torch import optim, cuda
 from time import time
@@ -17,12 +21,14 @@ from omegaconf import OmegaConf
 import cv2
 from functools import partial
 
+
+
 from collagen.core import Session
 from collagen.strategies import Strategy
 
 from BoneEnhance.components.training.session import create_data_provider, init_experiment, init_callbacks, \
     save_transforms, init_loss, init_model
-from BoneEnhance.components.training import parse_grayscale, parse_3d, parse_3d_debug, parse_segmentation
+from BoneEnhance.components.training import parse_grayscale, parse_3d, parse_segmentation
 from BoneEnhance.components.splits import build_splits
 from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
 
@@ -35,9 +41,10 @@ if __name__ == "__main__":
     start = time()
 
     # Initialize experiment
-    args_base, config_list, device = init_experiment()
+    args_base, config_list, config_paths, device = init_experiment()
 
     # Select the experiment configuration from
+    print(f'Running experiment: {config_paths[args_base.exp_idx]}')
     experiment = config_list[args_base.exp_idx]
     # Time of the current experiment
     start_exp = time()

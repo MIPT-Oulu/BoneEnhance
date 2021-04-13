@@ -12,19 +12,19 @@ strategy:
 training:
   # General
   calc_meanstd: True
-  segmentation: True
-  suffix: ''  # Options: _curated _reduced
+  suffix: '_1176'  # Options: _curated _reduced
   parse_color: False
-  crop_small: [16, 16]
+  crop_small: [16, 16, 16]
   crossmodality: False
-  rgb: True
+  rgb: False
   # Model
-  architecture: encoderdecoder
+  architecture: perceptualnet
   upscale_input: True  # In PerceptualNet = resize-convolution
   add_residual: False
   activation: relu
   normalization: in
-  autoencoder_pretrained: 2021_01_08_11_19_18_3D_autoencoder_ds_16
+  autoencoder_pretrained: 2021_02_28_10_03_55_3D_deep_autoencoder_ds_1176
+  autoencoder_layers: False
   pretrain: False
   existing_model: dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit
   magnification: 4 
@@ -33,10 +33,10 @@ training:
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 1
-  bs: 64
+  epochs: 100
+  bs: 12
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: bce_combined
+  loss: mse_tv
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False
@@ -62,6 +62,7 @@ transforms:
   v_range: [0.000001, 0.0009]
 inference:
   calc_inference: True
+  step: 2
   weight: 'gaussian'
   threshold: 0.8
 model:
@@ -69,8 +70,8 @@ model:
   n_outputs: 1
   spatial_dropout: 0.1
   bayesian_dropout: 0.5
-  backbone: resnet50
-  decoder: FPN
+  backbone: resnet34
+  decoder: enhance
 data_sampling:
   train:
     data_provider:

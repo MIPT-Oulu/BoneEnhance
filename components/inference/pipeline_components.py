@@ -221,9 +221,18 @@ def inference_runner_oof(args, config, split_config, device, plot=False):
 
     # Inference arguments
     args.save_dir = args.data_location / 'predictions_oof'
-    args.step = 2
-    args.weight = 'gaussian'
     sigma = 0.5  # Antialiasing filter for downscaling
+
+    # Tiling weight
+    if config.inference.weight is not None:
+        weight = config.inference.weight
+    else:
+        weight = 'mean'
+    # Tile step
+    if config.inference.step is not None:
+        step = config.inference.step
+    else:
+        step = 2
 
     # Create save directories
     save_dir = args.save_dir / str(config['training']['snapshot'] + '_oof')
@@ -268,20 +277,32 @@ def inference_runner_oof(args, config, split_config, device, plot=False):
 
                 # Resize target with the given magnification to provide the input image
                 if ds:
+                    orig_size = data.shape
                     factor = (data.shape[0] // mag, data.shape[1] // mag, data.shape[2] // mag)
                     data = resize(data.astype('float64'), factor, order=0, anti_aliasing=True, preserve_range=True,
                                   anti_aliasing_sigma=sigma)
+                else:
+                    orig_size = (data.shape[0] * mag, data.shape[1] * mag, data.shape[2] * mag)
+
+                if config.training.segmentation:
+                    data = resize(data.astype('float64'), orig_size, order=3, preserve_range=True)
 
             else:
                 data = cv2.imread(str(sample), cv2.IMREAD_GRAYSCALE)
 
                 if ds:
+                    orig_size = data.shape
                     # Get the downscaled input image
                     k = 5
 
                     # Antialiasing and downscaling to input size
                     new_size = (data.shape[1] // mag, data.shape[0] // mag)
                     data = cv2.resize(cv2.GaussianBlur(data, ksize=(k, k), sigmaX=0), new_size)
+                else:
+                    orig_size = (data.shape[1] * mag, data.shape[0] * mag)
+
+                if config.training.segmentation:
+                    data = cv2.resize(data, orig_size, interpolation=cv2.INTER_CUBIC)
 
             # 3-channel or 1-channel
             if config.training.rgb:
@@ -294,19 +315,14 @@ def inference_runner_oof(args, config, split_config, device, plot=False):
                                  savepath=str(save_dir / 'visualizations' / (str(sample.stem) + '_input.png')),
                                  scale_factor=1000)
 
-            if config.inference.weight is not None:
-                weight = config.inference.weight
-            else:
-                weight = 'mean'
-
             # Loop for image slices
             # 1st orientation
             with torch.no_grad():  # Do not update gradients
                 if len(data.shape) == 4:
-                    data = inference_3d(model, args, config, data, step=args.step, mean=mean, std=std, plot=plot,
+                    data = inference_3d(model, args, config, data, step=step, mean=mean, std=std, plot=plot,
                                         weight=weight)
                 else:
-                    data = inference(model, args, config, data, tile=args.step, mean=mean, std=std, plot=plot,
+                    data = inference(model, args, config, data, tile=step, mean=mean, std=std, plot=plot,
                                      weight=weight)
 
             # Scale the dynamic range
@@ -337,7 +353,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False):
     return save_dir
 
 
-def evaluation_runner(args, config, save_dir, calculate_bvtv=True, suffix='_3d'):
+def evaluation_runner(args, config, save_dir, use_bvtv=True, suffix='_3d'):
     start_eval = time()
 
     # Evaluation arguments
@@ -376,7 +392,7 @@ def evaluation_runner(args, config, save_dir, calculate_bvtv=True, suffix='_3d')
 
         # Do not calculate BV/TV if VOI is not defined for the dataset
         if len(samples_voi) != len(samples_target):
-            calculate_bvtv = False
+            use_bvtv = False
 
         # Loop for samples
         for idx, sample in enumerate(samples):
@@ -390,37 +406,18 @@ def evaluation_runner(args, config, save_dir, calculate_bvtv=True, suffix='_3d')
 
                 pred, files_pred = load(str(args.pred_path / snap.name / sample), axis=(1, 2, 0), rgb=False)
 
-                # Comparison for consistent array size
-                if len(pred.shape) != 1:
-                    # Crop in case of inconsistency
-                    crop = min(pred.shape, target.shape)
-                    target = target[:crop[0], :crop[1], :crop[2]]
-                    pred = pred[:crop[0], :crop[1], :crop[2]].squeeze()
+                # Crop in case of inconsistency
+                crop = min(pred.shape, target.shape)
+                target = target[:crop[0], :crop[1], :crop[2]]
+                pred = pred[:crop[0], :crop[1], :crop[2]].squeeze()
 
-                    # Evaluate metrics
-                    mse = mean_squared_error(target / 255., pred / 255.)
-                    psnr = peak_signal_noise_ratio(target / 255., pred / 255.)
-                    ssim = structural_similarity(target / 255., pred / 255.)
-                # In case image size changes, following pipeline is used
-                else:
-                    # Do not calculate BV/TV for inconsistent arrays
-                    calculate_bvtv = False
-                    mse, psnr, ssim = 0, 0, 0
-                    for i in range(pred.shape[0]):
-                        crop = min(pred[i].shape, target[i].shape)
-                        # Run slice-by-slice comparisons, accounting for inconsistency
-                        mse += mean_squared_error(target[i][:crop[0], :crop[1]] / 255.,
-                                                  pred[i][:crop[0], :crop[1]] / 255.)
-                        psnr += peak_signal_noise_ratio(target[i][:crop[0], :crop[1]] / 255.,
-                                                        pred[i][:crop[0], :crop[1]] / 255.)
-                        ssim += structural_similarity(target[i][:crop[0], :crop[1]] / 255.,
-                                                     pred[i][:crop[0], :crop[1]] / 255.)
-                    mse /= pred.shape[0]
-                    psnr /= pred.shape[0]
-                    ssim /= pred.shape[0]
+                # Evaluate metrics
+                mse = mean_squared_error(target / 255., pred / 255.)
+                psnr = peak_signal_noise_ratio(target / 255., pred / 255.)
+                ssim = structural_similarity(target / 255., pred / 255.)
 
                 # Binarize and calculate BVTV
-                if calculate_bvtv:
+                if use_bvtv:
 
                     # Otsu thresholding
                     if len(np.unique(pred)) != 2:
@@ -461,7 +458,8 @@ def evaluation_runner(args, config, save_dir, calculate_bvtv=True, suffix='_3d')
         results['BVTV'].append(np.average(results['BVTV']))
 
         # Write to excel
-        writer = pd.ExcelWriter(str(args.save_dir / ('metrics_' + str(snap.name))) + '.xlsx')
+        metric_value = str(round(results['SSIM'][-1], 3)).replace('.', '-')
+        writer = pd.ExcelWriter(str(args.save_dir / ('metrics_SSIM_' + metric_value + '_' + str(snap.name))) + '.xlsx')
         df1 = pd.DataFrame(results)
         df1.to_excel(writer, sheet_name='Metrics')
         writer.save()

@@ -10,16 +10,29 @@ from pathlib import Path
 from BoneEnhance.components.transforms import train_test_transforms
 
 
-def build_meta_from_files(base_path, config, args=None):
+def build_meta_from_files(base_path, config):
+    """
+    Compiles the data paths into a Pandas dataframe.
+    Note that the data should be given in a specific manner unless the suffix parameter is given in the config file:
+
+    - 2D data: 'input' and 'target' folders
+    - 3D data: 'input_3d' and 'target_3d' folders
+    - Downscaled data: 'input_3d_ds' and 'target_3d' folders
+
+    :param base_path:
+    :param config:
+    :return:
+    """
     # Dataframe for the metadata
     metadata = {'fname': [], 'target_fname': []}
 
-    # Data path
+    # For 3D experiments, always use 3D data if nothing else is specified
     if len(config.training.crop_small) == 3 and config.training.suffix == '':
         suffix = '_3d'
     else:
         suffix = config.training.suffix
 
+    # Add a specific file path for dataset
     if config.training.suffix is not None:
         target_loc = base_path / f'target{suffix}'
         input_loc = base_path / f'input{suffix}'
@@ -27,41 +40,41 @@ def build_meta_from_files(base_path, config, args=None):
         target_loc = base_path / 'target'
         input_loc = base_path / 'input'
 
+    # For autoencoder, use same input and target
     if config.autoencoder:
         input_loc = target_loc
 
+    # Finally, load downscaled data from specific folder in case of 3D experiments
     if not config.training.crossmodality and len(config.training.crop_small) == 3:
-        input_loc = Path(str(input_loc) + '_ds')
+        if Path(str(input_loc) + '_ds').exists():
+            input_loc = Path(str(input_loc) + '_ds')
+        else:
+            warn = Path(str(input_loc) + '_ds')
+            Warning(f'Folder for downscaled data: {warn} not found.')
 
-    # 3D metadata
-    if len(config.training.crop_small) == 3:
-        input_images = list(map(lambda x: pathlib.Path(x), input_loc.glob('*.h5')))
-        target_images = list(map(lambda x: pathlib.Path(x), target_loc.glob('*.h5')))
-    else:
-        # List files
-        input_images = list(map(lambda x: pathlib.Path(x), input_loc.glob('**/*[0-9].[pb][nm][gp]')))
-        target_images = list(map(lambda x: pathlib.Path(x), target_loc.glob('**/*[0-9].[pb][nm][gp]')))
+    # List files (add .h5, .png, .bmp, and .tif files)
+    input_images = list(map(lambda x: pathlib.Path(x), input_loc.glob('*.h5')))
+    input_images += list(map(lambda x: pathlib.Path(x), input_loc.glob('**/*[0-9].[pbt][nmi][gpf]')))
+    target_images = list(map(lambda x: pathlib.Path(x), target_loc.glob('*.h5')))
+    target_images += list(map(lambda x: pathlib.Path(x), target_loc.glob('**/*[0-9].[pbt][nmi][gpf]')))
+
+    # Sort alphabetically
     input_images.sort()
     target_images.sort()
 
     # Check for data consistency
     assert len(input_images), len(target_images)
 
-    # Dataframe
-    if len(config.training.crop_small) == 3:
-        [metadata['fname'].append((input_loc / img_name.name)) for img_name in input_images]
-        [metadata['target_fname'].append(target_loc / img_name.name) for img_name in target_images]
-    else:
-        # Folders arranged in subfolders based on sample
-        [metadata['fname'].append((input_loc / img_name.parent / img_name.name)) for img_name in input_images]
-        [metadata['target_fname'].append(target_loc / img_name.parent / img_name.name) for img_name in target_images]
+    # Compile the dataframe
+    [metadata['fname'].append(img_name) for img_name in input_images]
+    [metadata['target_fname'].append(img_name) for img_name in target_images]
 
     return pd.DataFrame(data=metadata)
 
 
 def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     # Metadata
-    metadata = build_meta_from_files(data_dir, config, args=args)
+    metadata = build_meta_from_files(data_dir, config)
     # Group_ID
     #metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:-1]), 0)
     metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:2]), 0)

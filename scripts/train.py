@@ -5,13 +5,9 @@ import gc
 from omegaconf import OmegaConf
 import cv2
 from functools import partial
-from torch.utils.tensorboard import SummaryWriter
 
 from collagen.core import Session
 from collagen.strategies import Strategy
-from collagen.callbacks import SamplingFreezer, ScalarMeterLogger, ImageSamplingVisualizer, RunningAverageMeter, \
-    BatchProcFreezer
-
 
 from BoneEnhance.components.training.session import create_data_provider, init_experiment, init_callbacks, \
     save_transforms, init_loss, init_model
@@ -28,7 +24,7 @@ if __name__ == "__main__":
     start = time()
 
     # Initialize experiment
-    args_base, config_list, device = init_experiment()
+    args_base, config_list, config_paths, device = init_experiment()
 
     # Loop for experiment configurations
     for experiment in range(len(config_list)):
@@ -36,6 +32,7 @@ if __name__ == "__main__":
         start_exp = time()
         args = deepcopy(args_base)  # Copy args so that they can be updated
         config = OmegaConf.create(config_list[experiment])
+        print(f'Running experiment: {config_paths[experiment]}')
 
         # Update arguments according to the configuration file
         if len(config.training.crop_small) == 3:
@@ -106,7 +103,7 @@ if __name__ == "__main__":
 
         # Calculate out-of-fold inference and evaluate metrics
         if config.inference.calc_inference:
-            save_dir = inference_runner_oof(args, config, splits_metadata, device)
+            save_dir = inference_runner_oof(args, config, splits_metadata, device)  # TODO step size
 
             evaluation_runner(args, config, save_dir, suffix=config.training.suffix)
 

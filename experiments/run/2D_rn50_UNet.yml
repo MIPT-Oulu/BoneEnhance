@@ -11,14 +11,15 @@ strategy:
     SR: 0
 training:
   # General
-  calc_meanstd: False
-  suffix: '_3d_duplicates'  # Options: _curated _reduced
+  calc_meanstd: True
+  segmentation: True
+  suffix: ''  # Options: _curated _reduced
   parse_color: False
-  crop_small: [16, 16, 16]
+  crop_small: [32, 32]
   crossmodality: False
-  rgb: False
+  rgb: True
   # Model
-  architecture: perceptualnet
+  architecture: encoderdecoder
   upscale_input: True  # In PerceptualNet = resize-convolution
   add_residual: False
   activation: relu
@@ -32,10 +33,10 @@ training:
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 60
-  bs: 6
+  epochs: 100
+  bs: 64
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: mse_tv
+  loss: bce_combined
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False
@@ -61,16 +62,16 @@ transforms:
   v_range: [0.000001, 0.0009]
 inference:
   calc_inference: False
-  step: 2
   weight: 'gaussian'
+  step: 2
   threshold: 0.8
 model:
   decoder_normalization: IN
   n_outputs: 1
   spatial_dropout: 0.1
   bayesian_dropout: 0.5
-  backbone: resnet34
-  decoder: enhance
+  backbone: resnet50
+  decoder: UNet
 data_sampling:
   train:
     data_provider:

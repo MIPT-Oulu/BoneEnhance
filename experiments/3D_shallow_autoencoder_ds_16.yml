@@ -60,6 +60,8 @@ transforms:
   v_range: [0.000001, 0.0009]
 inference:
   calc_inference: False
+  weight: 'gaussian'
+  step: 2
   threshold: 0.8
 model:
   decoder_normalization: IN

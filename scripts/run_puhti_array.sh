@@ -2,9 +2,9 @@
 #SBATCH --job-name=BoneEnhance
 #SBATCH --account=project_2002147
 #SBATCH --mail-type=BEGIN,END #Send email when job starts
-#SBATCH --partition=gpu
-#SBATCH --time=9:00:00
-#SBATCH --ntasks=1
+#SBATCH --partition=gputest
+#SBATCH --time=0:15:00
+#SBATCH --ntasks=3
 #SBATCH --mem=350G
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:v100:2
@@ -41,6 +41,6 @@ echo $CONDA_EXE
 #echo "Done!"
 
 echo "Start the job..."
-#srun ./exp_csc.sh ${SLURM_ARRAY_TASK_ID} ${DATA_DIR}/data
-srun ./exp_csc.sh #${DATA_DIR} ${BS} ${SNAP} ${SAMPLE_ID}
+#srun ./exp_csc_inference.sh ${SLURM_ARRAY_TASK_ID} ${DATA_DIR}/data
+srun ./exp_csc_train.sh #${DATA_DIR} ${BS} ${SNAP} ${SAMPLE_ID}
 echo "Done the job!"

@@ -6,7 +6,7 @@ from scipy.ndimage import zoom
 
 if __name__ == "__main__":
     # Initialize experiment
-    args, config, device = init_experiment()
+    args, config, _, device = init_experiment()
     #images_loc = Path('/media/dios/kaappi/Sakke/Saskatoon/µCT/Recs_bone')
     images_loc = Path('/media/santeri/data/BoneEnhance/Data/input_original')
 

@@ -29,8 +29,8 @@ if __name__ == "__main__":
     # Snapshots to be evaluated
     # µCT models
 
-    snaps = ['2021_03_03_11_52_07_1_3D_mse_tv_1176_HR', '2021_03_04_10_11_34_1_3D_mse_tv_1176', '2021_02_26_05_52_47_3D_perceptualnet_ds_mse_tv']
-    suffixes = ['_1176_HR', '_1176', '_3d']
+    snaps = ['2021_04_13_10_45_20_rn50_UNet_cm']
+    suffixes = ['']
     snaps = [args.snapshots / snap for snap in snaps]
 
     # Iterate through snapshots
@@ -68,10 +68,10 @@ if __name__ == "__main__":
         input_x = config['training']['crop_small'][0]
         input_y = config['training']['crop_small'][1]
 
-        save_d = inference_runner_oof(args_experiment, config, split_config, device, plot=args.plot)
-
+        #save_d = inference_runner_oof(args_experiment, config, split_config, device, plot=args.plot)
+        save_d = Path('../../Data/predictions_oof') / str(config['training']['snapshot'] + '_oof')
         masks = snap == '2021_02_26_05_52_47_3D_perceptualnet_ds_mse_tv'
-        evaluation_runner(args_experiment, config, save_d, calculate_bvtv=masks, suffix=suffixes[idx])
+        evaluation_runner(args_experiment, config, save_d, use_bvtv=masks, suffix=suffixes[idx])
 
         dur = time() - start
         print(f'Inference completed in {(dur % 3600) // 60} minutes, {dur % 60} seconds.')

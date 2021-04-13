@@ -88,7 +88,7 @@ def init_experiment(experiments='../experiments/run'):
     if args.exp_idx is not None:
         print(f'Running experiment: {config_paths[args.exp_idx][:-4]}')
 
-    return args, config_list, device
+    return args, config_list, config_paths, device
 
 
 def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimizer, mean, std):

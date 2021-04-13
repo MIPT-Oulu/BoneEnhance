@@ -63,6 +63,7 @@ transforms:
 inference:
   calc_inference: False
   weight: 'gaussian'
+  step: 2
   threshold: 0.8
 model:
   decoder_normalization: IN

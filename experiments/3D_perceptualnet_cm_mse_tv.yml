@@ -61,6 +61,7 @@ transforms:
   v_range: [0.000001, 0.0009]
 inference:
   calc_inference: True
+  step: 2
   weight: 'gaussian'
   threshold: 0.8
 model:

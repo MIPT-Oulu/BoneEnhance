@@ -163,6 +163,11 @@ def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False):
         if file.endswith('.png') or file.endswith('.bmp') or file.endswith('.tif'):
             try:
                 int(file[-7:-4])
+
+                # Do not load files with different prefix into the stack
+                if len(newlist) != 0 and file.rsplit('_', 1)[0] != newlist[-1].rsplit('_', 1)[0]:
+                    break
+
                 newlist.append(file)
             except ValueError:
                 continue

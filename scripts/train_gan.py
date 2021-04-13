@@ -20,7 +20,7 @@ if __name__ == "__main__":
     start = time()
 
     # Initialize experiment
-    args_base, config_list, device = init_experiment(experiments='../experiments/run_gan')
+    args_base, config_list, config_paths, device = init_experiment(experiments='../experiments/run_gan')
 
     for experiment in range(len(config_list)):
         # Current experiment

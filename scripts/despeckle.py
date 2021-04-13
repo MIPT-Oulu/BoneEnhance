@@ -7,7 +7,7 @@ from scipy.ndimage import zoom
 
 if __name__ == "__main__":
     # Initialize experiment
-    args, config, device = init_experiment()
+    args, config, _, device = init_experiment()
     images_loc = Path('/media/dios/kaappi/Santeri/Vessels')
 
     images_save = Path('/media/santeri/data/RabbitSegmentation/Vessels/Processed')

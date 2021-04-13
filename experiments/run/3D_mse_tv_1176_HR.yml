@@ -11,8 +11,8 @@ strategy:
     SR: 0
 training:
   # General
-  calc_meanstd: False
-  suffix: '_3d_duplicates'  # Options: _curated _reduced
+  calc_meanstd: True
+  suffix: '_1176'  # Options: _curated _reduced
   parse_color: False
   crop_small: [16, 16, 16]
   crossmodality: False
@@ -23,7 +23,8 @@ training:
   add_residual: False
   activation: relu
   normalization: in
-  autoencoder_pretrained: 2021_01_08_11_19_18_3D_autoencoder_ds_16
+  autoencoder_pretrained: 2021_02_28_10_03_55_3D_deep_autoencoder_ds_1176
+  autoencoder_layers: False
   pretrain: False
   existing_model: dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit
   magnification: 4 
@@ -32,8 +33,8 @@ training:
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 60
-  bs: 6
+  epochs: 100
+  bs: 12
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: mse_tv
   train_loss: True
@@ -60,7 +61,7 @@ transforms:
   contrast: 0.4
   v_range: [0.000001, 0.0009]
 inference:
-  calc_inference: False
+  calc_inference: True
   step: 2
   weight: 'gaussian'
   threshold: 0.8

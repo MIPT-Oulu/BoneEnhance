@@ -6,7 +6,7 @@ from BoneEnhance.components.training.session import init_experiment
 
 if __name__ == "__main__":
     # Initialize experiment
-    args, _, _ = init_experiment()
+    args, _, _, _ = init_experiment()
     base_path = args.data_location
     images_loc = base_path / 'target_3d'
 
