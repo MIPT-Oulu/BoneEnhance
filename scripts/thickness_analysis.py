@@ -10,9 +10,9 @@ from scipy.ndimage import zoom
 from skimage.transform import resize
 import argparse
 
-from BoneEnhance.components.utilities import load, save, print_orthogonal, threshold, calculate_bvtv
-from BoneEnhance.components.inference.thickness_analysis import _local_thickness
-from BoneEnhance.components.inference import largest_object
+from bone_enhance.utilities import load, save, print_orthogonal, threshold, calculate_bvtv
+from bone_enhance.inference.thickness_analysis import _local_thickness
+from bone_enhance.inference import largest_object
 
 
 if __name__ == '__main__':

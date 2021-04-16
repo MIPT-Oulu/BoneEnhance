@@ -14,12 +14,12 @@ from collagen.callbacks import SamplingFreezer, ScalarMeterLogger, ImageSampling
     BatchProcFreezer
 
 
-from BoneEnhance.components.training.session import create_data_provider, init_experiment, init_callbacks, \
+from bone_enhance.training.session import create_data_provider, init_experiment, init_callbacks, \
     save_transforms, init_loss, init_model
-from BoneEnhance.components.training import parse_grayscale, parse_autoencoder_2d, parse_autoencoder_3d
-from BoneEnhance.components.splits import build_splits
-from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
-from BoneEnhance.components.models import AutoEncoder
+from bone_enhance.training import parse_grayscale, parse_autoencoder_2d, parse_autoencoder_3d
+from bone_enhance.splits import build_splits
+from bone_enhance.inference.pipeline_components import inference_runner_oof, evaluation_runner
+from bone_enhance.models import AutoEncoder
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)

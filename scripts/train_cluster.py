@@ -9,9 +9,6 @@ Possible types of experiments:
 - 2D segmentation
 """
 # Set up paths for proper referencing of packages on cluster
-import sys
-sys.path.append('/scratch/project_2002147/rytkysan/BoneEnhance')
-sys.path.append('/projappl/project_2002147/miniconda3/lib/python3.7/site-packages')
 
 from torch import optim, cuda
 from time import time
@@ -21,16 +18,14 @@ from omegaconf import OmegaConf
 import cv2
 from functools import partial
 
-
-
 from collagen.core import Session
 from collagen.strategies import Strategy
 
-from BoneEnhance.components.training.session import create_data_provider, init_experiment, init_callbacks, \
+from bone_enhance.training.session import create_data_provider, init_experiment, init_callbacks, \
     save_transforms, init_loss, init_model
-from BoneEnhance.components.training import parse_grayscale, parse_3d, parse_segmentation
-from BoneEnhance.components.splits import build_splits
-from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
+from bone_enhance.training import parse_grayscale, parse_3d, parse_segmentation
+from bone_enhance.splits import build_splits
+from bone_enhance.inference.pipeline_components import inference_runner_oof, evaluation_runner
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
@@ -44,7 +39,7 @@ if __name__ == "__main__":
     args_base, config_list, config_paths, device = init_experiment()
 
     # Select the experiment configuration from
-    print(f'Running experiment: {config_paths[args_base.exp_idx]}')
+    print(f'Running experiment: {config_paths[args_base.exp_idx][:-4]}')
     experiment = config_list[args_base.exp_idx]
     # Time of the current experiment
     start_exp = time()
@@ -116,7 +111,7 @@ if __name__ == "__main__":
 
     # Duration of the current experiment
     dur = time() - start_exp
-    print(f'Model {experiment + 1} trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
+    print(f'Model {config_paths[args_base.exp_idx][:-4]} trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
 
     # Calculate out-of-fold inference and evaluate metrics
     if config.inference.calc_inference:

@@ -17,11 +17,11 @@ from collagen.callbacks import RunningAverageMeter, ModelSaver, RandomImageVisua
     SimpleLRScheduler, ScalarMeterLogger, ImagePairVisualizer
 from collagen.losses import CombinedLoss, PSNRLoss, BCEWithLogitsLoss2d, SoftJaccardLoss
 
-from BoneEnhance.components.transforms import train_test_transforms
-from BoneEnhance.components.models import EnhanceNet, \
+from bone_enhance.transforms import train_test_transforms
+from bone_enhance.models import EnhanceNet, \
     ConvNet, PerceptualNet
-from BoneEnhance.components.training.loss import PerceptualLoss, TotalVariationLoss
-from BoneEnhance.components.training.initialize_weights import InitWeight, init_weight_normal
+from bone_enhance.training.loss import PerceptualLoss, TotalVariationLoss
+from bone_enhance.training.initialize_weights import InitWeight, init_weight_normal
 from collagen.modelzoo.segmentation import EncoderDecoder
 
 
@@ -64,7 +64,7 @@ def init_experiment(experiments='../experiments/run'):
                 config_list.append(config)
 
         # Snapshot directory
-        snapshot_name = time.strftime(f'%Y_%m_%d_%H_%M_%S_{config_path[:-4]}')
+        snapshot_name = time.strftime(f'%Y_%m_%d_%H_%M_%S_{config_path[:-4]}_seed{args.seed}')
         (args.snapshots_dir / snapshot_name).mkdir(exist_ok=True, parents=True)
         config['training']['snapshot'] = snapshot_name
 

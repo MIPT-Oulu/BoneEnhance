@@ -16,9 +16,9 @@ from omegaconf import OmegaConf
 from skimage.transform import resize
 import h5py
 
-from BoneEnhance.components.utilities import load, save, print_orthogonal, render_volume, threshold
-from BoneEnhance.components.inference import InferenceModel, inference, largest_object, load_models, inference_3d
-from BoneEnhance.components.models import ConvNet, EnhanceNet
+from bone_enhance.utilities import load, save, print_orthogonal, render_volume, threshold
+from bone_enhance.inference import InferenceModel, inference, largest_object, load_models, inference_3d
+from bone_enhance.models import ConvNet, EnhanceNet
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)

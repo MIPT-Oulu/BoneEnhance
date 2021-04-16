@@ -15,8 +15,8 @@ import dill
 import yaml
 
 from collagen.core.utils import auto_detect_device
-from BoneEnhance.components.inference.model_components import load_models
-from BoneEnhance.components.utilities import load, calculate_bvtv, threshold
+from bone_enhance.inference.model_components import load_models
+from bone_enhance.utilities import load, calculate_bvtv, threshold
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)

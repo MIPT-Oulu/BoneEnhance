@@ -25,7 +25,7 @@ training:
   normalization: in
   autoencoder_pretrained: 2021_02_28_10_03_55_3D_deep_autoencoder_ds_1176_HR
   autoencoder_layers: False
-  pretrain: True
+  pretrain: False
   existing_model: 2021_02_25_05_51_33_1_3D_perceptualnet_ds_mse_tv
   magnification: 4 
   n_blocks: 15

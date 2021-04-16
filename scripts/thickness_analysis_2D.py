@@ -11,8 +11,8 @@ import numpy as np
 import scipy.ndimage as ndi
 import argparse
 
-from BoneEnhance.components.utilities import load, save, print_orthogonal, otsu_threshold
-from BoneEnhance.components.inference.thickness_analysis import _local_thickness
+from bone_enhance.utilities import load, save, print_orthogonal, otsu_threshold
+from bone_enhance.inference.thickness_analysis import _local_thickness
 
 
 if __name__ == '__main__':

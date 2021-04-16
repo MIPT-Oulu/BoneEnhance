@@ -15,9 +15,9 @@ from scipy.ndimage import zoom
 from skimage.transform import resize
 from omegaconf import OmegaConf
 
-from BoneEnhance.components.utilities import load, save, print_orthogonal, render_volume
-from BoneEnhance.components.inference import InferenceModel, inference, largest_object, load_models
-from BoneEnhance.components.models import ConvNet, EnhanceNet
+from bone_enhance.utilities import load, save, print_orthogonal, render_volume
+from bone_enhance.inference import InferenceModel, inference, largest_object, load_models
+from bone_enhance.models import ConvNet, EnhanceNet
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)

@@ -1,8 +1,8 @@
 import os
 import h5py
 from pathlib import Path
-from BoneEnhance.components.utilities import print_orthogonal
-from BoneEnhance.components.training.session import init_experiment
+from bone_enhance.utilities import print_orthogonal
+from bone_enhance.training.session import init_experiment
 
 if __name__ == "__main__":
     # Initialize experiment

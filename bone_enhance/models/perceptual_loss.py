@@ -69,9 +69,11 @@ class Vgg16(nn.Module):
                 for x in range(4):
                     self.slice1.add_module(str(x), layers_3d[x])
                     if isinstance(layers_3d[x], nn.Conv3d):
+                        # Zero pad the filter weights
                         if zeros:
                             weights = torch.zeros(vgg_pretrained_features[x].weight.size() + (3,))
                             weights[:, :, :, :, 1] = vgg_pretrained_features[x].weight
+                        # Repeat the weights
                         else:
                             weights = vgg_pretrained_features[x].weight.unsqueeze(4).repeat(1, 1, 1, 1, 3)#.unsqueeze(2).repeat(1, 1, 3, 1, 1)
                         self.slice1[x].weight = Parameter(weights)

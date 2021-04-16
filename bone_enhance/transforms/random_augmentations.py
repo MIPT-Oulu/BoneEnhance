@@ -1,9 +1,9 @@
 from solt import DataContainer
 import solt.transforms as slt
 import solt.core as slc
-from BoneEnhance.components.transforms.custom_transforms import Crop, Pad, Brightness, Contrast, Blur, Flip, Rotate90, \
+from BoneEnhance.bone_enhance.transforms.custom_transforms import Crop, Pad, Brightness, Contrast, Blur, Flip, Rotate90, \
     Noise
-from BoneEnhance.components.transforms.spatial_transforms import Rotate, Translate
+from BoneEnhance.bone_enhance.transforms.spatial_transforms import Rotate, Translate
 
 
 from collagen.data.utils import ApplyTransform, Compose

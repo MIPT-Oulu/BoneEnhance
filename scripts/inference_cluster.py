@@ -13,8 +13,8 @@ from time import time
 from omegaconf import OmegaConf
 import h5py
 
-from components.utilities import load, save, print_orthogonal, render_volume, threshold
-from components.inference import InferenceModel, inference, largest_object, load_models, inference_3d
+from bone_enhance.utilities import load, save, print_orthogonal, render_volume, threshold
+from bone_enhance.inference import InferenceModel, inference, largest_object, load_models, inference_3d
 
 import cv2
 cv2.ocl.setUseOpenCL(False)

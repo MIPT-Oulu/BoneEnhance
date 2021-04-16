@@ -471,12 +471,12 @@ def largest_object(input_mask, area_limit=None):
     """
     Keeps the largest connected component of a binary segmentation mask.
 
-    If area_limit is given, all disconnected components < area_limit are discarded.
+    If area_limit is given, all disconnected bone_enhance < area_limit are discarded.
     """
 
     output_mask = np.zeros(input_mask.shape, dtype=np.uint8)
 
-    # Label connected components
+    # Label connected bone_enhance
     binary_img = input_mask.astype(np.bool)
     blobs = measure.label(binary_img, connectivity=1)
 

@@ -7,7 +7,7 @@ from sklearn import model_selection
 from tqdm import tqdm
 from pathlib import Path
 
-from BoneEnhance.components.transforms import train_test_transforms
+from BoneEnhance.bone_enhance.transforms import train_test_transforms
 
 
 def build_meta_from_files(base_path, config):

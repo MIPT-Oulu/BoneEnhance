@@ -12,10 +12,10 @@ from collagen.core import Module
 from collagen.callbacks import ImagePairVisualizer, SimpleLRScheduler, \
     RandomImageVisualizer, ModelSaver
 
-from BoneEnhance.components.transforms import train_test_transforms
-from BoneEnhance.components.models import WGAN_VGG_generator, WGAN_VGG_discriminator, EnhanceNet, Vgg16, \
+from bone_enhance.transforms import train_test_transforms
+from bone_enhance.models import WGAN_VGG_generator, WGAN_VGG_discriminator, EnhanceNet, Vgg16, \
     Discriminator, ConvNet
-from BoneEnhance.components.utilities.callbacks import ScalarMeterLogger, RunningAverageMeter
+from bone_enhance.utilities.callbacks import ScalarMeterLogger, RunningAverageMeter
 
 
 class GANFakeImageSampler(ItemLoader):

@@ -9,11 +9,11 @@ from functools import partial
 from collagen.core import Session
 from collagen.strategies import Strategy
 
-from BoneEnhance.components.training.session import create_data_provider, init_experiment, init_callbacks, \
+from bone_enhance.training.session import create_data_provider, init_experiment, init_callbacks, \
     save_transforms, init_loss, init_model
-from BoneEnhance.components.training import parse_grayscale, parse_3d, parse_3d_debug, parse_segmentation
-from BoneEnhance.components.splits import build_splits
-from BoneEnhance.components.inference.pipeline_components import inference_runner_oof, evaluation_runner
+from bone_enhance.training import parse_grayscale, parse_3d, parse_3d_debug, parse_segmentation
+from bone_enhance.splits import build_splits
+from bone_enhance.inference.pipeline_components import inference_runner_oof, evaluation_runner
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
@@ -103,7 +103,7 @@ if __name__ == "__main__":
 
         # Calculate out-of-fold inference and evaluate metrics
         if config.inference.calc_inference:
-            save_dir = inference_runner_oof(args, config, splits_metadata, device)  # TODO step size
+            save_dir = inference_runner_oof(args, config, splits_metadata, device)
 
             evaluation_runner(args, config, save_dir, suffix=config.training.suffix)
 

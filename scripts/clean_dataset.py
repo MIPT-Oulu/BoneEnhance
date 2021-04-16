@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from BoneEnhance.components.training.session import init_experiment
+from bone_enhance.training.session import init_experiment
 import shutil
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 from glob import glob
 import cv2
-from BoneEnhance.components.utilities.main import load, save, print_orthogonal, load_logfile
+from bone_enhance.utilities.main import load, save, print_orthogonal, load_logfile
 from skimage.transform import resize
 
 if __name__ == "__main__":

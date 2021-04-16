@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
-from BoneEnhance.components.training.session import init_experiment
-from BoneEnhance.components.utilities.main import load, save, print_orthogonal
-from BoneEnhance.components.inference import largest_object
+from bone_enhance.training.session import init_experiment
+from bone_enhance.utilities.main import load, save, print_orthogonal
+from bone_enhance.inference import largest_object
 from scipy.ndimage import zoom
 
 if __name__ == "__main__":

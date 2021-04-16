@@ -3,13 +3,13 @@
 #SBATCH --job-name=BoneEnhance_train_seeds
 #SBATCH --account=project_2002147
 #SBATCH --mail-type=END #Send email when job is finished
-#SBATCH --partition=gpu
-#SBATCH --time=6:00:00
+#SBATCH --partition=gputest
+#SBATCH --time=0:15:00
 #SBATCH --ntasks=1
-#SBATCH --mem=64G
+#SBATCH --mem=8G
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:v100:2
-#SBATCH --array=1-9
+#SBATCH --array=0-1
 
 # Set up environment
 export PROJAPPL=/projappl/project_2002147

@@ -9,7 +9,7 @@ from skimage.util import random_noise
 from skimage.morphology import ball
 from random import randint
 
-from BoneEnhance.components.utilities import print_orthogonal
+from BoneEnhance.bone_enhance.utilities import print_orthogonal
 
 from solt.core import (
     BaseTransform,

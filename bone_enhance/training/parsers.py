@@ -6,7 +6,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from skimage.transform import resize
 
-from BoneEnhance.components.utilities import print_images, print_orthogonal
+from bone_enhance.utilities import print_images, print_orthogonal
 
 
 def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, config=None):

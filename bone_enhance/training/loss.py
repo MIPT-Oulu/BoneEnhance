@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plt
 import torch
 from torch import nn, Tensor
-from BoneEnhance.components.models.wgan import WGAN_VGG_FeatureExtractor
-from BoneEnhance.components.models import Vgg16, load_models
-from BoneEnhance.components.training.initialize_weights import InitWeight, init_weight_normal
-from BoneEnhance.components.utilities import convert_3d_tensor_to_random_2d
+from bone_enhance.models.wgan import WGAN_VGG_FeatureExtractor
+from bone_enhance.models import Vgg16, load_models
+from bone_enhance.training.initialize_weights import InitWeight, init_weight_normal
+from bone_enhance.utilities import convert_3d_tensor_to_random_2d
 from random import uniform
 
 
