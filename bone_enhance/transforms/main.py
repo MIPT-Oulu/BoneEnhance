@@ -5,9 +5,9 @@ from functools import partial
 from solt import DataContainer
 import solt.transforms as slt
 import solt.core as slc
-from BoneEnhance.bone_enhance.transforms.custom_transforms import Crop, Pad, Brightness, Contrast, Blur, Flip, Rotate90, \
+from bone_enhance.transforms.custom_transforms import Crop, Pad, Brightness, Contrast, Blur, Flip, Rotate90, \
     Noise
-from BoneEnhance.bone_enhance.transforms.random_augmentations import return_transforms
+from bone_enhance.transforms.random_augmentations import return_transforms
 
 from collagen.data.utils import ApplyTransform, Compose
 

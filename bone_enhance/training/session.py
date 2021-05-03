@@ -18,6 +18,7 @@ from collagen.callbacks import RunningAverageMeter, ModelSaver, RandomImageVisua
 from collagen.losses import CombinedLoss, PSNRLoss, BCEWithLogitsLoss2d, SoftJaccardLoss
 
 from bone_enhance.transforms import train_test_transforms
+from bone_enhance.utilities.ssim import SSIM
 from bone_enhance.models import EnhanceNet, \
     ConvNet, PerceptualNet
 from bone_enhance.training.loss import PerceptualLoss, TotalVariationLoss
@@ -42,7 +43,6 @@ def init_experiment(experiments='../experiments/run'):
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     parser.add_argument('--num_threads', type=int, default=16, help='Number of CPUs')
     parser.add_argument('--gpus', type=int, default=2, help='Number of GPUs')
-    #parser.add_argument('--segmentation', type=bool, default=False, help='Super-resolution or segmentation pipeline?')  # TODO Debug
     parser.add_argument('--exp_idx', type=int, default=None, help='Index for the corresponding training experiment')
     args = parser.parse_args()
 
@@ -84,9 +84,6 @@ def init_experiment(experiments='../experiments/run'):
     device = auto_detect_device()
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.enabled = True
-
-    if args.exp_idx is not None:
-        print(f'Running experiment: {config_paths[args.exp_idx][:-4]}')
 
     return args, config_list, config_paths, device
 
@@ -176,7 +173,7 @@ def init_loss(loss, config, device='cuda', mean=None, std=None, args=None):
     elif loss == 'combined_tv':
         return CombinedLoss([PerceptualLoss(criterion=nn.MSELoss(), config=config,
                                             compare_layer=['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'],
-                                            mean=mean, std=std).to(device),
+                                            mean=mean, std=std, zeros=config.training.zero_pad).to(device),
                              nn.L1Loss().to(device),
                              TotalVariationLoss().to(device)],
                             weights=[0.1, 1, 1]).to(device)
@@ -196,6 +193,12 @@ def init_loss(loss, config, device='cuda', mean=None, std=None, args=None):
     # Binary cross-entropy
     elif loss == 'bce':
         return nn.BCELoss().to(device)
+    elif loss == 'ssim':
+        if config.training.window is not None:
+            ws = config.training.window
+        else:
+            ws = 7
+        return SSIM(window_size=ws)
     else:
         raise Exception('Loss not implememnted!')
 

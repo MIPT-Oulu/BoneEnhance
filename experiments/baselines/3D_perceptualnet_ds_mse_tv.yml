@@ -33,7 +33,7 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 100
-  bs: 12
+  bs: 32
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
   loss: mse_tv
   train_loss: True
@@ -60,7 +60,7 @@ transforms:
   contrast: 0.4
   v_range: [0.000001, 0.0009]
 inference:
-  calc_inference: False
+  calc_inference: True
   step: 2
   weight: 'gaussian'
   threshold: 0.8

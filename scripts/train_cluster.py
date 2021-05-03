@@ -9,6 +9,9 @@ Possible types of experiments:
 - 2D segmentation
 """
 # Set up paths for proper referencing of packages on cluster
+import sys
+#sys.path.append('/scratch/project_2002147/rytkysan/BoneEnhance')
+#sys.path.append('/projappl/project_2002147/miniconda3/lib/python3.7/site-packages')
 
 from torch import optim, cuda
 from time import time
@@ -38,8 +41,11 @@ if __name__ == "__main__":
     # Initialize experiment
     args_base, config_list, config_paths, device = init_experiment()
 
+    # Array jobs start index from 1
+    args_base.exp_idx -= 1
+
     # Select the experiment configuration from
-    print(f'Running experiment: {config_paths[args_base.exp_idx][:-4]}')
+    print(f'Running experiment: {config_paths[args_base.exp_idx]}')
     experiment = config_list[args_base.exp_idx]
     # Time of the current experiment
     start_exp = time()
@@ -111,7 +117,7 @@ if __name__ == "__main__":
 
     # Duration of the current experiment
     dur = time() - start_exp
-    print(f'Model {config_paths[args_base.exp_idx][:-4]} trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
+    print(f'Model {config_paths[args_base.exp_idx]} trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
 
     # Calculate out-of-fold inference and evaluate metrics
     if config.inference.calc_inference:

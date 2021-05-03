@@ -1,3 +1,4 @@
+git+https://github.com/Po-Hsun-Su/pytorch-ssim.git
 git+https://github.com/MIPT-Oulu/Collagen.git
 cudatoolkit==10.1
 deep-pipeline==0.2.5

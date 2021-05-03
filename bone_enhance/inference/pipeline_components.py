@@ -17,10 +17,10 @@ from scipy.ndimage import zoom
 from skimage import measure
 from skimage.metrics import mean_squared_error, peak_signal_noise_ratio, structural_similarity
 from torch.utils.data import DataLoader
-from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
+from pytorch_toolbelt.inference.tiles import CudaTileMerger
 from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
 
-from .tiler3d import Tiler3D, TileMerger3D
+from .tiler3d import Tiler3D, TileMerger3D, ImageSlicer
 from .model_components import InferenceModel, load_models
 from ..utilities import load, save, print_orthogonal, print_images, threshold, calculate_bvtv
 from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculate_dice, \
@@ -221,6 +221,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False):
 
     # Inference arguments
     args.save_dir = args.data_location / 'predictions_oof'
+    args.save_dir.mkdir(exist_ok=True)
     sigma = 0.5  # Antialiasing filter for downscaling
 
     # Tiling weight
@@ -243,7 +244,11 @@ def inference_runner_oof(args, config, split_config, device, plot=False):
     crop = config.training.crop_small
     ds = not config.training.crossmodality
     mag = config.training.magnification
-    mean_std_path = args.snapshots_dir / f"mean_std_{crop[0]}x{crop[1]}.pth"
+    if ds:
+        mean_std_path = args.snapshots_dir / f"mean_std_{crop}_ds.pth"
+    else:
+        mean_std_path = args.snapshots_dir / f"mean_std_{crop}_cm.pth"
+
     ms = torch.load(mean_std_path)
     mean, std = ms['mean'], ms['std']
 
