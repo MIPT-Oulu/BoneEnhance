@@ -3,15 +3,15 @@ from pathlib import Path
 import cv2
 from bone_enhance.training.session import init_experiment
 from bone_enhance.utilities.main import load, save, print_orthogonal
-from scipy.ndimage import zoom
+from scipy.ndimage import zoom, median_filter
 
 if __name__ == "__main__":
     # Initialize experiment
     args, config, _, device = init_experiment()
-    images_loc = Path('/media/santeri/data/BoneEnhance/Data/target')
+    images_loc = Path('/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
     #images_loc = Path('/media/santeri/data/BoneEnhance/Data/Test set (KP02)/target')
 
-    images_save = Path('/media/santeri/data/BoneEnhance/Data/target_ds')
+    images_save = Path('/media/santeri/data/BoneEnhance/Data/Test set (KP02)')
 
     images_save.mkdir(exist_ok=True)
 
@@ -26,6 +26,7 @@ if __name__ == "__main__":
     samples = os.listdir(images_loc)
     samples = [name for name in samples if os.path.isdir(os.path.join(images_loc, name))]
     samples.sort()
+    samples = [samples[2]]
     #samples = samples[25:]
     for sample in samples:
         print(f'Processing sample: {sample}')
@@ -35,18 +36,21 @@ if __name__ == "__main__":
 
                 data, files = load(im_path, axis=(0, 1, 2))  #axis=(1, 2, 0))
 
-                (images_save / sample).mkdir(exist_ok=True)
+                data = median_filter(data, size=5)
+                save(str(images_save / (sample + '_filtered')), files, data)
 
-                for i in range(data.shape[0]):
-                    image = data[i]
-                    if factor != 1:
-                        resize_target = (image.shape[1] // factor, image.shape[0] // factor)
+                #(images_save / sample).mkdir(exist_ok=True)
+
+                #for i in range(data.shape[0]):
+                #    image = data[i]
+                #    if factor != 1:
+                #        resize_target = (image.shape[1] // factor, image.shape[0] // factor)
 
                         # Antialiasing
-                        image = cv2.GaussianBlur(image, ksize=(k, k), sigmaX=0)
-                        image = cv2.resize(image.copy(), resize_target, interpolation=cv2.INTER_NEAREST)
+                        #image = cv2.GaussianBlur(image, ksize=(k, k), sigmaX=0)
+                        #image = cv2.resize(image.copy(), resize_target, interpolation=cv2.INTER_NEAREST)
 
-                    cv2.imwrite(str(images_save / sample / files[i]), image)
+                    #cv2.imwrite(str(images_save / sample / files[i]), image)
 
 
 

@@ -11,21 +11,22 @@ if __name__ == "__main__":
     images_loc = Path('/media/santeri/Transcend/1176 Reconstructions')
 
     # Save path
-    images_save = Path('/media/santeri/data/BoneEnhance/Data/target_1176_HR')
+    images_save = Path('/media/santeri/data/BoneEnhance/Data/target_1176_2D')
     images_save.mkdir(exist_ok=True)
     # Output resolution
-    res_out = 50
+    res_out = 100
     # Stack size
     crop_size = np.array([128, 128, 128])
     # Antialiasing sigma
     sigma = 0.5
+    hdf5 = False
 
     # List samples
     samples = os.listdir(images_loc)
     samples = [name for name in samples if os.path.isdir(os.path.join(images_loc, name))]
     samples.sort()
 
-    #samples = samples[3:]
+    samples = samples[3:]
 
     # Resample datasets, create 3D stack
     for sample in samples:
@@ -33,9 +34,9 @@ if __name__ == "__main__":
         #try:
         # Load log file to check resolution
         im_path = images_loc / sample
-        log = load_logfile(str(im_path))
-        res = float(log['Image Pixel Size (um)'])
-        #res = 34.84
+        #log = load_logfile(str(im_path))
+        #res = float(log['Image Pixel Size (um)'])
+        res = 34.84
 
         # Scale factors and scaled crops
         factor = res_out / res
@@ -69,10 +70,14 @@ if __name__ == "__main__":
                                       anti_aliasing_sigma=sigma).astype('uint8')
 
                     # Save the cropped volume to hdf5
-                    fname = str(images_save / f'{sample}_{str(x).zfill(3)}{str(y).zfill(3)}{str(z).zfill(3)}.h5')
-                    with h5py.File(fname, 'w') as f:
-                        f.create_dataset('data', data=data_out)
+                    if hdf5:
+                        fname = str(images_save / f'{sample}_{str(x).zfill(3)}{str(y).zfill(3)}{str(z).zfill(3)}.h5')
+                        with h5py.File(fname, 'w') as f:
+                            f.create_dataset('data', data=data_out)
+                    else:
+                        fname = Path(f'{sample}_{str(x).zfill(3)}{str(y).zfill(3)}{str(z).zfill(3)}')
 
+                        save(str(images_save / fname), fname.name, data_out, verbose=False)
         #except (ValueError, FileNotFoundError):
         #    print(f'Error in sample {sample}')
         #    continue

@@ -54,6 +54,11 @@ def init_experiment(experiments='../experiments/run'):
     config_paths = os.listdir(str(args.experiment))
     config_paths.sort()
 
+    # With array jobs, only one experiment is conducted at a time
+    if args.exp_idx is not None:
+        # Array jobs start index from 1
+        config_paths = [config_paths[args.exp_idx - 1]]
+
     # Open configuration files and add to list
     config_list = []
     for config_path in config_paths:

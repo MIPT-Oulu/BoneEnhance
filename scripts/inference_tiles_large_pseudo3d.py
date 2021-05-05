@@ -24,51 +24,16 @@ cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
 
 
-if __name__ == "__main__":
-    start = time()
-
-    snap = 'dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit'
-    #snap = 'dios-erc-gpu_2020_10_19_14_09_24_3D_perceptualnet'
-    #snap = 'dios-erc-gpu_2020_09_30_14_14_42_perceptualnet_noscaling_3x3_cm_curated_trainloss'
-    snap = '2020_12_15_10_28_57_2D_perceptualnet_ds_16'  # Latest 2D model with fixes, only 1 fold
-    snap = '2021_01_08_09_49_45_2D_perceptualnet_ds_16'  # 2D model, 3 working folds
-    ds = False
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
-    parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/{snap}')
-    parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
-    parser.add_argument('--bs', type=int, default=12)
-    parser.add_argument('--step', type=int, default=3)
-    parser.add_argument('--plot', type=bool, default=False)
-    parser.add_argument('--calculate_mean_std', type=bool, default=True)
-    parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
-    parser.add_argument('--completed', type=int, default=0)
-    parser.add_argument('--avg_planes', type=bool, default=True)
-    parser.add_argument('--snapshot', type=Path,
-                        default=f'../../Workdir/snapshots/{snap}')
-    parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
-    args = parser.parse_args()
-    #subdir = 'NN_prediction'  # 'NN_prediction'
-
-    # Load snapshot configuration
-    with open(args.snapshot / 'config.yml', 'r') as f:
-        config = yaml.load(f, Loader=yaml.Loader)
-    config = OmegaConf.create(config)
-
-    with open(args.snapshot / 'args.dill', 'rb') as f:
-        args_experiment = dill.load(f)
-
-    with open(args.snapshot / 'split_config.dill', 'rb') as f:
-        split_config = dill.load(f)
+def main(args, config, args_experiment, sample_id=None, render=False):
+    #Save path
     args.save_dir.mkdir(exist_ok=True)
     (args.save_dir / 'visualizations').mkdir(exist_ok=True)
 
     # Load models
     models = glob(str(args.snapshot) + '/*fold_[0-9]_*.pth')
-    #models = glob(str(args.snapshot) + '/*fold_3_*.pth')
+    # models = glob(str(args.snapshot) + '/*fold_3_*.pth')
     models.sort()
-    #device = auto_detect_device()
+    # device = auto_detect_device()
     device = 'cuda'  # Use the second GPU for inference
 
     crop = config.training.crop_small
@@ -165,10 +130,9 @@ if __name__ == "__main__":
         else:
             mask_avg = out_xy
 
-
         # Scale the dynamic range
-        #mask_avg -= np.min(mask_avg)
-        #mask_avg /= np.max(mask_avg)
+        # mask_avg -= np.min(mask_avg)
+        # mask_avg /= np.max(mask_avg)
 
         mask_avg = (mask_avg * 255).astype('uint8')
 
@@ -180,9 +144,47 @@ if __name__ == "__main__":
                       white=True, use_outline=False)
         """
 
-        print_orthogonal(mask_avg, invert=True, res=0.2/4, title='Output', cbar=True,
+        print_orthogonal(mask_avg, invert=True, res=0.2 / 4, title='Output', cbar=True,
                          savepath=str(args.save_dir / 'visualizations' / (sample + '_prediction.png')),
                          scale_factor=1000)
 
     dur = time() - start
     print(f'Inference completed in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
+
+
+if __name__ == "__main__":
+    start = time()
+
+    snap = 'dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit'
+    #snap = 'dios-erc-gpu_2020_10_19_14_09_24_3D_perceptualnet'
+    #snap = 'dios-erc-gpu_2020_09_30_14_14_42_perceptualnet_noscaling_3x3_cm_curated_trainloss'
+    snap = '2020_12_15_10_28_57_2D_perceptualnet_ds_16'  # Latest 2D model with fixes, only 1 fold
+    snap = '2021_01_08_09_49_45_2D_perceptualnet_ds_16'  # 2D model, 3 working folds
+    ds = False
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
+    parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/{snap}')
+    parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
+    parser.add_argument('--bs', type=int, default=12)
+    parser.add_argument('--step', type=int, default=3)
+    parser.add_argument('--plot', type=bool, default=False)
+    parser.add_argument('--calculate_mean_std', type=bool, default=True)
+    parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
+    parser.add_argument('--completed', type=int, default=0)
+    parser.add_argument('--avg_planes', type=bool, default=False)
+    parser.add_argument('--snapshot', type=Path,
+                        default=f'../../Workdir/snapshots/{snap}')
+    parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
+    args = parser.parse_args()
+    #subdir = 'NN_prediction'  # 'NN_prediction'
+
+    # Load snapshot configuration
+    with open(args.snapshot / 'config.yml', 'r') as f:
+        config = yaml.load(f, Loader=yaml.Loader)
+    config = OmegaConf.create(config)
+
+    with open(args.snapshot / 'args.dill', 'rb') as f:
+        args_experiment = dill.load(f)
+
+    main(args, config, args_experiment, sample_id=2)

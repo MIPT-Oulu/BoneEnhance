@@ -17,6 +17,8 @@ from torch import optim, cuda
 from time import time
 from copy import deepcopy
 import gc
+import argparse
+from pathlib import Path
 from omegaconf import OmegaConf
 import cv2
 from functools import partial
@@ -24,6 +26,8 @@ from functools import partial
 from collagen.core import Session
 from collagen.strategies import Strategy
 
+from scripts.inference_tiles_large_3d import main
+from scripts.inference_tiles_large_pseudo3d import main
 from bone_enhance.training.session import create_data_provider, init_experiment, init_callbacks, \
     save_transforms, init_loss, init_model
 from bone_enhance.training import parse_grayscale, parse_3d, parse_segmentation
@@ -41,12 +45,9 @@ if __name__ == "__main__":
     # Initialize experiment
     args_base, config_list, config_paths, device = init_experiment()
 
-    # Array jobs start index from 1
-    args_base.exp_idx -= 1
-
     # Select the experiment configuration from
-    print(f'Running experiment: {config_paths[args_base.exp_idx]}')
-    experiment = config_list[args_base.exp_idx]
+    print(f'Running experiment: {config_paths[0]}')
+    experiment = config_list[0]
     # Time of the current experiment
     start_exp = time()
     args = deepcopy(args_base)  # Copy args so that they can be updated
@@ -117,13 +118,36 @@ if __name__ == "__main__":
 
     # Duration of the current experiment
     dur = time() - start_exp
-    print(f'Model {config_paths[args_base.exp_idx]} trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
+    print(f'Model {config_paths[0]} trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
 
     # Calculate out-of-fold inference and evaluate metrics
     if config.inference.calc_inference:
+        # Out-of-fold evaluation
         save_dir = inference_runner_oof(args, config, splits_metadata, device)
-
         evaluation_runner(args, config, save_dir, suffix=config.training.suffix)
+
+        # Test set
+        parser = argparse.ArgumentParser()
+        snap = ''
+        parser.add_argument('--dataset_root', type=Path, default='../../Data/Clinical data')
+        parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/{snap}')
+        parser.add_argument('--bs', type=int, default=64)
+        parser.add_argument('--plot', type=bool, default=False)
+        parser.add_argument('--weight', type=str, choices=['gaussian', 'mean'], default='gaussian')
+        parser.add_argument('--completed', type=int, default=0)
+        parser.add_argument('--step', type=int, default=3,
+                            help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
+        parser.add_argument('--avg_planes', type=bool, default=False)
+        parser.add_argument('--cuda', type=bool, default=False,
+                            help='Whether to merge the inference tiles on GPU or CPU')
+        parser.add_argument('--mask', type=bool, default=False, help='Whether to remove background with postprocessing')
+        parser.add_argument('--scale', type=bool, default=True,
+                            help='Whether to scale prediction to full dynamic range')
+        parser.add_argument('--calculate_mean_std', type=bool, default=True,
+                            help='Whether to calculate individual mean and std')
+        parser.add_argument('--snapshot', type=Path, default=f'../../Workdir/snapshots/{snap}')
+        parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
+        args = parser.parse_args()
 
     # Duration of the whole script
     dur = time() - start

@@ -51,6 +51,9 @@ def build_meta_from_files(base_path, config):
         else:
             warn = Path(str(input_loc) + '_ds')
             Warning(f'Folder for downscaled data: {warn} not found.')
+    # In 2D case, image is downscaled while parsing
+    elif not config.training.crossmodality:
+        input_loc = target_loc
 
     # List files (add .h5, .png, .bmp, and .tif files)
     input_images = list(map(lambda x: pathlib.Path(x), input_loc.glob('*.h5')))
