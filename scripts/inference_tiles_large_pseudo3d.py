@@ -115,16 +115,16 @@ def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, d
             # 1st orientation
             for slice_idx in tqdm(range(data_xy.shape[2]), desc='Running inference, XY'):
                 out_xy[:, :, slice_idx] = inference(model, args, config, data_xy[:, :, slice_idx, :],
-                                                    weight=args.weight, tile=args.step)
+                                                    weight=args.weight, tile=args.step, mean=mean, std=std)
 
             # 2nd and 3rd orientation
             if args.avg_planes:
                 for slice_idx in tqdm(range(data_xz.shape[2]), desc='Running inference, XZ'):
                     out_xz[:, :, slice_idx] = inference(model, args, config, data_xz[:, :, slice_idx, :],
-                                                        weight=args.weight, tile=args.step)
+                                                        weight=args.weight, tile=args.step, mean=mean, std=std)
                 for slice_idx in tqdm(range(data_yz.shape[2]), desc='Running inference, YZ'):
                     out_yz[:, :, slice_idx] = inference(model, args, config, data_yz[:, :, slice_idx, :],
-                                                        weight=args.weight, tile=args.step)
+                                                        weight=args.weight, tile=args.step, mean=mean, std=std)
 
         # Average probability maps
         if args.avg_planes:
@@ -187,7 +187,7 @@ if __name__ == "__main__":
                             default=f'../../Data/predictions_3D_clinical/ankle_experiments/visualization')
         parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
         parser.add_argument('--bs', type=int, default=64)
-        parser.add_argument('--step', type=int, default=3)
+        parser.add_argument('--step', type=int, default=2)
         parser.add_argument('--plot', type=bool, default=False)
         parser.add_argument('--calculate_mean_std', type=bool, default=True)
         parser.add_argument('--scale', type=bool, default=False)

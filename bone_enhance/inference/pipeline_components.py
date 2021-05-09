@@ -33,6 +33,10 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     Calculates inference on one image.
     """
 
+    # Check for mean and std
+    if mean is None or std is None:
+        print('No mean or std given! Data will not be scaled prior inference!')
+
     # Input variables
     input_x = config.training.crop_small[0]
     input_y = config.training.crop_small[1]
@@ -118,6 +122,10 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
     """
     Calculates inference on one image.
     """
+
+    # Check for mean and std
+    if mean is None or std is None:
+        print('No mean or std given! Data will not be scaled prior inference!')
 
     # Input variables
     mag = config.training.magnification
