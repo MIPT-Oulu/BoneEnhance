@@ -80,6 +80,7 @@ def main(args, config, args_experiment, sample_id=None, render=False):
 
         # Calculate mean and std from the sample
         if args.calculate_mean_std:
+            print('Calculating mean and std from the input')
             mean = torch.Tensor([np.mean(data_xy) / 255])
             std = torch.Tensor([np.std(data_xy) / 255])
 
@@ -87,7 +88,7 @@ def main(args, config, args_experiment, sample_id=None, render=False):
         # 1st orientation
         with torch.no_grad():  # Do not update gradients
             prediction = inference_3d(model, args, config, data_xy, step=args.step, cuda=args.cuda, mean=mean, std=std,
-                                      weight=args.weight)
+                                      weight=args.weight, plot=args.plot)
 
         # Scale the dynamic range
         if args.scale:
@@ -136,32 +137,39 @@ if __name__ == "__main__":
     #snap = '2021_03_04_10_11_34_1_3D_mse_tv_1176'  # Low resolution 1176 model (mse+tv)
 
     # Ankle experiments
-    snap = '2021_05_04_20_22_46_3D_mse_tv_1176_seed10'
+    path = '../../Workdir/snapshots'
+    snaps = os.listdir(path)
+    snaps = [snap for snap in snaps if os.path.isdir(os.path.join(path, snap))]
+    snaps = ['2021_03_04_10_11_34_1_3D_mse_tv_1176']
+    for snap in snaps:
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
-    parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/{snap}')
-    parser.add_argument('--bs', type=int, default=64)
-    parser.add_argument('--plot', type=bool, default=False)
-    parser.add_argument('--weight', type=str, choices=['gaussian', 'mean'], default='gaussian')
-    parser.add_argument('--completed', type=int, default=0)
-    parser.add_argument('--step', type=int, default=3, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
-    parser.add_argument('--cuda', type=bool, default=False, help='Whether to merge the inference tiles on GPU or CPU')
-    parser.add_argument('--mask', type=bool, default=False, help='Whether to remove background with postprocessing')
-    parser.add_argument('--scale', type=bool, default=True, help='Whether to scale prediction to full dynamic range')
-    parser.add_argument('--res', type=float, default=0.4, help='Input image pixel size')
-    parser.add_argument('--calculate_mean_std', type=bool, default=True, help='Whether to calculate individual mean and std')
-    #parser.add_argument('--snapshot', type=Path, default=f'../../Workdir/snapshots/{snap}')
-    parser.add_argument('--snapshot', type=Path, default=f'../../Workdir/ankle_experiments/{snap}')
-    parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
-    args = parser.parse_args()
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
+        parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/ankle_experiments/{snap}')
+        parser.add_argument('--bs', type=int, default=64)
+        parser.add_argument('--plot', type=bool, default=True)
+        parser.add_argument('--weight', type=str, choices=['gaussian', 'mean'], default='gaussian')
+        parser.add_argument('--completed', type=int, default=0)
+        parser.add_argument('--step', type=int, default=3, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
+        parser.add_argument('--cuda', type=bool, default=False, help='Whether to merge the inference tiles on GPU or CPU')
+        parser.add_argument('--mask', type=bool, default=False, help='Whether to remove background with postprocessing')
+        parser.add_argument('--scale', type=bool, default=True, help='Whether to scale prediction to full dynamic range')
+        parser.add_argument('--res', type=float, default=0.4, help='Input image pixel size')
+        parser.add_argument('--calculate_mean_std', type=bool, default=True, help='Whether to calculate individual mean and std')
+        #parser.add_argument('--snapshot', type=Path, default=f'../../Workdir/snapshots/{snap}')
+        parser.add_argument('--snapshot', type=Path, default=os.path.join(path, snap))
+        parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
+        args = parser.parse_args()
 
-    # Load snapshot configuration
-    with open(args.snapshot / 'config.yml', 'r') as f:
-        config = yaml.load(f, Loader=yaml.Loader)
-    config = OmegaConf.create(config)
 
-    with open(args.snapshot / 'args.dill', 'rb') as f:
-        args_experiment = dill.load(f)
 
-    main(args, config, args_experiment, sample_id=2)
+
+        # Load snapshot configuration
+        with open(args.snapshot / 'config.yml', 'r') as f:
+            config = yaml.load(f, Loader=yaml.Loader)
+        config = OmegaConf.create(config)
+
+        with open(args.snapshot / 'args.dill', 'rb') as f:
+            args_experiment = dill.load(f)
+
+        main(args, config, args_experiment, sample_id=2)

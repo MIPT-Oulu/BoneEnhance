@@ -205,7 +205,7 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
     return merged_pred[:, :, :, 0]
 
 
-def inference_runner_oof(args, config, split_config, device, plot=False):
+def inference_runner_oof(args, config, split_config, device, plot=False, verbose=False):
     """
     Runs inference on a dataset.
     :param args: Training arguments (paths, etc.)
@@ -269,7 +269,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False):
         model = InferenceModel([model_list[fold]]).to(device)
         model.eval()
 
-        for sample in tqdm(validation_files, desc=f'Running inference for fold {fold}'):
+        for sample in tqdm(validation_files, desc=f'Running inference for fold {fold}', disable=not verbose):
 
             # Do not calculate inference for data copies
             if 'copy' in str(sample):

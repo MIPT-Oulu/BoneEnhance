@@ -24,10 +24,11 @@ cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
 
 
-def main(args, config, args_experiment, sample_id=None, render=False):
+def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, ds=False):
     #Save path
     args.save_dir.mkdir(exist_ok=True)
     (args.save_dir / 'visualizations').mkdir(exist_ok=True)
+    snapshot = args.snapshot.name
 
     # Load models
     models = glob(str(args.snapshot) + '/*fold_[0-9]_*.pth')
@@ -39,7 +40,11 @@ def main(args, config, args_experiment, sample_id=None, render=False):
     crop = config.training.crop_small
     config.training.bs = args.bs
     mag = config.training.magnification
-    mean_std_path = args.snapshot.parent / f"mean_std_{crop[0]}x{crop[1]}.pth"
+    if config.training.crossmodality:
+        cm = 'cm'
+    else:
+        cm = 'ds'
+    mean_std_path = args.snapshot.parent / f'mean_std_{crop}_{cm}.pth'
     tmp = torch.load(mean_std_path)
     mean, std = tmp['mean'], tmp['std']
 
@@ -54,7 +59,7 @@ def main(args, config, args_experiment, sample_id=None, render=False):
     # samples = [os.path.basename(x) for x in glob(str(args.dataset_root / '*XZ'))]  # Load with specific name
     samples = os.listdir(args.dataset_root)
     samples.sort()
-    samples = [samples[id] for id in [7]]  # Get intended samples from list
+    samples = [samples[id] for id in [sample_id]]  # Get intended samples from list
 
     # Skip the completed samples
     if args.completed > 0:
@@ -79,9 +84,9 @@ def main(args, config, args_experiment, sample_id=None, render=False):
             data_xy = np.expand_dims(data_xy, -1)
         x, y, z, ch = data_xy.shape
 
-        print_orthogonal(data_xy[:, :, :, 0], invert=True, res=0.2, title='Input', cbar=True,
-                         savepath=str(args.save_dir / 'visualizations' / (sample + '_input.png')),
-                         scale_factor=1000)
+
+        print_orthogonal(data_xy[:, :, :, 0], invert=True, res=res, title='Input', cbar=True,
+                         savepath=str(args.visualizations / (sample[:-3] + f'_{snapshot}_input.png')), scale_factor=100)
 
         # Calculate mean and std from the sample
         if args.calculate_mean_std:
@@ -123,30 +128,34 @@ def main(args, config, args_experiment, sample_id=None, render=False):
 
         # Average probability maps
         if args.avg_planes:
-            mask_avg = ((out_xy + np.transpose(out_xz, (0, 2, 1)) + np.transpose(out_yz, (2, 0, 1))) / 3)
+            prediction = ((out_xy + np.transpose(out_xz, (0, 2, 1)) + np.transpose(out_yz, (2, 0, 1))) / 3)
 
             # Free memory
             del out_xz, out_yz
         else:
-            mask_avg = out_xy
+            prediction = out_xy
 
         # Scale the dynamic range
-        # mask_avg -= np.min(mask_avg)
-        # mask_avg /= np.max(mask_avg)
+        pred_max = np.max(prediction)
+        if args.scale:
+            prediction -= np.min(prediction)
+            prediction /= pred_max
+        elif pred_max > 1:
+            print(f'Maximum value {pred_max} will be scaled to one')
+            prediction /= pred_max
 
-        mask_avg = (mask_avg * 255).astype('uint8')
+        prediction = (prediction * 255).astype('uint8')
 
         # Save predicted full mask
-        save(str(args.save_dir / sample), sample, mask_avg, dtype=args.dtype)
-        """
-        render_volume(data_yz[:, :, :, 0] * mask_final,
-                      savepath=str(args.save_dir / 'visualizations' / (sample + '_render' + args.dtype)),
-                      white=True, use_outline=False)
-        """
+        save(str(args.save_dir / sample), sample, prediction, dtype=args.dtype)
+        if render:
+            render_volume(data_yz[:, :, :, 0] * prediction,
+                          savepath=str(args.save_dir / 'visualizations' / (sample + '_render' + args.dtype)),
+                          white=True, use_outline=False)
 
-        print_orthogonal(mask_avg, invert=True, res=0.2 / 4, title='Output', cbar=True,
-                         savepath=str(args.save_dir / 'visualizations' / (sample + '_prediction.png')),
-                         scale_factor=1000)
+        print_orthogonal(prediction, invert=True, res=res / 4, title='Output', cbar=True,
+                         savepath=str(args.visualizations / (sample[:-3] + f'_{snapshot}_prediction.png')),
+                         scale_factor=10)
 
     dur = time() - start
     print(f'Inference completed in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
@@ -160,31 +169,46 @@ if __name__ == "__main__":
     #snap = 'dios-erc-gpu_2020_09_30_14_14_42_perceptualnet_noscaling_3x3_cm_curated_trainloss'
     snap = '2020_12_15_10_28_57_2D_perceptualnet_ds_16'  # Latest 2D model with fixes, only 1 fold
     snap = '2021_01_08_09_49_45_2D_perceptualnet_ds_16'  # 2D model, 3 working folds
-    ds = False
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
-    parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/{snap}')
-    parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
-    parser.add_argument('--bs', type=int, default=12)
-    parser.add_argument('--step', type=int, default=3)
-    parser.add_argument('--plot', type=bool, default=False)
-    parser.add_argument('--calculate_mean_std', type=bool, default=True)
-    parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
-    parser.add_argument('--completed', type=int, default=0)
-    parser.add_argument('--avg_planes', type=bool, default=False)
-    parser.add_argument('--snapshot', type=Path,
-                        default=f'../../Workdir/snapshots/{snap}')
-    parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
-    args = parser.parse_args()
-    #subdir = 'NN_prediction'  # 'NN_prediction'
+    snap_path = '../../Workdir/ankle_experiments_2D'
+    snaps = os.listdir(snap_path)
+    snaps.sort()
+    snaps = [snap for snap in snaps if os.path.isdir(os.path.join(snap_path, snap))]
 
-    # Load snapshot configuration
-    with open(args.snapshot / 'config.yml', 'r') as f:
-        config = yaml.load(f, Loader=yaml.Loader)
-    config = OmegaConf.create(config)
+    for snap_id in range(len(snaps)):
 
-    with open(args.snapshot / 'args.dill', 'rb') as f:
-        args_experiment = dill.load(f)
+        snap = snaps[snap_id]
+        print(f'Calculating inference for snapshot: {snap} {snap_id+1}/{len(snaps)}')
 
-    main(args, config, args_experiment, sample_id=2)
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
+        parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/ankle_experiments/{snap}')
+        parser.add_argument('--visualizations', type=Path,
+                            default=f'../../Data/predictions_3D_clinical/ankle_experiments/visualization')
+        parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
+        parser.add_argument('--bs', type=int, default=64)
+        parser.add_argument('--step', type=int, default=3)
+        parser.add_argument('--plot', type=bool, default=False)
+        parser.add_argument('--calculate_mean_std', type=bool, default=True)
+        parser.add_argument('--scale', type=bool, default=False)
+        parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
+        parser.add_argument('--completed', type=int, default=0)
+        parser.add_argument('--avg_planes', type=bool, default=False)
+        parser.add_argument('--snapshot', type=Path,
+                            default=os.path.join(snap_path, snap))
+        parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
+        args = parser.parse_args()
+        #subdir = 'NN_prediction'  # 'NN_prediction'
+
+        # Load snapshot configuration
+        with open(args.snapshot / 'config.yml', 'r') as f:
+            config = yaml.load(f, Loader=yaml.Loader)
+        config = OmegaConf.create(config)
+
+        with open(args.snapshot / 'args.dill', 'rb') as f:
+            args_experiment = dill.load(f)
+
+        args.save_dir.mkdir(exist_ok=True)
+        args.visualizations.mkdir(exist_ok=True)
+
+        main(args, config, args_experiment, sample_id=2, res=0.4)

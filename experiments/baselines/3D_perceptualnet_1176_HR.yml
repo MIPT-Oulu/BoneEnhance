@@ -43,7 +43,7 @@ training:
   imagenet_normalize_loss: False
   gram: True  # Calculate Gram matrix on Perceptual loss
   # LR reduction
-  use_LR_red: True-
+  use_LR_red: True
   patience: 5
   factor: 0.1
   eps: 1e-7

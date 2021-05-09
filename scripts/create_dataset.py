@@ -4,6 +4,7 @@ import cv2
 from bone_enhance.training.session import init_experiment
 from bone_enhance.utilities.main import load, save, print_orthogonal
 from scipy.ndimage import zoom, median_filter
+from skimage.transform import resize
 
 if __name__ == "__main__":
     # Initialize experiment
@@ -18,7 +19,7 @@ if __name__ == "__main__":
     #subdir = 'trabecular_data/Binned4x/bonemask'
     resample = True
     #factor = 200/2.75
-    factor = 16
+    factor = 4
     k = 5
     #n_slices = 100
 
@@ -34,10 +35,11 @@ if __name__ == "__main__":
             if resample:  # Resample slices
                 im_path = images_loc / sample #/ subdir
 
-                data, files = load(im_path, axis=(0, 1, 2))  #axis=(1, 2, 0))
-
+                data, files = load(im_path, axis=(1, 2, 0))
+                new_size = (data.shape[0] * factor, data.shape[1] * factor, data.shape[2] * factor)
+                data = resize(data, new_size, order=3, preserve_range=True).astype('uint8')
                 data = median_filter(data, size=5)
-                save(str(images_save / (sample + '_filtered')), files, data)
+                save(str(images_save / (sample + '_filtered')), sample, data)
 
                 #(images_save / sample).mkdir(exist_ok=True)
 

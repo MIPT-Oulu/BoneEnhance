@@ -4,12 +4,12 @@
 #SBATCH --account=project_2002147
 #SBATCH --mail-type=END #Send email when job is finished
 #SBATCH --partition=gpu
-#SBATCH --time=12:00:00
+#SBATCH --time=18:00:00
 #SBATCH --ntasks=1
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:v100:1
-#SBATCH --array=1-6
+#SBATCH --array=1-3
 
 # Set up environment
 export SCRATCH=/scratch/project_2002147/rytkysan
@@ -18,7 +18,7 @@ export SCRATCH=/scratch/project_2002147/rytkysan
 . ${SCRATCH}/miniconda3/etc/profile.d/conda.sh
 conda activate bone-enhance-env
 
-declare -a SEEDS=(10 20 30 40 50 60 70 80)
+declare -a SEEDS=(40 50 60 70 80)
 
 for SEED in "${SEEDS[@]}"
 do

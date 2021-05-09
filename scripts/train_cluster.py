@@ -8,10 +8,6 @@ Possible types of experiments:
 - 2D super-resolution (2 parameters in crop_small)
 - 2D segmentation
 """
-# Set up paths for proper referencing of packages on cluster
-import sys
-#sys.path.append('/scratch/project_2002147/rytkysan/BoneEnhance')
-#sys.path.append('/projappl/project_2002147/miniconda3/lib/python3.7/site-packages')
 
 from torch import optim, cuda
 from time import time
@@ -123,7 +119,8 @@ if __name__ == "__main__":
     # Calculate out-of-fold inference and evaluate metrics
     if config.inference.calc_inference:
         # Out-of-fold evaluation
-        save_dir = inference_runner_oof(args, config, splits_metadata, device)
+        print(f'Running inference and evaluation')
+        save_dir = inference_runner_oof(args, config, splits_metadata, device, verbose=False)
         evaluation_runner(args, config, save_dir, suffix=config.training.suffix)
 
         # Test set

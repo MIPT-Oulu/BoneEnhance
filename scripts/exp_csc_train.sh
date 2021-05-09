@@ -5,4 +5,4 @@
 conda info --envs
 module list
 # Run training
-python -m train_cluster --exp_idx $1 --seed $2
+python -m train_cluster --exp_idx $1 --seed $2 --num_threads 32
