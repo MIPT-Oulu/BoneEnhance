@@ -28,7 +28,7 @@ from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculat
 
 
 def inference(inference_model, args, config, img_full, device='cuda', weight='mean', plot=False, mean=None, std=None,
-              tile=2):
+              step=2, cuda=True):
     """
     Calculates inference on one image.
     """
@@ -38,43 +38,49 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
         print('No mean or std given! Data will not be scaled prior inference!')
 
     # Input variables
-    input_x = config.training.crop_small[0]
-    input_y = config.training.crop_small[1]
+    tile = list(config.training.crop_small)
     x, y, ch = img_full.shape
+
+    # Scale mean and std to appropriate range (float instead of uint8)
+    if mean.mean() > 1 or std.mean() > 1:
+        mean /= 255.
+        std /= 255.
 
     # Segmentation model does not upscale the image
     if config.training.architecture == 'encoderdecoder':
         mag = 1
-        x_out, y_out = x, y
-        input_x *= config.training.magnification
-        input_y *= config.training.magnification
+        out = (x, y)
+        tile[0] *= config.training.magnification
+        tile[1] *= config.training.magnification
     else:
         mag = config.training.magnification
-        x_out, y_out = x * mag, y * mag
+        out = (x * mag, y * mag)
+
+    # Check the number of channels
+    if ch == 3 and not config.training.rgb:
+        img_full = np.expand_dims(np.mean(img_full, axis=-1), axis=-1)
+        ch = 1
+    elif ch == 1 and config.training.rgb:
+        img_full = np.repeat(img_full, 2, axis=-1)
+
 
     # Cut large image into overlapping tiles
-    tiler = ImageSlicer(img_full.shape, tile_size=(input_x, input_y),
-                        tile_step=(input_x // tile, input_y // tile), weight=weight)
-
-    x_tile = np.min((input_x * mag, x_out))
-    y_tile = np.min((input_y * mag, y_out))
-    tiler_out = ImageSlicer((x_out, y_out, ch), tile_size=(x_tile, y_tile),
-                            tile_step=(x_tile // tile, y_tile // tile), weight=weight)
+    tiler = Tiler3D(img_full.shape, tile=tile, out=out, step=step, mag=mag, weight=weight)
 
     # HCW -> CHW. Optionally, do normalization here
     tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]
 
     # Allocate a CUDA buffer for holding entire mask
-    merger = CudaTileMerger(tiler_out.target_shape, channels=3, weight=tiler_out.weight)
+    merger = TileMerger3D(tiler.target_shape, channels=ch, weight=tiler.weight, cuda=cuda)
 
     # Run predictions for tiles and accumulate them
-    for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler_out.crops)), batch_size=config['training']['bs'],
+    for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler.crops_out)), batch_size=args.bs,
                                                 pin_memory=True):
         # Move tile to GPU
         if mean is not None and std is not None:
             tiles_batch = tiles_batch.float()
             for ch in range(len(mean)):
-                tiles_batch[:, ch, :, :] = ((tiles_batch[:, ch, :, :] - mean[ch]) / std[ch])
+                tiles_batch[:, ch, :, :] = (((tiles_batch[:, ch, :, :]  / 255.) - mean[ch]) / std[ch])
             tiles_batch = tiles_batch.to(device)
         else:
             tiles_batch = (tiles_batch.float() / 255.).to(device)
@@ -92,16 +98,20 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
 
         # Check for inconsistencies
         #if pred_batch.shape[2] > x_out:
-        pred_batch = pred_batch[:, :, :x_tile, :]
+        #pred_batch = pred_batch[:, :, :x_tile, :]
         #if pred_batch.shape[3] > y_out:
-        pred_batch = pred_batch[:, :, :, :y_tile]
+        #pred_batch = pred_batch[:, :, :, :y_tile]
+
+        if not cuda:
+            pred_batch = pred_batch.cpu()
 
         # Merge on GPU
         merger.integrate_batch(pred_batch, coords_batch)
 
     # Normalize accumulated mask and convert back to numpy
     merged_pred = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
-    merged_pred = tiler_out.crop_to_orignal_size(merged_pred)
+    merged_pred = tiler.crop_to_orignal_size(merged_pred).squeeze()
+
     # Plot
     if plot:
         for i in range(args.bs):
@@ -114,7 +124,10 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     torch.cuda.empty_cache()
     gc.collect()
 
-    return merged_pred.squeeze()[:, :, 0]
+    if len(merged_pred.shape) == 3:
+        return merged_pred[:, :, 0]
+    else:
+        return merged_pred
 
 
 def inference_3d(inference_model, args, config, img_full, device='cuda', plot=False,
@@ -129,7 +142,7 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
 
     # Input variables
     mag = config.training.magnification
-    tile = list(config['training']['crop_small'])
+    tile = list(config.training.crop_small)
 
     x, y, z, ch = img_full.shape
     out = (x * mag, y * mag, z * mag)
@@ -156,9 +169,8 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
     merger = TileMerger3D(tiler.target_shape, channels=ch, weight=tiler.weight, cuda=cuda)
 
     # Run predictions for tiles and accumulate them
-    for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler.crops_out)), batch_size=config['training']['bs'],
-                                                #pin_memory=True,
-                                                num_workers=16):
+    for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler.crops_out)), batch_size=config.training.bs,
+                                                pin_memory=True):
         # Move tile to GPU
         if mean is not None and std is not None:
             tiles_batch = tiles_batch.float()
@@ -335,7 +347,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
                     data = inference_3d(model, args, config, data, step=step, mean=mean, std=std, plot=plot,
                                         weight=weight)
                 else:
-                    data = inference(model, args, config, data, tile=step, mean=mean, std=std, plot=plot,
+                    data = inference(model, args, config, data, step=step, mean=mean, std=std, plot=plot,
                                      weight=weight)
 
             # Scale the dynamic range

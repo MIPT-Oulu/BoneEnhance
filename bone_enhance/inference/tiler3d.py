@@ -43,20 +43,37 @@ class Tiler3D:
         crops = []
         crops_out = []
         bbox_crops = []
-        for x in range(
-                0, self.input[0] + self.margin_begin[0] + self.margin_end[0] - self.tile[0] + 1, self.step[0]
-        ):
-            for y in range(
-                    0, self.input[1] + self.margin_begin[1] + self.margin_end[1] - self.tile[1] + 1, self.step[1]
-            ):
-                for z in range(
-                        0, self.input[2] + self.margin_begin[2] + self.margin_end[2] - self.tile[2] + 1, self.step[2]
-                ):
-                    crops.append((x, y, z, self.tile[0], self.tile[1], self.tile[2]))
-                    bbox_crops.append((x - self.margin_begin[0], y - self.margin_begin[1], z - self.margin_begin[2],
-                                       self.tile[0], self.tile[1], self.tile[2]))
 
-                    crops_out.append((x * mag, y * mag, z * mag, self.tile_out[0], self.tile_out[1], self.tile_out[2]))
+        # 3D tiling
+        if self.dim == 3:
+            for x in range(
+                    0, self.input[0] + self.margin_begin[0] + self.margin_end[0] - self.tile[0] + 1, self.step[0]
+            ):
+                for y in range(
+                        0, self.input[1] + self.margin_begin[1] + self.margin_end[1] - self.tile[1] + 1, self.step[1]
+                ):
+                    for z in range(
+                            0, self.input[2] + self.margin_begin[2] + self.margin_end[2] - self.tile[2] + 1, self.step[2]
+                    ):
+                        crops.append((x, y, z, self.tile[0], self.tile[1], self.tile[2]))
+                        bbox_crops.append((x - self.margin_begin[0], y - self.margin_begin[1], z - self.margin_begin[2],
+                                           self.tile[0], self.tile[1], self.tile[2]))
+
+                        crops_out.append((x * mag, y * mag, z * mag, self.tile_out[0], self.tile_out[1], self.tile_out[2]))
+        else:
+            for x in range(
+                    0, self.input[0] + self.margin_begin[0] + self.margin_end[0] - self.tile[0] + 1, self.step[0]
+            ):
+                for y in range(
+                        0, self.input[1] + self.margin_begin[1] + self.margin_end[1] - self.tile[1] + 1, self.step[1]
+                ):
+                    crops.append((x, y, self.tile[0], self.tile[1]))
+                    bbox_crops.append((x - self.margin_begin[0], y - self.margin_begin[1],
+                                       self.tile[0], self.tile[1]))
+
+                    crops_out.append(
+                        (x * mag, y * mag, self.tile_out[0], self.tile_out[1]))
+
 
         self.crops = np.array(crops)
         self.crops_out = np.array(crops_out)
@@ -69,20 +86,33 @@ class Tiler3D:
         self.image_pad = size
         image_pad = np.zeros(size + (image.shape[-1],))
         #image_pad[self.margin_begin:image.shape[:-1] + self.margin_begin] = image
-        image_pad[self.margin_begin[0]:image.shape[0] + self.margin_begin[0],
-                  self.margin_begin[1]:image.shape[1] + self.margin_begin[1],
-                  self.margin_begin[2]:image.shape[2] + self.margin_begin[2], :] = image
+        if self.dim == 3:
+            image_pad[self.margin_begin[0]:image.shape[0] + self.margin_begin[0],
+                      self.margin_begin[1]:image.shape[1] + self.margin_begin[1],
+                      self.margin_begin[2]:image.shape[2] + self.margin_begin[2], :] = image
+        else:
+            image_pad[self.margin_begin[0]:image.shape[0] + self.margin_begin[0],
+                      self.margin_begin[1]:image.shape[1] + self.margin_begin[1], :] = image
         image = image_pad
 
         tiles = []
-        for x, y, z, tile_x, tile_y, tile_z in self.crops:
-            tile = image[x: x + tile_x, y: y + tile_y, z: z + tile_z].copy()
-            if tile.shape[0] != self.tile[0]:
-                print(tile.shape[0])
-            assert tile.shape[1] == self.tile[1]
-            assert tile.shape[2] == self.tile[2]
+        if self.dim == 3:
+            for x, y, z, tile_x, tile_y, tile_z in self.crops:
+                tile = image[x: x + tile_x, y: y + tile_y, z: z + tile_z].copy()
+                if tile.shape[0] != self.tile[0]:
+                    print(tile.shape[0])
+                assert tile.shape[1] == self.tile[1]
+                assert tile.shape[2] == self.tile[2]
 
-            tiles.append(tile)
+                tiles.append(tile)
+        else:
+            for x, y, tile_x, tile_y in self.crops:
+                tile = image[x: x + tile_x, y: y + tile_y].copy()
+                if tile.shape[0] != self.tile[0]:
+                    print(tile.shape[0])
+                assert tile.shape[1] == self.tile[1]
+
+                tiles.append(tile)
         return tiles
 
     def crop_to_orignal_size(self, image):
@@ -97,11 +127,17 @@ class Tiler3D:
         ]
         """
         n = 5
-        crop = image[
-               n:self.out[0] + n,
-               n:self.out[1] + n,
-               n:self.out[2] + n,
-               ]
+        if self.dim == 3:
+            crop = image[
+                   n:self.out[0] + n,
+                   n:self.out[1] + n,
+                   n:self.out[2] + n,
+                   ]
+        else:
+            crop = image[
+                   n:self.out[0] + n,
+                   n:self.out[1] + n,
+                   ]
         return crop
 
     def merge(self, tiles: List[np.ndarray], channels, dtype=np.float16):
@@ -139,7 +175,10 @@ class Tiler3D:
     def _gaussian(self, tile_size, step):
         m = np.zeros(tile_size, dtype=np.float32)
         dim = np.array(m.shape) // 2
-        m[dim[0], dim[1], dim[2]] = 1
+        if len(dim) == 3:
+            m[dim[0], dim[1], dim[2]] = 1
+        else:
+            m[dim[0], dim[1]] = 1
         return gaussian_filter(m, sigma=dim[0] // step)
 
 
@@ -157,8 +196,12 @@ class TileMerger3D:
         """
 
         self.weight = torch.from_numpy(np.expand_dims(weight, axis=0)).float()
-        self.image = torch.zeros((channels, image_shape[0], image_shape[1], image_shape[2]), dtype=torch.float32)
-        self.norm_mask = torch.zeros((1, image_shape[0], image_shape[1], image_shape[2]), dtype=torch.float32)
+        if len(image_shape) == 3:
+            self.image = torch.zeros((channels, image_shape[0], image_shape[1], image_shape[2]), dtype=torch.float32)
+            self.norm_mask = torch.zeros((1, image_shape[0], image_shape[1], image_shape[2]), dtype=torch.float32)
+        else:
+            self.image = torch.zeros((channels, image_shape[0], image_shape[1]), dtype=torch.float32)
+            self.norm_mask = torch.zeros((1, image_shape[0], image_shape[1]), dtype=torch.float32)
         if cuda:
             self.weight = self.weight.cuda()
             self.image = self.image.cuda()
@@ -173,9 +216,16 @@ class TileMerger3D:
         if len(batch) != len(crop_coords):
             raise ValueError("Number of images in batch does not correspond to number of coordinates")
 
-        for tile, (x, y, z, tile_x, tile_y, tile_z) in zip(batch, crop_coords):
-            self.image[:, x: x + tile_x, y: y + tile_y, z: z + tile_z] += tile * self.weight
-            self.norm_mask[:, x: x + tile_x, y: y + tile_y, z: z + tile_z] += self.weight
+        # 3D merge
+        if len(batch.size()) == 5:
+            for tile, (x, y, z, tile_x, tile_y, tile_z) in zip(batch, crop_coords):
+                self.image[:, x: x + tile_x, y: y + tile_y, z: z + tile_z] += tile * self.weight
+                self.norm_mask[:, x: x + tile_x, y: y + tile_y, z: z + tile_z] += self.weight
+        # 2D merge
+        else:
+            for tile, (x, y, tile_x, tile_y) in zip(batch, crop_coords):
+                self.image[:, x: x + tile_x, y: y + tile_y] += tile * self.weight
+                self.norm_mask[:, x: x + tile_x, y: y + tile_y] += self.weight
 
     def merge(self) -> torch.Tensor:
         return self.image / self.norm_mask

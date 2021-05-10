@@ -32,6 +32,7 @@ if __name__ == "__main__":
 
     # Load ground truth BVTV
     experiments = os.listdir(args.dataset_root)
+    experiments = [e for e in experiments if not os.path.isdir(os.path.join(args.dataset_root, e))]
 
     compiled_results = {'Experiment': [], 'MSE': [], 'PSNR': [], 'SSIM': []}
     for experiment in experiments:

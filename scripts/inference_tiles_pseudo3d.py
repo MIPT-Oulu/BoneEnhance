@@ -133,16 +133,16 @@ if __name__ == "__main__":
 
             for slice_idx in tqdm(range(data_xy.shape[2]), desc='Running inference, XY'):
                 out_xy[:, :, slice_idx] = inference(model, args, config, data_xy[:, :, slice_idx, :],
-                                                    weight=args.weight, tile=args.step)
+                                                    weight=args.weight, step=args.step)
 
             # 2nd and 3rd orientation
             if args.avg_planes:
                 for slice_idx in tqdm(range(data_xz.shape[2]), desc='Running inference, XZ'):
                     out_xz[:, :, slice_idx] = inference(model, args, config, data_xz[:, :, slice_idx, :],
-                                                        weight=args.weight, tile=args.step)
+                                                        weight=args.weight, step=args.step)
                 for slice_idx in tqdm(range(data_yz.shape[2]), desc='Running inference, YZ'):
                     out_yz[:, :, slice_idx] = inference(model, args, config, data_yz[:, :, slice_idx, :],
-                                                        weight=args.weight, tile=args.step)
+                                                        weight=args.weight, step=args.step)
 
         # Average probability maps
         if args.avg_planes:

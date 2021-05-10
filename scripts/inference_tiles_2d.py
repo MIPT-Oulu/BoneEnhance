@@ -127,7 +127,7 @@ if __name__ == "__main__":
         with torch.no_grad():  # Do not update gradients
 
             for slice_idx in tqdm(range(data_xy.shape[2]), desc='Running inference, XY'):
-                out_xy[:, :, slice_idx] = inference(model, args, config, data_xy[:, :, slice_idx, :], tile=args.tile,
+                out_xy[:, :, slice_idx] = inference(model, args, config, data_xy[:, :, slice_idx, :], step=args.tile,
                                                     mean=mean, std=std)
 
         # Scale the dynamic range

@@ -166,7 +166,7 @@ if __name__ == "__main__":
                     out = np.zeros((data.shape[0], data.shape[1], data.shape[2]))
                     for slice_idx in tqdm(range(data.shape[2]), desc='Running inference, XY'):
                         out[:, :, slice_idx] = inference(model, args, config, data[:, :, slice_idx, :],
-                                                         tile=args.step, weight=args.weight,
+                                                         step=args.step, weight=args.weight,
                                                          mean=mean, std=std)
                     data = out
                 else:
