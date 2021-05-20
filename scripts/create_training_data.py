@@ -1,46 +1,49 @@
 import os
 import h5py
+import argparse
 import numpy as np
-from pathlib import Path
 import cv2
+from pathlib import Path
 from bone_enhance.utilities.main import load, save, print_orthogonal, load_logfile
 from skimage.transform import resize
 
 if __name__ == "__main__":
     # Initialize experiment
-    images_loc = Path('/media/santeri/Transcend/1176 Reconstructions')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--images_loc', type=Path, default='/media/santeri/Transcend/1176 Reconstructions')
+    parser.add_argument('--images_save', type=Path, default='/media/santeri/data/BoneEnhance/Data/target_1176_HR_2D')
+    parser.add_argument('--res_out', type=int, default=50, help='Target resolution for training data (in µm)')
+    parser.add_argument('--completed', type=int, default=0, help='Samples already processed and skipped.')
+    parser.add_argument('--crop_size', type=list, default=[128, 128, 128], help='Size of one training patch')
+    parser.add_argument('--sigma', type=float, default=0.5, help='Standard deviation of gaussian blur (antialiasing).')
+    parser.add_argument('--hdf5', type=bool, default=False, help='Save as 3D data (True) or a stack of 2D images.')
+
+    args = parser.parse_args()
 
     # Save path
-    images_save = Path('/media/santeri/data/BoneEnhance/Data/target_1176_2D')
-    images_save.mkdir(exist_ok=True)
-    # Output resolution
-    res_out = 100
-    # Stack size
-    crop_size = np.array([128, 128, 128])
-    # Antialiasing sigma
-    sigma = 0.5
+    args.images_save.mkdir(exist_ok=True)
     hdf5 = False
 
     # List samples
-    samples = os.listdir(images_loc)
-    samples = [name for name in samples if os.path.isdir(os.path.join(images_loc, name))]
+    samples = os.listdir(args.images_loc)
+    samples = [name for name in samples if os.path.isdir(os.path.join(args.images_loc, name))]
     samples.sort()
 
-    samples = samples[3:]
+    if args.completed > 0:
+        samples = samples[args.completed:]
 
     # Resample datasets, create 3D stack
     for sample in samples:
         print(f'Processing sample: {sample}')
         #try:
         # Load log file to check resolution
-        im_path = images_loc / sample
-        #log = load_logfile(str(im_path))
-        #res = float(log['Image Pixel Size (um)'])
-        res = 34.84
+        im_path = args.images_loc / sample
+        log = load_logfile(str(im_path))
+        res = float(log['Image Pixel Size (um)'])
 
         # Scale factors and scaled crops
-        factor = res_out / res
-        crop_large = np.floor(crop_size * factor).astype('uint32')
+        factor = args.res_out / res
+        crop_large = np.floor(np.array(args.crop_size) * factor).astype('uint32')
 
         # Load images
         data, files = load(im_path, axis=(1, 2, 0))
@@ -66,18 +69,18 @@ if __name__ == "__main__":
                                ]
 
                     # Crop is now in resolution "res_out"
-                    data_out = resize(data_out, crop_size, order=0, anti_aliasing=True, preserve_range=True,
-                                      anti_aliasing_sigma=sigma).astype('uint8')
+                    data_out = resize(data_out, args.crop_size, order=0, anti_aliasing=True, preserve_range=True,
+                                      anti_aliasing_sigma=args.sigma).astype('uint8')
 
                     # Save the cropped volume to hdf5
-                    if hdf5:
-                        fname = str(images_save / f'{sample}_{str(x).zfill(3)}{str(y).zfill(3)}{str(z).zfill(3)}.h5')
+                    if args.hdf5:
+                        fname = str(args.images_save / f'{sample}_{str(x).zfill(3)}{str(y).zfill(3)}{str(z).zfill(3)}.h5')
                         with h5py.File(fname, 'w') as f:
                             f.create_dataset('data', data=data_out)
                     else:
                         fname = Path(f'{sample}_{str(x).zfill(3)}{str(y).zfill(3)}{str(z).zfill(3)}')
 
-                        save(str(images_save / fname), fname.name, data_out, verbose=False)
+                        save(str(args.images_save / fname), fname.name, data_out, verbose=False)
         #except (ValueError, FileNotFoundError):
         #    print(f'Error in sample {sample}')
         #    continue

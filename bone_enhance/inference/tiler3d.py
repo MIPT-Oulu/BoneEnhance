@@ -117,26 +117,19 @@ class Tiler3D:
 
     def crop_to_orignal_size(self, image):
         """
-        crop = image[
-            self.margin_begin_out[0]: self.out[0] + self.margin_begin_out[0],
-            self.margin_begin_out[1]: self.out[1] + self.margin_begin_out[1],
-            self.margin_begin_out[2]: self.out[2] + self.margin_begin_out[2],
-            :self.out[0],
-           :self.out[1],
-           :self.out[2],
-        ]
+        Crop the predicted image based on the padded margins.
         """
-        n = 5
+        cr = self.margin_begin_out
         if self.dim == 3:
             crop = image[
-                   n:self.out[0] + n,
-                   n:self.out[1] + n,
-                   n:self.out[2] + n,
+                   cr[0]:self.out[0] + cr[0],
+                   cr[1]:self.out[1] + cr[1],
+                   cr[2]:self.out[2] + cr[2],
                    ]
         else:
             crop = image[
-                   n:self.out[0] + n,
-                   n:self.out[1] + n,
+                   cr[0]:self.out[0] + cr[0],
+                   cr[1]:self.out[1] + cr[1],
                    ]
         return crop
 

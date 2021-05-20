@@ -12,7 +12,7 @@ strategy:
 training:
   # General
   calc_meanstd: True
-  suffix: '_1176_2D'  # Options: _curated _reduced
+  suffix: '_1176_HR_2D'  # Options: _curated _reduced
   parse_color: False
   crop_small: [16, 16]
   crossmodality: False
@@ -33,10 +33,10 @@ training:
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 100
-  bs: 32
+  epochs: 50
+  bs: 64
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: mse_tv
+  loss: combined_tv
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False
@@ -62,7 +62,7 @@ transforms:
   v_range: [0.000001, 0.0009]
 inference:
   calc_inference: True
-  step: 2
+  step: 3
   weight: 'gaussian'
   threshold: 0.8
 model:

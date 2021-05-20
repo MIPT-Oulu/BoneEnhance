@@ -16,7 +16,7 @@ from glob import glob
 
 from collagen.core.utils import auto_detect_device
 from bone_enhance.inference.model_components import InferenceModel, load_models
-from bone_enhance.inference.pipeline_components import inference, largest_object
+from bone_enhance.inference.pipeline_components import inference, largest_object, inference_runner_oof
 
 from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
 from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     # Snapshots to be evaluated
     # µCT models
 
-    snaps = ['dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit']
+    snaps = ['2021_05_14_13_50_15_2D_perceptual_tv_1176_HR_seed42']
     #snaps = ['dios-erc-gpu_2020_10_12_12_50_52_perceptualnet_newsplit_cm_bg']
 
 
@@ -65,65 +65,14 @@ if __name__ == "__main__":
         with open(snap / 'split_config.dill', 'rb') as f:
             split_config = dill.load(f)
 
-        save_dir = args.save_dir / str(snap.stem + '_oof')
-        save_dir.mkdir(exist_ok=True)
-        if not config.training.crossmodality:
-            save_dir_ds = args.save_dir / str(snap.stem + '_downscale_oof')
-            save_dir_ds.mkdir(exist_ok=True)
-
         device = auto_detect_device()
+        args_experiment.bs = config.training.bs
 
-        # Load models
-        model_list = load_models(str(snap), config, n_gpus=args_experiment.gpus)
+        save_dir = inference_runner_oof(args_experiment, config, split_config, device)
 
-        print(f'Found {len(model_list)} models.')
-
-        # Create directories
-        save_dir.mkdir(exist_ok=True)
-        input_x = config['training']['crop_small'][0]
-        input_y = config['training']['crop_small'][1]
-
-        # Loop for all images
-        for fold in range(len(model_list)):
-            # List validation images
-            validation_files = split_config[f'fold_{fold}']['eval'].target_fname.values
-
-            # Model without validation images
-            model = InferenceModel([model_list[fold]]).to(device)
-            model.eval()
-
-            for file in tqdm(validation_files, desc=f'Running inference for fold {fold}'):
-
-                img_full = cv2.imread(str(file))
-
-                resize = (img_full.shape[1] // 32, img_full.shape[0] // 32)
-                img_full = cv2.resize(img_full.copy(), resize)
-
-                with torch.no_grad():  # Do not update gradients
-                    prediction = inference(model, args, config, img_full, weight=args.weight,
-                                           mean=split_config['mean'], std=split_config['std']
-                                           )#[:, :, 0]
-                    if args.plot:
-                        plt.imshow(prediction)
-                        plt.colorbar()
-                        plt.show()
-
-                # Scale the dynamic range
-                prediction -= np.min(prediction)
-                prediction /= np.max(prediction)
-
-                prediction = (prediction * 255).astype('uint8')
-
-                # When saving 3D stacks, file structure should be preserved
-                (save_dir / file.parent.stem).mkdir(exist_ok=True)
-                cv2.imwrite(str(save_dir / file.parent.stem / file.stem) + '.bmp', prediction)
-                if not config.training.crossmodality:
-                    (save_dir_ds / file.parent.stem).mkdir(exist_ok=True)
-                    cv2.imwrite(str(save_dir_ds / file.parent.stem / file.stem) + '.bmp', img_full)
-
-                # Free memory
-                torch.cuda.empty_cache()
-                gc.collect()
+        # Free memory
+        torch.cuda.empty_cache()
+        gc.collect()
 
         dur = time() - start
         print(f'Inference completed in {(dur % 3600) // 60} minutes, {dur % 60} seconds.')

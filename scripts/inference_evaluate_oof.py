@@ -29,7 +29,7 @@ if __name__ == "__main__":
     # Snapshots to be evaluated
     # µCT models
 
-    snaps = ['2021_04_13_10_45_20_rn50_UNet_cm']
+    snaps = ['2021_05_14_13_50_15_2D_perceptual_tv_1176_HR_seed42']
     suffixes = ['']
     snaps = [args.snapshots / snap for snap in snaps]
 

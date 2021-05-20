@@ -58,9 +58,14 @@ def load_logfile(path: str, first=True) -> dict:
     # Read the first log file in list
     if first:
         log = log[0]
-        with open(log) as f:
-            # Read and split along newline (\n)
-            log_file = f.read().splitlines()
+        try:
+            with open(log) as f:
+                # Read and split along newline (\n)
+                log_file = f.read().splitlines()
+        except UnicodeDecodeError: # ANSI encoding
+            with open(log, encoding='gbk') as f:
+                # Read and split along newline (\n)
+                log_file = f.read().splitlines()
     # Concatenate all log files into one list
     else:
         log_file = []

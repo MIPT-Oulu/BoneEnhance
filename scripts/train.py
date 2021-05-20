@@ -103,6 +103,7 @@ if __name__ == "__main__":
 
         # Calculate out-of-fold inference and evaluate metrics
         if config.inference.calc_inference:
+            args.bs = config.training.bs
             save_dir = inference_runner_oof(args, config, splits_metadata, device)
 
             evaluation_runner(args, config, save_dir, suffix=config.training.suffix)
