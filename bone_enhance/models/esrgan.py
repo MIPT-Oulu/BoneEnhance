@@ -112,7 +112,6 @@ class Discriminator(nn.Module):
             layers.append(nn.BatchNorm2d(out_filters))
             layers.append(nn.LeakyReLU(0.2, inplace=True))
             return layers
-        # TODO max-pooling after every two layers
         layers = []
         # Create blocks with increasing feature map size
         in_filters = in_channels

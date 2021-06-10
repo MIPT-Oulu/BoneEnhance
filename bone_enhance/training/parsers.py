@@ -80,7 +80,6 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
 
     # Target is scaled to -1 to +1 range
     target = (target / 255. - 0.5) * 2
-    # TODO target from -1 to 1
 
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.999:
