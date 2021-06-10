@@ -127,8 +127,6 @@ class PerceptualNet(nn.Module):
 
         final_block = [
             convolution(f_maps[1], f_maps[2], kernel_size=kernel, stride=1, padding=pad, bias=True),
-            self.norm(f_maps[2], affine=True),
-            self.activation
         ]
 
         # Construct the layers
@@ -154,9 +152,4 @@ class PerceptualNet(nn.Module):
                 x = x.repeat(1, 3, 1, 1)
 
         # Scaled Tanh activation
-        if self.final_activation:
-            x = x.tanh()
-            # No need for scaling since no negative values are obtained
-            #x = x.add(1.)
-            #x = x.mul(0.5)
-        return x
+        return x.tanh()

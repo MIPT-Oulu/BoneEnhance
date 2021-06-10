@@ -71,8 +71,9 @@ def main(args, config, args_experiment, sample_id=None, render=False):
             data_xy, files = load(str(args.dataset_root / sample), rgb=True, axis=(1, 2, 0))
 
         # 3-channel
-        if len(data_xy.shape) != 4 and config.training.rgb:
+        if len(data_xy.shape) != 4:
             data_xy = np.expand_dims(data_xy, 3)
+        if config.training.rgb and data_xy.shape[3] != 3:
             data_xy = np.repeat(data_xy, 3, axis=3)
 
         print_orthogonal(data_xy[:, :, :, 0], invert=True, res=args.res, title='Input', cbar=True,
@@ -91,7 +92,7 @@ def main(args, config, args_experiment, sample_id=None, render=False):
                                       weight=args.weight, plot=args.plot)
 
         # Scale the dynamic range
-        if args.scale:
+        if args.scale or np.max(prediction) > 1:
             prediction -= np.min(prediction)
             prediction /= np.max(prediction)
 
@@ -137,17 +138,25 @@ if __name__ == "__main__":
     #snap = '2021_03_04_10_11_34_1_3D_mse_tv_1176'  # Low resolution 1176 model (mse+tv)
 
     # Ankle experiments
-    path = '../../Workdir/snapshots'
+    path = '../../Workdir/ankle_experiments'
     snaps = os.listdir(path)
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(path, snap))]
-    snaps = ['2021_03_04_10_11_34_1_3D_mse_tv_1176']
-    for snap in snaps:
+    #snaps = ['2021_03_04_10_11_34_1_3D_mse_tv_1176']
 
+    for snap_id in range(len(snaps)):
+        # Print snapshot info
+        snap = snaps[snap_id]
+        print(f'Calculating inference for snapshot: {snap} {snap_id + 1}/{len(snaps)}')
+
+        # Input arguments
         parser = argparse.ArgumentParser()
         parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
-        parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/ankle_experiments/{snap}')
+        #parser.add_argument('--dataset_root', type=Path, default='../../Data/Test set (full)/input_3d')
+        parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/ankle_experiments2/{snap}')
+        #parser.add_argument('--save_dir', type=Path,
+        #                    default=f'../../Data/Test set (full)/predictions_wacv/{snap}')
         parser.add_argument('--bs', type=int, default=64)
-        parser.add_argument('--plot', type=bool, default=True)
+        parser.add_argument('--plot', type=bool, default=False)
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean'], default='gaussian')
         parser.add_argument('--completed', type=int, default=0)
         parser.add_argument('--step', type=int, default=3, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')

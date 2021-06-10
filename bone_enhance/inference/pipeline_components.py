@@ -63,7 +63,6 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     elif ch == 1 and config.training.rgb:
         img_full = np.repeat(img_full, 2, axis=-1)
 
-
     # Cut large image into overlapping tiles
     tiler = Tiler3D(img_full.shape, tile=tile, out=out, step=step, mag=mag, weight=weight)
 
@@ -79,8 +78,8 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
         # Move tile to GPU
         if mean is not None and std is not None:
             tiles_batch = tiles_batch.float()
-            for ch in range(len(mean)):
-                tiles_batch[:, ch, :, :] = (((tiles_batch[:, ch, :, :]  / 255.) - mean[ch]) / std[ch])
+            for c in range(tiles_batch.size(1)):
+                tiles_batch[:, c, :, :] = (((tiles_batch[:, c, :, :] / 255.) - mean[c]) / std[c])
             tiles_batch = tiles_batch.to(device)
         else:
             tiles_batch = (tiles_batch.float() / 255.).to(device)
@@ -335,7 +334,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
             else:
                 data = np.expand_dims(data, axis=-1)
 
-            if len(data.shape) == 4:
+            if len(data.shape) == 4 and plot:
                 print_orthogonal(data[:, :, :, 0], invert=True, res=0.2, title='Input', cbar=True,
                                  savepath=str(save_dir / 'visualizations' / (str(sample.stem) + '_input.png')),
                                  scale_factor=1000)
@@ -362,9 +361,10 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
                 (save_dir / sample.stem).mkdir(exist_ok=True)
                 save(str(save_dir / sample.stem), str(sample.stem), data, dtype='.png', verbose=False)
 
-                print_orthogonal(data, invert=True, res=0.2 / 4, title='Output', cbar=True,
-                                 savepath=str(save_dir / 'visualizations' / (str(sample.stem) + '_prediction.png')),
-                                 scale_factor=1000)
+                if plot:
+                    print_orthogonal(data, invert=True, res=0.2 / 4, title='Output', cbar=True,
+                                     savepath=str(save_dir / 'visualizations' / (str(sample.stem) + '_prediction.png')),
+                                     scale_factor=1000)
             else:
                 (save_dir / sample.parent.stem).mkdir(exist_ok=True)
                 cv2.imwrite(str(save_dir / sample.parent.stem / sample.name), data)

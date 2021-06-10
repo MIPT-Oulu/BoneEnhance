@@ -4,6 +4,7 @@ import matplotlib.ticker as ticker
 import random
 import os
 import cv2
+from pydicom import dcmread
 from tqdm import tqdm
 from joblib import Parallel, delayed
 from glob import glob
@@ -144,7 +145,7 @@ def load_images(path, n_jobs=12, rgb=False, uCT=False):
         return files, np.array(data)
 
 
-def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False):
+def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False, dicom=False):
     """
     Loads an image stack as numpy array.
 
@@ -165,8 +166,14 @@ def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False):
     # Exclude extra files
     newlist = []
     for file in files:
-        if file.endswith('.png') or file.endswith('.bmp') or file.endswith('.tif'):
+        if file.endswith('.png') or file.endswith('.bmp') or file.endswith('.tif') \
+                or file.endswith('.dcm') or file.endswith('.ima'):
             try:
+                if file.endswith('.dcm') or file.endswith('.ima'):
+                    newlist.append(file)
+                    dicom = True
+                    continue
+
                 int(file[-7:-4])
 
                 # Do not load files with different prefix into the stack
@@ -178,7 +185,9 @@ def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False):
                 continue
     files = newlist[:]  # replace list
     # Load images
-    if rgb:
+    if dicom:
+        data = Parallel(n_jobs=n_jobs)(delayed(read_image_dicom)(path, file) for file in files)
+    elif rgb:
         data = Parallel(n_jobs=n_jobs)(delayed(read_image_rgb)(path, file) for file in files)
     else:
         data = Parallel(n_jobs=n_jobs)(delayed(read_image_gray)(path, file) for file in files)
@@ -205,6 +214,14 @@ def read_image_gray(path, file):
     image = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
     #image = cv2.imread(f, -1)
     return image
+
+
+def read_image_dicom(path, file):
+    """Reads image from given path."""
+    # Image
+    f = os.path.join(path, file)
+    image = dcmread(f)
+    return image.pixel_array
 
 
 def read_image_rgb(path, file):
@@ -242,17 +259,22 @@ def save(path, file_name, data, n_jobs=12, dtype='.png', verbose=True):
     if data[0, 0, 0].dtype is bool:
         data = data * 255
 
+    if dtype == '.tif' or dtype == '.tiff':
+        n_bits = 'uint16'
+    else:
+        n_bits = 'uint8'
+
     # Parallel saving (nonparallel if n_jobs = 1)
     if type(file_name) is list:
         Parallel(n_jobs=n_jobs)(delayed(cv2.imwrite)
                                 (path + '/' + file_name[k][:-4] + dtype,
-                                 data[:, :, k].astype('uint8'))
+                                 data[:, :, k].astype(n_bits))
                                 for k in tqdm(range(nfiles), 'Saving dataset', disable=not verbose))
 
     else:
         Parallel(n_jobs=n_jobs)(delayed(cv2.imwrite)
                                 (path + '/' + file_name + '_' + str(k).zfill(8) + dtype,
-                                 data[:, :, k].astype('uint8'))
+                                 data[:, :, k].astype(n_bits))
                                 for k in tqdm(range(nfiles), 'Saving dataset', disable=not verbose))
 
 

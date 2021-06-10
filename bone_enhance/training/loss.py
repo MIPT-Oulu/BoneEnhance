@@ -167,6 +167,8 @@ class PerceptualLoss(nn.Module):
 
                 axs[0, j].set_title(key)
                 axs[1, j].set_title(key)
+            plt.tight_layout()
+
             fig.show()
 
 

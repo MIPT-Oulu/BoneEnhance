@@ -1,0 +1,91 @@
+strategy:
+  # Support for 'train' or 'eval' stages only
+  stage_names:
+    - train
+    - eval
+  accumulate_grad:
+    SR: False
+  accumulate_grad_in_iter:
+    SR: False
+  train_starts_at_epoch:
+    SR: 0
+training:
+  # General
+  calc_meanstd: True
+  suffix: '_IVD_FR'  # Options: _curated _reduced
+  parse_color: False
+  crop_small: [16, 16]
+  crossmodality: False
+  rgb: True
+  # Model
+  architecture: perceptualnet
+  upscale_input: True  # In PerceptualNet = resize-convolution
+  add_residual: False
+  activation: relu
+  normalization: in
+  autoencoder_pretrained: 2021_02_28_10_03_55_3D_deep_autoencoder_ds_1176
+  autoencoder_layers: False
+  pretrain: False
+  existing_model: dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit
+  magnification: 8
+  n_blocks: 15
+  # Training
+  wd: 0.0001
+  lr: 0.0001
+  n_folds: 4
+  epochs: 100
+  bs: 64
+  # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
+  loss: mse_tv
+  train_loss: True
+  log_jaccard: True
+  imagenet_normalize_loss: False
+  gram: True  # Calculate Gram matrix on Perceptual loss
+  # LR reduction
+  use_LR_red: True
+  patience: 5
+  factor: 0.1
+  eps: 1e-7
+transforms:
+  probability: 0.5
+  scale: [0.9, 1.1]
+  translation: 5
+  rotation: [-30, 30]
+  shear: [-0.1, 0.1]
+  gamma: [0.7, 1.5]
+  sigma: [0.4, 1.5]
+  hsv: [0, 50]
+  gain_sp: 0.1
+  gain_gn: 0.5
+  brightness: [-50, 50]
+  contrast: 0.4
+  v_range: [0.000001, 0.0009]
+inference:
+  calc_inference: True
+  step: 3
+  weight: 'gaussian'
+  threshold: 0.8
+model:
+  decoder_normalization: IN
+  n_outputs: 1
+  spatial_dropout: 0.1
+  bayesian_dropout: 0.5
+  backbone: resnet34
+  decoder: enhance
+data_sampling:
+  train:
+    data_provider:
+      SR:
+        loader_train:
+          cate: ItemLoader
+          batches_per_iter: 1
+          data_key: "data"
+          target_key: "target"
+  eval:
+    data_provider:
+      SR:
+        loader_eval:
+          cate: ItemLoader
+          batches_per_iter: 1
+          data_key: "data"
+          target_key: "target"

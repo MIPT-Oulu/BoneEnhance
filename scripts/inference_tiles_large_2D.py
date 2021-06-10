@@ -32,9 +32,7 @@ def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, d
 
     # Load models
     models = glob(str(args.snapshot) + '/*fold_[0-9]_*.pth')
-    # models = glob(str(args.snapshot) + '/*fold_3_*.pth')
     models.sort()
-    # device = auto_detect_device()
     device = 'cuda'  # Use the second GPU for inference
 
     crop = config.training.crop_small
@@ -83,36 +81,21 @@ def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, d
 
         if len(data_xy.shape) != 4:
             data_xy = np.expand_dims(data_xy, -1)
+        if config.training.rgb:
+            data_xy = np.repeat(data_xy, 3, axis=-1)
+        x, y, z, ch = data_xy.shape
 
 
         print_orthogonal(data_xy[:, :, :, 0], invert=True, res=res, title='Input', cbar=True,
-                         savepath=str(args.save_dir / 'visualizations' / (sample[:-3] + f'_{snapshot}_input.png')), scale_factor=100)
+                         savepath=str(args.visualizations / (sample[:-3] + f'_{snapshot}_input.png')), scale_factor=100)
 
         # Calculate mean and std from the sample
         if args.calculate_mean_std:
             mean = torch.Tensor([np.mean(data_xy) / 255])
             std = torch.Tensor([np.std(data_xy) / 255])
 
-        data_xz = np.transpose(data_xy, (0, 2, 1, 3))  # X-Z-Y-Ch
-        data_yz = np.transpose(data_xy, (1, 2, 0, 3))  # Y-Z-X-Ch
-
-        # In case of MRI, make the resolution isotropic
-        #data_xy = zoom(data_xy, zoom=(1, 1, 4/res, 1))
-        #print_orthogonal(data_xy[:, :, :, 0], invert=True, res=res, title='Input (interpolated)', cbar=True,
-        #                 savepath=str(args.visualizations / (sample[:-3] + f'_{snapshot}_input_scaled.png')), scale_factor=100)
-
-        # Interpolate 3rd dimension
-        x, y, z, ch = data_xy.shape
-        data_xy = zoom(data_xy, zoom=(1, 1, config.training.magnification, 1))
-        if args.avg_planes:
-            data_xz = zoom(data_xz, zoom=(1, 1, config.training.magnification, 1))
-            data_yz = zoom(data_yz, zoom=(1, 1, config.training.magnification, 1))
-
         # Output shape
-        out_xy = np.zeros((x * mag, y * mag, z * mag))
-        if args.avg_planes:
-            out_xz = np.zeros((x * mag, z * mag, y * mag))
-            out_yz = np.zeros((y * mag, z * mag, x * mag))
+        prediction = np.zeros((x * mag, y * mag, z))
 
         # Loop for image slices
         # 1st orientation
@@ -120,45 +103,25 @@ def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, d
 
             # 1st orientation
             for slice_idx in tqdm(range(data_xy.shape[2]), desc='Running inference, XY'):
-                out_xy[:, :, slice_idx] = inference(model, args, config, data_xy[:, :, slice_idx, :],
+                prediction[:, :, slice_idx] = inference(model, args, config, data_xy[:, :, slice_idx, :],
                                                     weight=args.weight, step=args.step, mean=mean, std=std)
 
-            # 2nd and 3rd orientation
-            if args.avg_planes:
-                for slice_idx in tqdm(range(data_xz.shape[2]), desc='Running inference, XZ'):
-                    out_xz[:, :, slice_idx] = inference(model, args, config, data_xz[:, :, slice_idx, :],
-                                                        weight=args.weight, step=args.step, mean=mean, std=std)
-                for slice_idx in tqdm(range(data_yz.shape[2]), desc='Running inference, YZ'):
-                    out_yz[:, :, slice_idx] = inference(model, args, config, data_yz[:, :, slice_idx, :],
-                                                        weight=args.weight, step=args.step, mean=mean, std=std)
-
-        # Average probability maps
-        if args.avg_planes:
-            out_xy = ((out_xy + np.transpose(out_xz, (0, 2, 1)) + np.transpose(out_yz, (2, 0, 1))) / 3)
-
-            # Free memory
-            del out_xz, out_yz
-
         # Scale the dynamic range
-        pred_max = np.max(out_xy)
+        pred_max = np.max(prediction)
         if args.scale:
-            out_xy -= np.min(out_xy)
-            out_xy /= pred_max
+            prediction -= np.min(prediction)
+            prediction /= pred_max
         elif pred_max > 1:
             print(f'Maximum value {pred_max} will be scaled to one')
-            out_xy /= pred_max
+            prediction /= pred_max
 
-        out_xy = (out_xy * 255).astype('uint8')
+        prediction = (prediction * 255).astype('uint8')
 
         # Save predicted full mask
-        save(str(args.save_dir / sample), sample, out_xy, dtype=args.dtype)
-        if render:
-            render_volume(data_yz[:, :, :, 0] * out_xy,
-                          savepath=str(args.save_dir / 'visualizations' / (sample + '_render' + args.dtype)),
-                          white=True, use_outline=False)
+        save(str(args.save_dir / sample), sample, prediction, dtype=args.dtype)
 
-        print_orthogonal(out_xy, invert=True, res=res / 4, title='Output', cbar=True,
-                         savepath=str(args.save_dir / 'visualizations' / (sample[:-3] + f'_{snapshot}_prediction.png')),
+        print_orthogonal(prediction, invert=True, res=res / 4, title='Output', cbar=True,
+                         savepath=str(args.visualizations / (sample[:-3] + f'_{snapshot}_prediction.png')),
                          scale_factor=100)
 
     dur = time() - start
@@ -168,19 +131,12 @@ def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, d
 if __name__ == "__main__":
     start = time()
 
-    snap = 'dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit'
-    #snap = 'dios-erc-gpu_2020_10_19_14_09_24_3D_perceptualnet'
-    #snap = 'dios-erc-gpu_2020_09_30_14_14_42_perceptualnet_noscaling_3x3_cm_curated_trainloss'
-    snap = '2020_12_15_10_28_57_2D_perceptualnet_ds_16'  # Latest 2D model with fixes, only 1 fold
-    snap = '2021_01_08_09_49_45_2D_perceptualnet_ds_16'  # 2D model, 3 working folds
-
-    snap_path = '../../Workdir/wacv_experiments'
-    #snap_path = '../../Workdir/snapshots'
+    snap_path = '../../Workdir/snapshots'
     snaps = os.listdir(snap_path)
     snaps.sort()
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(snap_path, snap))]
-    #snaps = snaps[2:]
-    #snaps = ['2021_05_27_08_56_20_2D_perceptual_tv_IVD_4x_pretrained_seed42']
+    snaps = snaps[2:]
+    snaps = ['2021_05_27_08_56_20_2D_perceptual_tv_IVD_4x_pretrained_seed42']
 
     for snap_id in range(len(snaps)):
 
@@ -188,25 +144,18 @@ if __name__ == "__main__":
         print(f'Calculating inference for snapshot: {snap} {snap_id+1}/{len(snaps)}')
 
         parser = argparse.ArgumentParser()
-        #parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
-        parser.add_argument('--dataset_root', type=Path, default='../../Data/Test set (full)/input_3d')
-        #parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Patient_0006/')
-        #parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/wacv_experiments/{snap}')
-        parser.add_argument('--save_dir', type=Path,
-                            default=f'../../Data/Test set (full)/predictions_wacv/{snap}')
-        #parser.add_argument('--visualizations', type=Path,
-        #                    default=f'../../Data/predictions_3D_clinical/wacv_experiments/visualization')
+        parser.add_argument('--dataset_root', type=Path, default='/media/santeri/data/BoneEnhance/Data/MRI_IVD/Patient_0006/')
+        parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}')
         parser.add_argument('--visualizations', type=Path,
-                            default=f'../../Data/Test set (full)/predictions_wacv/visualization')
+                            default=f'../../Data/predictions_3D_clinical/IVD_experiments/visualization')
         parser.add_argument('--bs', type=int, default=64)
         parser.add_argument('--step', type=int, default=3)
         parser.add_argument('--plot', type=bool, default=False)
         parser.add_argument('--calculate_mean_std', type=bool, default=True)
-        parser.add_argument('--scale', type=bool, default=False)
+        parser.add_argument('--scale', type=bool, default=True)
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
         parser.add_argument('--completed', type=int, default=0)
         parser.add_argument('--sample_id', type=list, default=None, help='Process specific samples unless None.')
-        parser.add_argument('--avg_planes', type=bool, default=True)
         parser.add_argument('--snapshot', type=Path,
                             default=os.path.join(snap_path, snap))
         parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')

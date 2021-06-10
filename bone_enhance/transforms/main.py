@@ -64,7 +64,10 @@ def numpy2tens(x: np.ndarray, dtype='f') -> torch.Tensor:
     -------
     result: torch.Tensor
     """
-    #x = x.squeeze()
+
+    # Uint16 is not supported. Convert to int
+    if x.dtype.name == 'uint16':
+        x = x.astype('int32')
 
     # CxHxW format
     if len(x.shape) == 2:

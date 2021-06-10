@@ -4,6 +4,7 @@ from pathlib import Path
 from time import time
 import argparse
 import dill
+import os
 import yaml
 
 from collagen.core.utils import auto_detect_device
@@ -29,9 +30,11 @@ if __name__ == "__main__":
     # Snapshots to be evaluated
     # µCT models
 
-    snaps = ['2021_05_14_13_50_15_2D_perceptual_tv_1176_HR_seed42']
+    #snaps = ['2021_05_27_08_56_20_2D_perceptual_tv_IVD_4x_pretrained_seed42']
+    path = '../../Workdir/ankle_experiments'
+    snaps = os.listdir(path)
     suffixes = ['']
-    snaps = [args.snapshots / snap for snap in snaps]
+    snaps = [Path(os.path.join(path, snap)) for snap in snaps if os.path.isdir(os.path.join(path, snap))]
 
     # Iterate through snapshots
     args.save_dir.mkdir(exist_ok=True)
@@ -45,6 +48,8 @@ if __name__ == "__main__":
 
         with open(snap / 'args.dill', 'rb') as f:
             args_experiment = dill.load(f)
+            args_experiment.bs = args.bs
+            args_experiment.snapshots_dir = Path(path)
 
         with open(snap / 'split_config.dill', 'rb') as f:
             split_config = dill.load(f)
@@ -65,13 +70,11 @@ if __name__ == "__main__":
 
         # Create directories
         save_dir.mkdir(exist_ok=True)
-        input_x = config['training']['crop_small'][0]
-        input_y = config['training']['crop_small'][1]
 
-        #save_d = inference_runner_oof(args_experiment, config, split_config, device, plot=args.plot)
+        save_d = inference_runner_oof(args_experiment, config, split_config, device, plot=args.plot)
         save_d = Path('../../Data/predictions_oof') / str(config['training']['snapshot'] + '_oof')
         masks = snap == '2021_02_26_05_52_47_3D_perceptualnet_ds_mse_tv'
-        evaluation_runner(args_experiment, config, save_d, use_bvtv=masks, suffix=suffixes[idx])
+        evaluation_runner(args_experiment, config, save_d, use_bvtv=masks, suffix='')
 
         dur = time() - start
         print(f'Inference completed in {(dur % 3600) // 60} minutes, {dur % 60} seconds.')

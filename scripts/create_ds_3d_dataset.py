@@ -9,10 +9,10 @@ from skimage.transform import resize
 
 if __name__ == "__main__":
     # Initialize experiment
-    images_loc = Path('/media/santeri/data/BoneEnhance/Data/target_3d_duplicates')
+    images_loc = Path('/media/santeri/data/BoneEnhance/Data/target_IVD_isotropic_3D')
 
     # Save path
-    images_save = Path('/media/santeri/data/BoneEnhance/Data/input_3d_duplicates_ds')
+    images_save = Path('/media/santeri/data/BoneEnhance/Data/input_IVD_isotropic_3D_ds')
     images_save.mkdir(exist_ok=True)
     # Output resolution
     mag = 4
@@ -41,7 +41,7 @@ if __name__ == "__main__":
             data = f['data'][:]
 
         # Visualize full stack
-        print_orthogonal(data, res=res/1e3, invert=True, cbar=True, scale_factor=10)
+        #print_orthogonal(data, res=res/1e3, invert=True, cbar=True, scale_factor=10)
 
         # Downscale to input size
         new_size = (data.shape[0] // mag, data.shape[1] // mag, data.shape[2] // mag)

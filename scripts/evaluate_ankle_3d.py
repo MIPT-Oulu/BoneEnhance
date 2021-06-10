@@ -102,8 +102,8 @@ def evaluation_runner(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pred_path', type=Path, default=f'../../Data/predictions_3D_clinical/ankle_experiments')
-    parser.add_argument('--save_dir', type=Path, default='../../Data/predictions_3D_clinical/ankle_experiments_eval')
+    parser.add_argument('--pred_path', type=Path, default=f'../../Data/predictions_3D_clinical/ankle_experiments2')
+    parser.add_argument('--save_dir', type=Path, default='../../Data/predictions_3D_clinical/ankle_experiments_eval2')
     parser.add_argument('--ref_path', type=Path, default=f'../../Data/Test set (KP02)/ANKLE_SCALED_SMALLVOI_filtered')
     parser.add_argument('--num_threads', type=int, default=12)
     parser.add_argument('--plot', type=bool, default=False)

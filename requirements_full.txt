@@ -12,6 +12,7 @@ opencv-python
 pandas
 pillow
 pretrainedmodels
+pydicom
 pytorch-toolbelt==0.3.2
 pyyaml
 scikit-image

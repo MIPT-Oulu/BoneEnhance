@@ -3,6 +3,7 @@ import h5py
 import argparse
 import numpy as np
 import cv2
+
 from pathlib import Path
 from bone_enhance.utilities.main import load, save, print_orthogonal, load_logfile
 from skimage.transform import resize
@@ -10,19 +11,19 @@ from skimage.transform import resize
 if __name__ == "__main__":
     # Initialize experiment
     parser = argparse.ArgumentParser()
-    parser.add_argument('--images_loc', type=Path, default='/media/santeri/Transcend/1176 Reconstructions')
-    parser.add_argument('--images_save', type=Path, default='/media/santeri/data/BoneEnhance/Data/target_1176_HR_2D')
-    parser.add_argument('--res_out', type=int, default=50, help='Target resolution for training data (in µm)')
+    parser.add_argument('--images_loc', type=Path, default='/media/santeri/data/BoneEnhance/Data/target_IVD_isotropic_FR')
+    #'/media/santeri/Transcend/1176 Reconstructions')
+    parser.add_argument('--images_save', type=Path, default='/media/santeri/data/BoneEnhance/Data/target_IVD_isotropic_3D')
+    parser.add_argument('--res_out', type=int, default=171.875, help='Target resolution for training data (in µm)')
     parser.add_argument('--completed', type=int, default=0, help='Samples already processed and skipped.')
-    parser.add_argument('--crop_size', type=list, default=[128, 128, 128], help='Size of one training patch')
+    parser.add_argument('--crop_size', type=list, default=[64, 64, 64], help='Size of one training patch')
     parser.add_argument('--sigma', type=float, default=0.5, help='Standard deviation of gaussian blur (antialiasing).')
-    parser.add_argument('--hdf5', type=bool, default=False, help='Save as 3D data (True) or a stack of 2D images.')
+    parser.add_argument('--hdf5', type=bool, default=True, help='Save as 3D data (True) or a stack of 2D images.')
 
     args = parser.parse_args()
 
     # Save path
     args.images_save.mkdir(exist_ok=True)
-    hdf5 = False
 
     # List samples
     samples = os.listdir(args.images_loc)
@@ -38,8 +39,9 @@ if __name__ == "__main__":
         #try:
         # Load log file to check resolution
         im_path = args.images_loc / sample
-        log = load_logfile(str(im_path))
-        res = float(log['Image Pixel Size (um)'])
+        #log = load_logfile(str(im_path))
+        #res = float(log['Image Pixel Size (um)'])
+        res = 90
 
         # Scale factors and scaled crops
         factor = args.res_out / res

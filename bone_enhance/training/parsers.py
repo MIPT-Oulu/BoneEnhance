@@ -21,7 +21,15 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
 
     # Magnification
     mag = config.training.magnification
-    k = choice([5])
+    # Antialiasing kernel size
+    if config.training.antialiasing is not None:
+        k = config.training.antialiasing
+    else:
+        k = 5
+    if config.training.sigma is not None:
+        s = config.training.sigma
+    else:
+        s = 0
 
     # Resize target to 4x magnification respect to input
     if config is not None and not config.training.crossmodality:
@@ -40,7 +48,7 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
         # No antialias
         #img = cv2.resize(target, new_size, interpolation=cv2.INTER_LANCZOS4)
         # Antialias
-        img = cv2.resize(cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0), new_size)
+        img = cv2.resize(cv2.GaussianBlur(target, ksize=(k, k), sigmaX=s, sigmaY=s), new_size)
         #img = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=k).astype('uint8')
     elif config is not None:
 
@@ -55,7 +63,7 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
 
 
         new_size = (img.shape[1] * mag, img.shape[0] * mag)
-        target = cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0)
+        target = cv2.GaussianBlur(target, ksize=(k, k), sigmaX=s, sigmaY=s)
         target = cv2.resize(target, new_size)
         #target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=k).astype('uint8')
     else:
@@ -70,11 +78,12 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     # Apply random transforms. Images are returned in format 3xHxW
     img, target = transform((img, target))
 
-    # Target is scaled to 0-1 range
-    target = target / 255.
+    # Target is scaled to -1 to +1 range
+    target = (target / 255. - 0.5) * 2
+    # TODO target from -1 to 1
 
     # Plot a small random portion of image-target pairs during debug
-    if debug and uniform(0, 1) >= 0.99:
+    if debug and uniform(0, 1) >= 0.999:
         fig = plt.figure(dpi=300)
         ax1 = fig.add_subplot(121)
         im = ax1.imshow(np.asarray(img[0, :, :] / 255.), cmap='gray')
@@ -201,7 +210,8 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
     # Images are in the format 3xHxWxD
     # and scaled to 0-1 range
     #img /= 255.
-    target /= 255.
+    # Target is scaled to -1 to +1 range
+    target = (target / 255. - 0.5) * 2
 
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.98:
@@ -277,7 +287,8 @@ def parse_3d_debug(root, entry, transform, data_key, target_key, debug=False, co
 
     # Images are in the format 3xHxW
     # and scaled to 0-1 range
-    target = target / 255.  # .permute(2, 0, 1) / 255.
+    # Target is scaled to -1 to +1 range
+    target = (target / 255. - 0.5) * 2
 
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.95 and len(img.shape) != 4:
@@ -357,8 +368,8 @@ def parse_autoencoder_2d(root, entry, transform, data_key, target_key, debug=Fal
     # Apply random transforms. Images are returned in format 3xHxW
     img, target = transform((img, target))
 
-    # Target is scaled to 0-1 range
-    target = target / 255.
+    # Target is scaled to -1 to +1 range
+    target = (target / 255. - 0.5) * 2
 
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.99:
@@ -422,9 +433,8 @@ def parse_autoencoder_3d(root, entry, transform, data_key, target_key, debug=Fal
     # Apply random transforms
     img, target = transform((img, target))
 
-    # Images are in the format 3xHxWxD
-    # and scaled to 0-1 range
-    target /= 255.
+    # Target is scaled to -1 to +1 range
+    target = (target / 255. - 0.5) * 2
 
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.95 and len(img.shape) != 4:
