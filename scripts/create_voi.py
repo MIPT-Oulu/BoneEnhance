@@ -20,7 +20,7 @@ if __name__ == '__main__':
     start = time()
 
     # Ankle experiments
-    path = '../../Workdir/wacv_experiments'
+    path = '../../Workdir/wacv_experiments_new_2D'
     snaps = os.listdir(path)
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(path, snap))]
 
@@ -30,8 +30,8 @@ if __name__ == '__main__':
         #filter_size = 12
         parser = argparse.ArgumentParser()
         parser.add_argument('--masks', type=Path, default=base_path / 'trabecular_VOI')
-        parser.add_argument('--save', type=Path, default=base_path / 'masks_wacv' / snap)
-        parser.add_argument('--preds', type=Path, default=base_path / 'predictions_wacv' / snap)
+        parser.add_argument('--save', type=Path, default=base_path / 'masks_wacv_new' / snap)
+        parser.add_argument('--preds', type=Path, default=base_path / 'predictions_wacv_new' / snap)
         parser.add_argument('--plot', type=bool, default=True)
         parser.add_argument('--scale_voi', type=bool, default=False)
         parser.add_argument('--save_h5', type=bool, default=False)
@@ -66,6 +66,7 @@ if __name__ == '__main__':
             samples_pred.remove('visualizations')
 
         # Save paths
+        args.save.parent.mkdir(exist_ok=True)
         args.save.mkdir(exist_ok=True)
         (args.save / 'visualization').mkdir(exist_ok=True)
         if args.save_h5:
@@ -134,7 +135,7 @@ if __name__ == '__main__':
                 print_orthogonal(pred, savepath=str(args.save / 'visualization' / (sample + '_pred.png')), res=50 / 1000)
 
             # Apply volume-of-interest
-            pred = np.logical_and(pred, voi)
+            pred = np.logical_and(pred, voi).astype(np.uint8) * 255
 
             if args.plot:
                 print_orthogonal(pred, savepath=str(args.save / 'visualization' / (sample + '_voi.png')), res=50 / 1000)

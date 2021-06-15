@@ -140,8 +140,8 @@ if __name__ == '__main__':
 
         # Thickness analysis
         # Create array of correct size
-        #th_map = _local_thickness(pred, mode=args.mode, spacing_mm=args.resolution, stack_axis=1,
-        #                          thickness_max_mm=args.max_th)
+        th_map = _local_thickness(pred, mode=args.mode, spacing_mm=args.resolution, stack_axis=1,
+                                  thickness_max_mm=args.max_th)
 
         #th_map_input = _local_thickness(input, mode=args.mode, spacing_mm=args.resolution_input, stack_axis=1,
         #                                thickness_max_mm=args.max_th)

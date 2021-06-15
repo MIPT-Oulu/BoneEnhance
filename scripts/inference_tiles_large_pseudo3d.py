@@ -24,8 +24,8 @@ cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
 
 
-def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, ds=False):
-    #Save path
+def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
+    # Save path
     args.save_dir.mkdir(exist_ok=True)
     (args.save_dir / 'visualizations').mkdir(exist_ok=True)
     snapshot = args.snapshot.name
@@ -50,7 +50,6 @@ def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, d
 
     # List the models
     model_list = load_models(str(args.snapshot), config, n_gpus=args_experiment.gpus)
-
     model = InferenceModel(model_list).to(device)
     model.eval()
     print(f'Found {len(model_list)} models.')
@@ -68,7 +67,11 @@ def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, d
 
     # Main loop
     for idx, sample in enumerate(samples):
-        print(f'==> Processing sample {idx + 1} of {len(samples)}: {sample}')
+        # Remove file extensions
+        sample_stem = Path(sample).stem
+
+        # Print sample info
+        print(f'==> Processing sample {idx + 1} of {len(samples)}: {sample_stem}')
 
         # Load image stacks
         if sample.endswith('.h5'):
@@ -77,29 +80,35 @@ def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, d
         else:
             data_xy, files = load(str(args.dataset_root / sample), rgb=False, axis=(1, 2, 0))
 
+        # Downscale input image
         if ds:
             factor = (data_xy.shape[0] // mag, data_xy.shape[1] // mag, data_xy.shape[2] // mag)
             data_xy = resize(data_xy, factor, order=0, anti_aliasing=True, preserve_range=True)
 
+        # Channel dimension
         if len(data_xy.shape) != 4:
             data_xy = np.expand_dims(data_xy, -1)
 
-
-        print_orthogonal(data_xy[:, :, :, 0], invert=True, res=res, title='Input', cbar=True,
-                         savepath=str(args.save_dir / 'visualizations' / (sample[:-3] + f'_{snapshot}_input.png')), scale_factor=100)
+        # Visualize input stack
+        print_orthogonal(data_xy[:, :, :, 0], invert=True, res=args.res, title='Input', cbar=True,
+                         savepath=str(args.save_dir / 'visualizations' / (sample_stem + f'_{snapshot}_input.png')), scale_factor=100)
 
         # Calculate mean and std from the sample
         if args.calculate_mean_std:
             mean = torch.Tensor([np.mean(data_xy) / 255])
             std = torch.Tensor([np.std(data_xy) / 255])
 
-        data_xz = np.transpose(data_xy, (0, 2, 1, 3))  # X-Z-Y-Ch
-        data_yz = np.transpose(data_xy, (1, 2, 0, 3))  # Y-Z-X-Ch
+        # Copy the stack into other orthogonal planes
+        if args.avg_planes:
+            data_xz = np.transpose(data_xy, (0, 2, 1, 3))  # X-Z-Y-Ch
+            data_yz = np.transpose(data_xy, (1, 2, 0, 3))  # Y-Z-X-Ch
 
         # In case of MRI, make the resolution isotropic
-        #data_xy = zoom(data_xy, zoom=(1, 1, 4/res, 1))
-        #print_orthogonal(data_xy[:, :, :, 0], invert=True, res=res, title='Input (interpolated)', cbar=True,
-        #                 savepath=str(args.visualizations / (sample[:-3] + f'_{snapshot}_input_scaled.png')), scale_factor=100)
+        if args.mri:
+            anisotropy_factor = 4 / args.res
+            data_xy = zoom(data_xy, zoom=(1, 1, anisotropy_factor, 1))
+            print_orthogonal(data_xy[:, :, :, 0], invert=True, res=args.res, title='Input (interpolated)', cbar=True,
+                             savepath=str(args.visualizations / (sample_stem + f'_{snapshot}_input_scaled.png')), scale_factor=100)
 
         # Interpolate 3rd dimension
         x, y, z, ch = data_xy.shape
@@ -151,14 +160,15 @@ def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, d
         out_xy = (out_xy * 255).astype('uint8')
 
         # Save predicted full mask
-        save(str(args.save_dir / sample), sample, out_xy, dtype=args.dtype)
+        save(str(args.save_dir / sample_stem), sample_stem, out_xy, dtype=args.dtype)
         if render:
             render_volume(data_yz[:, :, :, 0] * out_xy,
-                          savepath=str(args.save_dir / 'visualizations' / (sample + '_render' + args.dtype)),
+                          savepath=str(args.save_dir / 'visualizations' / (sample_stem + '_render' + args.dtype)),
                           white=True, use_outline=False)
 
-        print_orthogonal(out_xy, invert=True, res=res / 4, title='Output', cbar=True,
-                         savepath=str(args.save_dir / 'visualizations' / (sample[:-3] + f'_{snapshot}_prediction.png')),
+        # Visualize output
+        print_orthogonal(out_xy, invert=True, res=args.res / 4, title='Output', cbar=True,
+                         savepath=str(args.save_dir / 'visualizations' / (sample_stem + f'_{snapshot}_prediction.png')),
                          scale_factor=100)
 
     dur = time() - start
@@ -168,18 +178,19 @@ def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, d
 if __name__ == "__main__":
     start = time()
 
-    snap = 'dios-erc-gpu_2020_10_12_09_40_33_perceptualnet_newsplit'
-    #snap = 'dios-erc-gpu_2020_10_19_14_09_24_3D_perceptualnet'
-    #snap = 'dios-erc-gpu_2020_09_30_14_14_42_perceptualnet_noscaling_3x3_cm_curated_trainloss'
+    # Single snapshot
     snap = '2020_12_15_10_28_57_2D_perceptualnet_ds_16'  # Latest 2D model with fixes, only 1 fold
     snap = '2021_01_08_09_49_45_2D_perceptualnet_ds_16'  # 2D model, 3 working folds
 
-    snap_path = '../../Workdir/wacv_experiments'
+    # List all snapshots from a path
+    snap_path = '../../Workdir/wacv_experiments_new_2D'
     #snap_path = '../../Workdir/snapshots'
     snaps = os.listdir(snap_path)
     snaps.sort()
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(snap_path, snap))]
-    #snaps = snaps[2:]
+    # Skip snapshots
+    #snaps = snaps[5:]
+    # List of specific snapshots
     #snaps = ['2021_05_27_08_56_20_2D_perceptual_tv_IVD_4x_pretrained_seed42']
 
     for snap_id in range(len(snaps)):
@@ -193,7 +204,7 @@ if __name__ == "__main__":
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Patient_0006/')
         #parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/wacv_experiments/{snap}')
         parser.add_argument('--save_dir', type=Path,
-                            default=f'../../Data/Test set (full)/predictions_wacv/{snap}')
+                            default=f'../../Data/Test set (full)/predictions_wacv_new/{snap}')
         #parser.add_argument('--visualizations', type=Path,
         #                    default=f'../../Data/predictions_3D_clinical/wacv_experiments/visualization')
         parser.add_argument('--visualizations', type=Path,
@@ -205,13 +216,14 @@ if __name__ == "__main__":
         parser.add_argument('--scale', type=bool, default=False)
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
         parser.add_argument('--completed', type=int, default=0)
+        parser.add_argument('--res', type=float, default=0.2, help='Input image pixel size')
         parser.add_argument('--sample_id', type=list, default=None, help='Process specific samples unless None.')
         parser.add_argument('--avg_planes', type=bool, default=True)
+        parser.add_argument('--mri', type=bool, default=False, help='Is anisotropic MRI data used?')
         parser.add_argument('--snapshot', type=Path,
                             default=os.path.join(snap_path, snap))
         parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
         args = parser.parse_args()
-        #subdir = 'NN_prediction'  # 'NN_prediction'
 
         # Load snapshot configuration
         with open(args.snapshot / 'config.yml', 'r') as f:
@@ -225,4 +237,4 @@ if __name__ == "__main__":
         args.save_dir.mkdir(exist_ok=True)
         args.visualizations.mkdir(exist_ok=True)
 
-        main(args, config, args_experiment, sample_id=None, res=0.2)
+        main(args, config, args_experiment, sample_id=None)

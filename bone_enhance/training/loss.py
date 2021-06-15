@@ -63,6 +63,11 @@ class PerceptualLoss(nn.Module):
                 logits = logits.repeat(1, 3, 1, 1,)
                 targets = targets.repeat(1, 3, 1, 1)
 
+        # Convert to 0-1 range
+        if logits.max() > 1 or logits.min() < 0:
+            logits = (logits + 1) / 2
+            targets = (targets + 1) / 2
+
         # Use 2D loss for 3D data
         if not self.vol and logits.dim() == 5:
             logits, targets = convert_3d_tensor_to_random_2d([logits, targets], mag=1)
@@ -104,7 +109,6 @@ class PerceptualLoss(nn.Module):
                         target_feature[key] = self.gram(target_feature[key])
 
             # Calculate loss layer by layer
-            layer = self.compare_layer
             loss = 0
             for key in pred_feature:
                 loss += self.p_criterion(pred_feature[key], target_feature[key])
