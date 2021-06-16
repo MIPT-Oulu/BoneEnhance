@@ -103,7 +103,7 @@ def _local_thick_3d(mask, med_axis, distance, search_extent, sampling):
 def _local_thickness(mask, *, mode='med2d_dist3d_lth3d',
                      spacing_mm=None, stack_axis=None,
                      thickness_max_mm=None,
-                     return_med_axis=False, return_distance=False):
+                     return_med_axis=False, return_distance=False, verbose=False):
     """
     Inspired by https://imagej.net/Local_Thickness .
     Args:
@@ -171,7 +171,7 @@ def _local_thickness(mask, *, mode='med2d_dist3d_lth3d',
             acc_dist = []
             acc_out = []
 
-            for idx_slice in tqdm(range(mask.shape[stack_axis]), desc='Calculating thickness'):
+            for idx_slice in tqdm(range(mask.shape[stack_axis]), desc='Calculating thickness', disable=not verbose):
                 sel_idcs = [slice(None), ] * mask.ndim
                 sel_idcs[stack_axis] = idx_slice
                 sel_idcs = tuple(sel_idcs)
@@ -201,7 +201,8 @@ def _local_thickness(mask, *, mode='med2d_dist3d_lth3d',
             acc_dist = []
 
             # Slice-by-slice implementation for medial axis and distance transform
-            for idx_slice in tqdm(range(mask.shape[stack_axis]), desc='Calculating medial axis and distance transform'):
+            for idx_slice in tqdm(range(mask.shape[stack_axis]), desc='Calculating medial axis and distance transform',
+                                  disable=not verbose):
                 sel_idcs = [slice(None), ] * mask.ndim
                 sel_idcs[stack_axis] = idx_slice
                 sel_idcs = tuple(sel_idcs)
@@ -220,7 +221,7 @@ def _local_thickness(mask, *, mode='med2d_dist3d_lth3d',
             acc_med = []
 
             # Slice-by-slice implementation for medial axis
-            for idx_slice in tqdm(range(mask.shape[stack_axis]), desc='Calculating medial axis'):
+            for idx_slice in tqdm(range(mask.shape[stack_axis]), desc='Calculating medial axis', disable=not verbose):
                 sel_idcs = [slice(None), ] * mask.ndim
                 sel_idcs[stack_axis] = idx_slice
                 sel_idcs = tuple(sel_idcs)
@@ -264,7 +265,7 @@ def _local_thickness(mask, *, mode='med2d_dist3d_lth3d',
 
 
 def local_thickness(input_, num_classes, stack_axis, spacing_mm=(1, 1, 1),
-                    skip_classes=None, mode='med2d_dist3d_lth3d', thickness_max_mm=None):
+                    skip_classes=None, mode='med2d_dist3d_lth3d', thickness_max_mm=None, verbose=False):
     """
     Args:
         input_: (b, d0, ..., dn) ndarray or tensor
@@ -303,7 +304,7 @@ def local_thickness(input_, num_classes, stack_axis, spacing_mm=(1, 1, 1),
             th_map_class = _local_thickness(
                 sel_input_, mode=mode,
                 spacing_mm=spacing_mm, stack_axis=stack_axis,
-                return_med_axis=False, return_distance=False, thickness_max_mm=thickness_max_mm)
+                return_med_axis=False, return_distance=False, thickness_max_mm=thickness_max_mm, verbose=verbose)
 
             th_map[sel_input_] = th_map_class[sel_input_]
         th_maps[sample_idx, :] = th_map
