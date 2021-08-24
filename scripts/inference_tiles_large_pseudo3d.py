@@ -16,7 +16,7 @@ from scipy.ndimage import zoom
 from skimage.transform import resize
 from omegaconf import OmegaConf
 
-from bone_enhance.utilities import load, save, print_orthogonal, render_volume
+from bone_enhance.utilities import load, save, print_orthogonal, render_volume, calculate_mean_std
 from bone_enhance.inference import InferenceModel, inference, largest_object, load_models
 from bone_enhance.models import ConvNet, EnhanceNet
 
@@ -50,7 +50,7 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
 
     # List the models
     model_list = load_models(str(args.snapshot), config, n_gpus=args_experiment.gpus)
-    model = InferenceModel(model_list).to(device)
+    model = InferenceModel(model_list, sigmoid=config.training.segmentation).to(device)
     model.eval()
     print(f'Found {len(model_list)} models.')
 
@@ -78,7 +78,7 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
             with h5py.File(str(args.dataset_root / sample), 'r') as f:
                 data_xy = f['data'][:]
         else:
-            data_xy, files = load(str(args.dataset_root / sample), rgb=False, axis=(1, 2, 0))
+            data_xy, files = load(str(args.dataset_root / sample), rgb=False, axis=(1, 2, 0), dicom=args.dicom)
 
         # Downscale input image
         if ds:
@@ -88,6 +88,8 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
         # Channel dimension
         if len(data_xy.shape) != 4:
             data_xy = np.expand_dims(data_xy, -1)
+        if config.training.rgb:
+            data_xy = np.repeat(data_xy, 3, axis=-1)
 
         # Visualize input stack
         print_orthogonal(data_xy[:, :, :, 0], invert=True, res=args.res, title='Input', cbar=True,
@@ -95,20 +97,21 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
 
         # Calculate mean and std from the sample
         if args.calculate_mean_std:
-            mean = torch.Tensor([np.mean(data_xy) / 255])
-            std = torch.Tensor([np.std(data_xy) / 255])
+            mean, std = calculate_mean_std(data_xy, config.training.rgb)
+
+
+        # In case of MRI, make the resolution isotropic
+        if args.mri:
+            slice_thickness = 1.0
+            anisotropy_factor = slice_thickness / args.res
+            data_xy = zoom(data_xy, zoom=(1, 1, anisotropy_factor, 1))
+            print_orthogonal(data_xy[:, :, :, 0], invert=True, res=args.res, title='Input (interpolated)', cbar=True,
+                             savepath=str(args.save_dir / 'visualizations' / (sample_stem + f'_{snapshot}_input_scaled.png')), scale_factor=100)
 
         # Copy the stack into other orthogonal planes
         if args.avg_planes:
             data_xz = np.transpose(data_xy, (0, 2, 1, 3))  # X-Z-Y-Ch
             data_yz = np.transpose(data_xy, (1, 2, 0, 3))  # Y-Z-X-Ch
-
-        # In case of MRI, make the resolution isotropic
-        if args.mri:
-            anisotropy_factor = 4 / args.res
-            data_xy = zoom(data_xy, zoom=(1, 1, anisotropy_factor, 1))
-            print_orthogonal(data_xy[:, :, :, 0], invert=True, res=args.res, title='Input (interpolated)', cbar=True,
-                             savepath=str(args.visualizations / (sample_stem + f'_{snapshot}_input_scaled.png')), scale_factor=100)
 
         # Interpolate 3rd dimension
         x, y, z, ch = data_xy.shape
@@ -143,10 +146,15 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
 
         # Average probability maps
         if args.avg_planes:
-            out_xy = ((out_xy + np.transpose(out_xz, (0, 2, 1)) + np.transpose(out_yz, (2, 0, 1))) / 3)
+            #out_xy = ((out_xy + np.transpose(out_xz, (0, 2, 1)) + np.transpose(out_yz, (2, 0, 1))) / 3).astype('float32')
+            out_xy += np.transpose(out_xz, (0, 2, 1))
+            del out_xz
+            out_xy += np.transpose(out_yz, (2, 0, 1))
+            del out_yz
+            out_xy = (out_xy / 3).astype('float32')
 
             # Free memory
-            del out_xz, out_yz
+            #del out_xz, out_yz
 
         # Scale the dynamic range
         pred_max = np.max(out_xy)
@@ -183,15 +191,17 @@ if __name__ == "__main__":
     snap = '2021_01_08_09_49_45_2D_perceptualnet_ds_16'  # 2D model, 3 working folds
 
     # List all snapshots from a path
-    snap_path = '../../Workdir/wacv_experiments_new_2D'
+    #snap_path = '../../Workdir/wacv_experiments_new_2D'
+    snap_path = '../../Workdir/IVD_experiments_2D'
     #snap_path = '../../Workdir/snapshots'
     snaps = os.listdir(snap_path)
     snaps.sort()
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(snap_path, snap))]
     # Skip snapshots
-    #snaps = snaps[5:]
+    #snaps = [snaps[-1]]
     # List of specific snapshots
     #snaps = ['2021_05_27_08_56_20_2D_perceptual_tv_IVD_4x_pretrained_seed42']
+    #snaps = ['2021_08_04_15_34_33_2D_perceptual_tv_IVD_4x_pretrained_isotropic_seed42']
 
     for snap_id in range(len(snaps)):
 
@@ -200,26 +210,23 @@ if __name__ == "__main__":
 
         parser = argparse.ArgumentParser()
         #parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
-        parser.add_argument('--dataset_root', type=Path, default='../../Data/Test set (full)/input_3d')
-        #parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Patient_0006/')
-        #parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/wacv_experiments/{snap}')
-        parser.add_argument('--save_dir', type=Path,
-                            default=f'../../Data/Test set (full)/predictions_wacv_new/{snap}')
-        #parser.add_argument('--visualizations', type=Path,
-        #                    default=f'../../Data/predictions_3D_clinical/wacv_experiments/visualization')
-        parser.add_argument('--visualizations', type=Path,
-                            default=f'../../Data/Test set (full)/predictions_wacv/visualization')
+        #parser.add_argument('--dataset_root', type=Path, default='../../Data/Test_set_(full)/input_3d')
+        parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Repeatability/')
+        parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}_avg')
+        #parser.add_argument('--save_dir', type=Path,
+        #                    default=f'../../Data/Test_set_(full)/predictions_wacv_new/{snap}_single')
         parser.add_argument('--bs', type=int, default=64)
-        parser.add_argument('--step', type=int, default=3)
+        parser.add_argument('--step', type=int, default=2)
         parser.add_argument('--plot', type=bool, default=False)
         parser.add_argument('--calculate_mean_std', type=bool, default=True)
         parser.add_argument('--scale', type=bool, default=False)
+        parser.add_argument('--dicom', type=bool, default=True, help='Is DICOM format used for loading?')
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
         parser.add_argument('--completed', type=int, default=0)
-        parser.add_argument('--res', type=float, default=0.2, help='Input image pixel size')
+        parser.add_argument('--res', type=float, default=0.531, help='Input image pixel size')
         parser.add_argument('--sample_id', type=list, default=None, help='Process specific samples unless None.')
         parser.add_argument('--avg_planes', type=bool, default=True)
-        parser.add_argument('--mri', type=bool, default=False, help='Is anisotropic MRI data used?')
+        parser.add_argument('--mri', type=bool, default=True, help='Is anisotropic MRI data used?')
         parser.add_argument('--snapshot', type=Path,
                             default=os.path.join(snap_path, snap))
         parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
@@ -235,6 +242,5 @@ if __name__ == "__main__":
 
         args.save_dir.parent.mkdir(exist_ok=True)
         args.save_dir.mkdir(exist_ok=True)
-        args.visualizations.mkdir(exist_ok=True)
 
         main(args, config, args_experiment, sample_id=None)

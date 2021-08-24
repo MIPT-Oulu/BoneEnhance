@@ -4,12 +4,12 @@
 #SBATCH --account=project_2002147
 #SBATCH --mail-type=END #Send email when job is finished
 #SBATCH --partition=gpu
-#SBATCH --time=24:00:00
+#SBATCH --time=36:00:00
 #SBATCH --ntasks=1
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=36
 #SBATCH --gres=gpu:v100:1
-#SBATCH --array=1-6
+#SBATCH --array=1-8
 
 # Set up environment
 export SCRATCH=/scratch/project_2002147/rytkysan

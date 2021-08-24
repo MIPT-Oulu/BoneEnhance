@@ -12,9 +12,9 @@ strategy:
 training:
   # General
   calc_meanstd: True
-  suffix: '_IVD_isotropic'  # Options: _curated _reduced
+  suffix: '_IVD_3D_isotropic_HR'  # Options: _curated _reduced
   parse_color: False
-  crop_small: [16, 16]
+  crop_small: [16, 16, 16]
   crossmodality: False
   rgb: False
   antialiasing: 9
@@ -27,18 +27,18 @@ training:
   normalization: in
   autoencoder_pretrained: 2021_02_28_10_03_55_3D_deep_autoencoder_ds_1176
   autoencoder_layers: False
-  pretrain: True
-  existing_model: 2021_06_10_12_34_40_2D_perceptual_tv_1176_seed30
+  pretrain: False
+  existing_model: 2021_06_11_21_42_17_3D_perceptual_tv_1176_seed20
   magnification: 4 
   n_blocks: 15
   # Training
   wd: 0.0001
   lr: 0.0001
   n_folds: 4
-  epochs: 50
-  bs: 64
+  epochs: 100
+  bs: 16
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: combined_tv
+  loss: mse_tv
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False

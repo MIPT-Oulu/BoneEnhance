@@ -17,23 +17,30 @@ if __name__ == '__main__':
     start = time()
 
     # Prediction path
-    path = Path('../../Data/Test set (full)/predictions_wacv_new')
+    path = Path('../../Data/Test set (full)/input_interpolated')
     t = strftime(f'%Y_%m_%d_%H_%M')
-    savepath = f'../../Data/Test set (full)/masks_wacv_new/Results_{t}.xlsx'
+    savepath = f'../../Data/Test set (full)/masks_wacv_new/Results_conventional{t}.xlsx'
     snaps = os.listdir(path)
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(path, snap))]
 
     correlations = {'Snapshot': [], 'BVTV': [], 'Tb.Th': [], 'Tb.Sp': [], 'Tb.N': [],
                     'BVTV (p)': [], 'Tb.Th (p)': [], 'Tb.Sp (p)': [], 'Tb.N (p)': []}
     for snap in snaps:
+        # Remove timestamp from snapshot
+        if snap[:2] == '2D' or snap[:2] == '3D':
+            snap_short = snap
+        else:
+            snap_short = snap.split('_', 6)[-1]
+
+        # Arguments
         parser = argparse.ArgumentParser()
         parser.add_argument('--masks', type=Path, default=path.parent / 'trabecular_VOI')
-        parser.add_argument('--save', type=Path, default=path.parent / 'masks_wacv_new' / snap)
+        parser.add_argument('--save', type=Path, default=path.parent / 'masks_wacv_new' / snap_short)
         parser.add_argument('--preds', type=Path, default=path / snap)
         parser.add_argument('--ground_truth', type=Path, default='../../Data/uCT_parameters.csv')
         parser.add_argument('--final_results', type=Path, default='../../Data/final_results.csv')
         parser.add_argument('--plot', type=bool, default=False)
-        parser.add_argument('--save_masks', type=bool, default=False)
+        parser.add_argument('--save_masks', type=bool, default=True)
         parser.add_argument('--batch_id', type=int, default=None)
         parser.add_argument('--resolution', type=tuple, default=(50, 50, 50))  # in µm
         parser.add_argument('--mode', type=str, choices=['med2d_dist3d_lth3d', 'stacked_2d', 'med2d_dist2d_lth3d'],
@@ -70,13 +77,13 @@ if __name__ == '__main__':
         target = pd.read_csv(args.ground_truth)
 
         # Loop for samples
-        for idx in tqdm(range(len(samples)), desc=f'Processing snapshot {snap}'):
+        for idx in tqdm(range(len(samples)), desc=f'Processing snapshot {snap_short}'):
             time_sample = time()
             sample = samples[idx]
             sample_pred = samples_pred[idx]
 
             # Load prediction and volume-of-interest
-            pred, _ = load(str(args.preds / sample_pred), axis=(1, 2, 0,))
+            pred, _ = load(str(args.preds / sample_pred / 'conventional_segmentation_gray'), axis=(1, 2, 0,))
             voi, files = load(str(args.masks / sample), axis=(1, 2, 0,))
 
             if len(np.unique(pred)) != 2:
@@ -138,8 +145,14 @@ if __name__ == '__main__':
         #               #
 
         # Pearson correlation
+
+        # Remove NaNs
         results['Trabecular separation'] = list(np.nan_to_num(results['Trabecular separation']))
-        correlations['Snapshot'].append(snap)
+        results['Trabecular thickness'] = list(np.nan_to_num(results['Trabecular thickness']))
+        results['Trabecular number'] = list(np.nan_to_num(results['Trabecular number']))
+
+        # Calculate correlations
+        correlations['Snapshot'].append(snap_short)
         correlations['BVTV'].append(pearsonr(results['BVTV'], target['BVTV'].values)[0])
         correlations['BVTV (p)'].append(pearsonr(results['BVTV'], target['BVTV'].values)[1])
         correlations['Tb.Th'].append(pearsonr(results['Trabecular thickness'], target['Tb.Th'].values)[0])
@@ -149,7 +162,7 @@ if __name__ == '__main__':
         correlations['Tb.N'].append(pearsonr(results['Trabecular number'], target['Tb.N'].values)[0])
         correlations['Tb.N (p)'].append(pearsonr(results['Trabecular number'], target['Tb.N'].values)[1])
 
-        # Save results to excel
+        # Save morphometric results to excel
         # Load existing file
         if os.path.isfile(savepath):
             book = load_workbook(savepath)
@@ -159,10 +172,10 @@ if __name__ == '__main__':
             writer = pd.ExcelWriter(savepath, engine='openpyxl')
         # Append new results
         df1 = pd.DataFrame(results)
-        df1.to_excel(writer, sheet_name=snap)
+        df1.to_excel(writer, sheet_name=snap_short)
         writer.save()
 
-    # Save results to excel
+    # Save correlation results to excel
     # Load existing file
     book = load_workbook(savepath)
     writer = pd.ExcelWriter(savepath, engine='openpyxl', mode='a')

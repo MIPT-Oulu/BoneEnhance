@@ -22,6 +22,7 @@ from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
 
 from .tiler3d import Tiler3D, TileMerger3D, ImageSlicer
 from .model_components import InferenceModel, load_models
+from .thickness_analysis import _local_thickness
 from ..utilities import load, save, print_orthogonal, print_images, threshold, calculate_bvtv
 from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculate_dice, \
     calculate_volumetric_similarity, calculate_confusion_matrix_from_arrays as calculate_conf
@@ -47,7 +48,7 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
         std /= 255.
 
     # Segmentation model does not upscale the image
-    if config.training.architecture == 'encoderdecoder':
+    if config.training.segmentation:
         mag = 1
         out = (x, y)
         tile[0] *= config.training.magnification
@@ -61,7 +62,7 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
         img_full = np.expand_dims(np.mean(img_full, axis=-1), axis=-1)
         ch = 1
     elif ch == 1 and config.training.rgb:
-        img_full = np.repeat(img_full, 2, axis=-1)
+        img_full = np.repeat(img_full, 3, axis=-1)
 
     # Cut large image into overlapping tiles
     tiler = Tiler3D(img_full.shape, tile=tile, out=out, step=step, mag=mag, weight=weight)
@@ -239,7 +240,8 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
     start_inf = time()
 
     # Inference arguments
-    args.save_dir = args.data_location / 'predictions_oof'
+    if args.save_dir is None:
+        args.save_dir = args.data_location / 'predictions_oof'
     args.save_dir.mkdir(exist_ok=True)
     sigma = 0.5  # Antialiasing filter for downscaling
 
@@ -289,6 +291,19 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
         model.eval()
 
         for sample in tqdm(validation_files, desc=f'Running inference for fold {fold}', disable=not verbose):
+
+            # Correct name for cluster experiments
+            if sample.parts[1] == 'run' and str(sample).endswith('.h5'):
+                # 3D -> Samples are in the same folder
+                sample = args.data_location / sample.parent.name / sample.name
+            elif sample.parts[1] == 'run':
+                # 2D -> Sample folder included
+                sample = args.data_location / sample.parent.parent.name / sample.parent.name / sample.name
+
+
+            ### Replace target with input ### # TODO
+            sample = Path(str(sample).replace('target', 'input'))
+            ds = False
 
             # Do not calculate inference for data copies
             if 'copy' in str(sample):
@@ -382,12 +397,12 @@ def evaluation_runner(args, config, save_dir, use_bvtv=True, suffix='_3d'):
     start_eval = time()
 
     # Evaluation arguments
-    args.image_path = args.data_location / 'input'
     args.target_path = args.data_location / f'target{suffix}'
-    args.masks = Path('/media/dios/kaappi/Sakke/Saskatoon/Verity/Registration')
-    args.pred_path = args.data_location / 'predictions_oof'
-    args.save_dir = args.data_location / 'evaluation_oof'
-    args.save_dir.mkdir(exist_ok=True)
+    if args.save_dir is None:
+        args.save_dir = args.data_location / 'predictions_oof'
+    if args.eval_dir is None:
+        args.eval_dir = args.data_location / 'evaluation_oof'
+    args.eval_dir.mkdir(exist_ok=True)
 
     # Snapshots to be evaluated
     if type(save_dir) != list:
@@ -397,7 +412,12 @@ def evaluation_runner(args, config, save_dir, use_bvtv=True, suffix='_3d'):
     for snap in save_dir:
 
         # Initialize results
-        results = {'Sample': [], 'MSE': [], 'PSNR': [], 'SSIM': [], 'BVTV': []}
+        if use_bvtv:
+            targets = {'Sample': [], 'Trabecular thickness': [], 'Trabecular separation': [], 'BVTV': [], 'Trabecular number': []}
+            results = {'Sample': [], 'MSE': [], 'PSNR': [], 'SSIM': [],
+                       'Trabecular thickness': [], 'Trabecular separation': [], 'BVTV': [], 'Trabecular number': []}
+        else:
+            results = {'Sample': [], 'MSE': [], 'PSNR': [], 'SSIM': []}
 
         # Sample list
         all_samples = os.listdir(snap)
@@ -411,13 +431,6 @@ def evaluation_runner(args, config, save_dir, use_bvtv=True, suffix='_3d'):
         # List the µCT target
         samples_target = os.listdir(args.target_path)
         samples_target.sort()
-        # List VOI
-        samples_voi = os.listdir(args.image_path)
-        samples_voi.sort()
-
-        # Do not calculate BV/TV if VOI is not defined for the dataset
-        if len(samples_voi) != len(samples_target):
-            use_bvtv = False
 
         # Loop for samples
         for idx, sample in enumerate(samples):
@@ -429,7 +442,7 @@ def evaluation_runner(args, config, save_dir, use_bvtv=True, suffix='_3d'):
                 else:
                     target, files = load(str(args.target_path / samples_target[idx]), rgb=False, axis=(1, 2, 0))
 
-                pred, files_pred = load(str(args.pred_path / snap.name / sample), axis=(1, 2, 0), rgb=False)
+                pred, files_pred = load(str(args.save_dir / snap.name / sample), axis=(1, 2, 0), rgb=False)
 
                 # Crop in case of inconsistency
                 crop = min(pred.shape, target.shape)
@@ -441,52 +454,44 @@ def evaluation_runner(args, config, save_dir, use_bvtv=True, suffix='_3d'):
                 psnr = peak_signal_noise_ratio(target / 255., pred / 255.)
                 ssim = structural_similarity(target / 255., pred / 255.)
 
-                # Binarize and calculate BVTV
+                print(f'Sample {sample}: MSE = {mse}, PSNR = {psnr}, SSIM = {ssim}')
+
+                # Morphometric analysis
                 if use_bvtv:
-
-                    # Otsu thresholding
-                    if len(np.unique(pred)) != 2:
-                        pred, _ = threshold(pred, method='otsu')
-
-                    # Apply VOI
-                    voi, _ = load(str(args.masks / samples_voi[idx] / 'ROI'), axis=(1, 2, 0))
-                    voi = zoom(voi.squeeze(), (4, 4, 4), order=0)
-                    # Fix size mismatch
-                    size = np.min((voi.shape, pred.shape), axis=0)
-                    pred = np.logical_and(pred[:size[0], :size[1], :size[2]],
-                                          voi[:size[0], :size[1], :size[2]])
-
-                    # Calculate BVTV
-                    bvtv = calculate_bvtv(pred, voi)
-                else:
-                    # Cannot calculate bvtv without reference VOI
-                    bvtv = 0
-
-                print(f'Sample {sample}: MSE = {mse}, PSNR = {psnr}, SSIM = {ssim}, BVTV: {bvtv}')
+                    results = morphometric_analysis(pred, results)
+                    targets = morphometric_analysis(targets, targets)
 
                 # Update results
                 results['Sample'].append(sample)
                 results['MSE'].append(mse)
                 results['PSNR'].append(psnr)
                 results['SSIM'].append(ssim)
-                results['BVTV'].append(bvtv)
 
             except (AttributeError, ValueError):
                 print(f'Sample {sample} failing. Skipping to next one.')
                 continue
 
-        # Add average value to
+        # Add average value
         results['Sample'].append('Average values')
         results['MSE'].append(np.average(results['MSE']))
         results['PSNR'].append(np.average(results['PSNR']))
         results['SSIM'].append(np.average(results['SSIM']))
-        results['BVTV'].append(np.average(results['BVTV']))
+
+        if use_bvtv:
+            results['Trabecular thickness'].append(np.average(results['Trabecular thickness']))
+            results['BVTV'].append(np.average(results['BVTV']))
+            results['Trabecular separation'].append(np.average(results['Trabecular separation']))
+            results['Trabecular number'].append(np.average(results['Trabecular number']))
 
         # Write to excel
         metric_value = str(round(results['SSIM'][-1], 3)).replace('.', '-')
-        writer = pd.ExcelWriter(str(args.save_dir / ('metrics_SSIM_' + metric_value + '_' + str(snap.name))) + '.xlsx')
+        writer = pd.ExcelWriter(str(args.eval_dir / ('metrics_SSIM_' + metric_value + '_' + str(snap.name))) + '.xlsx')
         df1 = pd.DataFrame(results)
         df1.to_excel(writer, sheet_name='Metrics')
+
+        if use_bvtv:
+            df2 = pd.DataFrame(targets)
+            df2.to_excel(writer, sheet_name='Targets')
         writer.save()
 
         print(f'Metrics evaluated in {(time() - start_eval) // 60} minutes, {(time() - start_eval) % 60} seconds.')
@@ -528,3 +533,43 @@ def largest_object(input_mask, area_limit=None):
         output_mask[blobs == largest_blob_label] = 255
 
     return output_mask
+
+
+def morphometric_analysis(pred, results, mode='med2d_dist3d_lth3d', resolution=(50, 50, 50), max_th=None, tb_n='rod'):
+    #                       #
+    # Morphometric analysis #
+    #                       #
+
+    voi = np.ones(pred.shape)
+
+    # Thickness map
+    th_map = _local_thickness(pred, mode=mode, spacing_mm=resolution, stack_axis=1,
+                              thickness_max_mm=max_th, verbose=False)
+    # Bone volume fraction
+    bvtv = calculate_bvtv(pred, voi)
+
+    # Update results
+    th_map = th_map[np.nonzero(th_map)].flatten()
+    tb_th = np.mean(th_map)
+    results['Trabecular thickness'].append(tb_th)
+    results['BVTV'].append(bvtv)
+
+    # Separation map
+    pred = np.logical_and(np.invert(pred), voi).astype(np.uint8) * 255
+    th_map = _local_thickness(pred, mode=mode, spacing_mm=resolution, stack_axis=1,
+                              thickness_max_mm=max_th, verbose=False)
+    th_map = th_map[np.nonzero(th_map)].flatten()
+    tb_sep = np.mean(th_map)
+    results['Trabecular separation'].append(tb_sep)
+
+    # Trabecular number
+    if tb_n == '3d':  # 3D model
+        results['Trabecular number'].append(1 / (tb_sep + tb_th))
+    elif tb_n == 'plate':  # 2D plate model
+        results['Trabecular number'].append(bvtv / tb_th)
+    elif tb_n == 'rod':  # 2D cylinder rod model
+        results['Trabecular number'].append(np.sqrt((4 / np.pi) * bvtv) / tb_th)
+    else:  # Append 0 for compatibility
+        results['Trabecular number'].append(0)
+
+    return results

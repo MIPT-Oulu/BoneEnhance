@@ -11,12 +11,12 @@ from skimage.transform import resize
 if __name__ == "__main__":
     # Initialize experiment
     parser = argparse.ArgumentParser()
-    parser.add_argument('--images_loc', type=Path, default='/media/santeri/data/BoneEnhance/Data/target_IVD_isotropic_FR')
+    parser.add_argument('--images_loc', type=Path, default='/media/santeri/data/BoneEnhance/Data/target_IVD_isotropic_2D_HR')
     #'/media/santeri/Transcend/1176 Reconstructions')
-    parser.add_argument('--images_save', type=Path, default='/media/santeri/data/BoneEnhance/Data/target_IVD_isotropic_3D')
-    parser.add_argument('--res_out', type=int, default=171.875, help='Target resolution for training data (in µm)')
+    parser.add_argument('--images_save', type=Path, default='/media/santeri/data/BoneEnhance/Data/target_IVD_isotropic_3D_HR')
+    parser.add_argument('--res_out', type=int, default=132.75, help='Target resolution for training data (in µm)')
     parser.add_argument('--completed', type=int, default=0, help='Samples already processed and skipped.')
-    parser.add_argument('--crop_size', type=list, default=[64, 64, 64], help='Size of one training patch')
+    parser.add_argument('--crop_size', type=list, default=[100, 100, 100], help='Size of one training patch')
     parser.add_argument('--sigma', type=float, default=0.5, help='Standard deviation of gaussian blur (antialiasing).')
     parser.add_argument('--hdf5', type=bool, default=True, help='Save as 3D data (True) or a stack of 2D images.')
 
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         im_path = args.images_loc / sample
         #log = load_logfile(str(im_path))
         #res = float(log['Image Pixel Size (um)'])
-        res = 90
+        res = 132.75
 
         # Scale factors and scaled crops
         factor = args.res_out / res
@@ -71,8 +71,8 @@ if __name__ == "__main__":
                                ]
 
                     # Crop is now in resolution "res_out"
-                    data_out = resize(data_out, args.crop_size, order=0, anti_aliasing=True, preserve_range=True,
-                                      anti_aliasing_sigma=args.sigma).astype('uint8')
+                    #data_out = resize(data_out, args.crop_size, order=0, anti_aliasing=True, preserve_range=True,
+                    #                  anti_aliasing_sigma=args.sigma).astype('uint8')
 
                     # Save the cropped volume to hdf5
                     if args.hdf5:

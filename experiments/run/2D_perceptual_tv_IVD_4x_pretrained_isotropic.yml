@@ -12,7 +12,7 @@ strategy:
 training:
   # General
   calc_meanstd: True
-  suffix: '_IVD_isotropic'  # Options: _curated _reduced
+  suffix: '_IVD_isotropic_2D_HR'  # Options: _curated _reduced
   parse_color: False
   crop_small: [16, 16]
   crossmodality: False

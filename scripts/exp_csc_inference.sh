@@ -2,7 +2,7 @@
 
 # Input variables
 DATA_DIR=/scratch/project_2002147/rytkysan/BoneEnhance/Data
-SNAP=../../Workdir/snapshots/2021_03_03_11_52_07_1_3D_mse_tv_1176_HR
+SNAP=../../Workdir/snapshots/2021_05_05_10_55_23_2D_perceptual_tv_1176_seed10
 #SNAP=../../Workdir/snapshots/2021_03_04_10_11_34_1_3D_mse_tv_1176
 declare -i BS=64
 declare -i SAMPLE_ID=1

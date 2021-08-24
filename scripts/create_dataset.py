@@ -11,27 +11,35 @@ from skimage.transform import resize
 if __name__ == "__main__":
     # Initialize experiment
     args, config, _, device = init_experiment()
-    images_loc = Path('/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
+    snap = '2021_08_04_09_10_16_2D_ssim_IVD_4x_seed42'
+    #images_loc = Path('/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
+    images_loc = Path('/media/santeri/data/BoneEnhance/Data/target_1176_HR_2D')
     images_loc = Path('/media/santeri/data/BoneEnhance/Data/MRI_IVD/9.4T MRI Scans')
+    images_loc = Path(f'../../Data/predictions_3D_clinical/IVD_experiments/Repeatability/{snap}')
+    #images_loc = Path('/media/santeri/data/BoneEnhance/Data/MRI_IVD/3T scans dicom')
 
-    images_save = Path('/media/santeri/data/BoneEnhance/Data/target_IVD_isotropic_3D')
+    images_save = Path('/media/santeri/data/BoneEnhance/Data/target_IVD_2D_HR')
+    images_save = Path(f'../../Data/predictions_3D_clinical/IVD_experiments/Repeatability_dcm/{snap}')
 
     images_save.mkdir(exist_ok=True)
 
     #subdir = 'trabecular_data/Binned4x/bonemask'
-    resample = True
-    normalize = True
-    factor = 171.875/90
-    factor_slice = 1000/90
-    sigma = 0.5
-    dtype = '.png'
+    resample = False
+    normalize = False
+    factor = 90/132.75
+    #factor = 4
+    factor_slice = 1361.4/90
+    sigma = 1
+    dtype = '.dcm'
     k = 3
-    hdf5 = True
+    hdf5 = False
 
     # Resample large number of slices
     samples = os.listdir(images_loc)
     #samples = [name for name in samples if os.path.isdir(os.path.join(images_loc, name))]
     samples.sort()
+    if 'visualizations' in samples:
+        samples.remove('visualizations')
     for sample in samples:
         print(f'Processing sample: {sample}')
         try:
@@ -45,13 +53,14 @@ if __name__ == "__main__":
 
                 # Upscale
                 # Make MRI data "isotropic"
-                new_size = (data.shape[0], data.shape[1], data.shape[2] * factor_slice)
+                #new_size = (data.shape[0], data.shape[1], int(data.shape[2] * factor_slice))
+                #data = resize(data, new_size, order=3, preserve_range=True)
+                new_size = (int(data.shape[0] * factor), int(data.shape[1] * factor), int(data.shape[2]))
                 data = resize(data, new_size, order=3, preserve_range=True)
-                #new_size = (data.shape[0] * factor, data.shape[1] * factor, data.shape[2] * factor)
-                #data = resize(data, new_size, order=3, preserve_range=True).astype('uint8')
+                #data = (data / 2 ** 8).astype('uint8')
                 # Downscale
-                new_size = (data.shape[0] // factor, data.shape[1] // factor, data.shape[2] // factor)
-                data = resize(data, new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=sigma)
+                #new_size = (data.shape[0] // factor, data.shape[1] // factor, data.shape[2])
+                #data = resize(data, new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=sigma)
                 #data = median_filter(data, size=5)
                 if normalize:
                     min_data = np.min(data)
@@ -87,8 +96,7 @@ if __name__ == "__main__":
                         data = f['data'][:]
                     sample = sample[:-3]
                 else:
-                    data, files = load(str(images_loc / sample), rgb=False, axis=(1, 2, 0))
-
+                    data, files = load(str(images_loc / sample), rgb=False, axis=(1, 2, 0))#, dicom=True)
 
                 save(str(images_save / sample), sample, data, dtype=dtype)
 

@@ -106,7 +106,6 @@ def train_test_transforms(conf, args, mean=None, std=None):
     trf = conf.transforms
     training = conf.training
     crop_small = tuple(training.crop_small)
-    crop_large = tuple([crop * training.magnification for crop in crop_small])
     prob = trf.probability
     vol = len(crop_small) == 3
 

@@ -16,7 +16,7 @@ from scipy.ndimage import zoom
 from skimage.transform import resize
 from omegaconf import OmegaConf
 
-from bone_enhance.utilities import load, save, print_orthogonal, render_volume
+from bone_enhance.utilities import load, save, print_orthogonal, render_volume, calculate_mean_std
 from bone_enhance.inference import InferenceModel, inference, largest_object, load_models
 from bone_enhance.models import ConvNet, EnhanceNet
 
@@ -73,7 +73,7 @@ def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, d
             with h5py.File(str(args.dataset_root / sample), 'r') as f:
                 data_xy = f['data'][:]
         else:
-            data_xy, files = load(str(args.dataset_root / sample), rgb=False, axis=(1, 2, 0))
+            data_xy, files = load(str(args.dataset_root / sample), rgb=False, axis=(1, 2, 0), dicom=args.dicom)
 
         if ds:
             factor = (data_xy.shape[0] // mag, data_xy.shape[1] // mag, data_xy.shape[2] // mag)
@@ -91,8 +91,8 @@ def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, d
 
         # Calculate mean and std from the sample
         if args.calculate_mean_std:
-            mean = torch.Tensor([np.mean(data_xy) / 255])
-            std = torch.Tensor([np.std(data_xy) / 255])
+            mean, std = calculate_mean_std(data_xy, config.training.rgb)
+
 
         # Output shape
         prediction = np.zeros((x * mag, y * mag, z))
@@ -131,12 +131,12 @@ def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, d
 if __name__ == "__main__":
     start = time()
 
-    snap_path = '../../Workdir/snapshots'
+    snap_path = '../../Workdir/IVD_experiments'
     snaps = os.listdir(snap_path)
     snaps.sort()
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(snap_path, snap))]
-    snaps = snaps[2:]
-    snaps = ['2021_05_27_08_56_20_2D_perceptual_tv_IVD_4x_pretrained_seed42']
+    #snaps = snaps[2:]
+    #snaps = ['2021_05_27_08_56_20_2D_perceptual_tv_IVD_4x_pretrained_seed42']
 
     for snap_id in range(len(snaps)):
 
@@ -144,8 +144,8 @@ if __name__ == "__main__":
         print(f'Calculating inference for snapshot: {snap} {snap_id+1}/{len(snaps)}')
 
         parser = argparse.ArgumentParser()
-        parser.add_argument('--dataset_root', type=Path, default='/media/santeri/data/BoneEnhance/Data/MRI_IVD/Patient_0006/')
-        parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}')
+        parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Repeatability/')
+        parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}_sparse')
         parser.add_argument('--visualizations', type=Path,
                             default=f'../../Data/predictions_3D_clinical/IVD_experiments/visualization')
         parser.add_argument('--bs', type=int, default=64)
@@ -153,6 +153,7 @@ if __name__ == "__main__":
         parser.add_argument('--plot', type=bool, default=False)
         parser.add_argument('--calculate_mean_std', type=bool, default=True)
         parser.add_argument('--scale', type=bool, default=True)
+        parser.add_argument('--dicom', type=bool, default=True, help='Is DICOM format used for loading?')
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
         parser.add_argument('--completed', type=int, default=0)
         parser.add_argument('--sample_id', type=list, default=None, help='Process specific samples unless None.')

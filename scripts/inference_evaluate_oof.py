@@ -17,7 +17,10 @@ cv2.setNumThreads(0)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--save_dir', type=Path, default='../../Data/evaluation_oof')
+    parser.add_argument('--save_dir', type=Path, default='../../Data/predictions_oof_wacv')
+    parser.add_argument('--eval_dir', type=Path, default='../../Data/evaluation_oof_wacv')
+    parser.add_argument('--data_location', type=Path, default='../../Data')
+    parser.add_argument('--snap_id', type=int, default=None)
     parser.add_argument('--bs', type=int, default=4)
     parser.add_argument('--magnification', type=int, default=4)
     parser.add_argument('--plot', type=bool, default=False)
@@ -30,11 +33,14 @@ if __name__ == "__main__":
     # Snapshots to be evaluated
     # µCT models
 
-    #snaps = ['2021_05_27_08_56_20_2D_perceptual_tv_IVD_4x_pretrained_seed42']
-    path = '../../Workdir/ankle_experiments'
+    path = '../../Workdir/wacv_experiments_new'
+    #path = args.snapshots
     snaps = os.listdir(path)
     suffixes = ['']
     snaps = [Path(os.path.join(path, snap)) for snap in snaps if os.path.isdir(os.path.join(path, snap))]
+    if args.snap_id is not None:
+        snaps = [snaps[args.snap_id - 1]]
+    #snaps = [args.snapshots / '2021_06_29_15_08_12_3D_perceptual_tv_IVD_4x_pretrained_isotropic_seed42']
 
     # Iterate through snapshots
     args.save_dir.mkdir(exist_ok=True)
@@ -54,13 +60,6 @@ if __name__ == "__main__":
         with open(snap / 'split_config.dill', 'rb') as f:
             split_config = dill.load(f)
 
-        if not config.training.crossmodality:
-            save_dir = args.save_dir / str(snap.stem + '_downscale_oof')
-            save_dir.mkdir(exist_ok=True)
-        else:
-            save_dir = args.save_dir / str(snap.stem + '_oof')
-            save_dir.mkdir(exist_ok=True)
-
         device = auto_detect_device()
 
         # Load models
@@ -68,13 +67,17 @@ if __name__ == "__main__":
 
         print(f'Found {len(model_list)} models.')
 
-        # Create directories
-        save_dir.mkdir(exist_ok=True)
+        # Correct data location in case of a cluster experiment
+        args_experiment.data_location = args.data_location
+        args_experiment.eval_dir = args.eval_dir
+        args_experiment.save_dir = args.save_dir
 
-        save_d = inference_runner_oof(args_experiment, config, split_config, device, plot=args.plot)
-        save_d = Path('../../Data/predictions_oof') / str(config['training']['snapshot'] + '_oof')
-        masks = snap == '2021_02_26_05_52_47_3D_perceptualnet_ds_mse_tv'
-        evaluation_runner(args_experiment, config, save_d, use_bvtv=masks, suffix='')
+        # Inference
+        save_d = inference_runner_oof(args_experiment, config, split_config, device, plot=args.plot, verbose=False)
+        #save_d = Path('../../Data/predictions_oof_wacv') / str(config['training']['snapshot'] + '_oof')
+
+        # Evaluate predictions on validation images
+        evaluation_runner(args_experiment, config, save_d, suffix=config.training.suffix)
 
         dur = time() - start
         print(f'Inference completed in {(dur % 3600) // 60} minutes, {dur % 60} seconds.')

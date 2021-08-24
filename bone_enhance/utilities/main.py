@@ -2,9 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import random
+import torch
 import os
 import cv2
-from pydicom import dcmread
+from pydicom import dcmread, dcmwrite, Dataset
+from pydicom.dataset import FileDataset, FileMetaDataset
+from datetime import datetime
 from tqdm import tqdm
 from joblib import Parallel, delayed
 from glob import glob
@@ -97,6 +100,21 @@ def load_logfile(path: str, first=True) -> dict:
     return log_file
 
 
+def calculate_mean_std(array, rgb=False):
+    """
+    Calculates mean and standard deviation from array.
+    :param array:
+    :param rgb:
+    :return:
+    """
+    mean = torch.Tensor([np.mean(array) / 255])
+    std = torch.Tensor([np.std(array) / 255])
+
+    if rgb:
+        mean = np.repeat(mean, 3, axis=-1)
+        std = np.repeat(std, 3, axis=-1)
+    return mean, std
+
 
 def load_images(path, n_jobs=12, rgb=False, uCT=False):
     """
@@ -167,9 +185,9 @@ def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False, dicom=False):
     newlist = []
     for file in files:
         if file.endswith('.png') or file.endswith('.bmp') or file.endswith('.tif') \
-                or file.endswith('.dcm') or file.endswith('.ima'):
+                or file.endswith('.dcm') or file.endswith('.ima') or dicom:
             try:
-                if file.endswith('.dcm') or file.endswith('.ima'):
+                if file.endswith('.dcm') or file.endswith('.ima') or dicom:
                     newlist.append(file)
                     dicom = True
                     continue
@@ -211,8 +229,8 @@ def read_image_gray(path, file):
     """Reads image from given path."""
     # Image
     f = os.path.join(path, file)
-    image = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
-    #image = cv2.imread(f, -1)
+    #image = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
+    image = cv2.imread(f, -1)
     return image
 
 
@@ -256,29 +274,82 @@ def save(path, file_name, data, n_jobs=12, dtype='.png', verbose=True):
         os.makedirs(path, exist_ok=True)
     nfiles = np.shape(data)[2]
 
+    # Save bool as uint8, 255
     if data[0, 0, 0].dtype is bool:
         data = data * 255
 
+    # 8- or 16-bit
     if dtype == '.tif' or dtype == '.tiff':
         n_bits = 'uint16'
     else:
         n_bits = 'uint8'
 
+    # Save as dicom or image
+    if dtype == '.dcm' or dtype == '':
+        writer = write_image_dicom
+    else:
+        writer = cv2.imwrite
+
     # Parallel saving (nonparallel if n_jobs = 1)
     if type(file_name) is list:
-        Parallel(n_jobs=n_jobs)(delayed(cv2.imwrite)
+        Parallel(n_jobs=n_jobs)(delayed(writer)
                                 (path + '/' + file_name[k][:-4] + dtype,
                                  data[:, :, k].astype(n_bits))
                                 for k in tqdm(range(nfiles), 'Saving dataset', disable=not verbose))
 
     else:
-        Parallel(n_jobs=n_jobs)(delayed(cv2.imwrite)
+        Parallel(n_jobs=n_jobs)(delayed(writer)
                                 (path + '/' + file_name + '_' + str(k).zfill(8) + dtype,
                                  data[:, :, k].astype(n_bits))
                                 for k in tqdm(range(nfiles), 'Saving dataset', disable=not verbose))
 
 
-def save_images(path, file_names, data, n_jobs=12, crop=False):
+def write_image_dicom(path, image):
+    # Create a DICOM dataset with filler values (except for the image file)
+    file_meta = FileMetaDataset()
+    file_meta.MediaStorageSOPClassUID = '1.2.840.10008.5.1.4.1.1.2'
+    file_meta.MediaStorageSOPInstanceUID = "1.2.3"
+    file_meta.ImplementationClassUID = "1.2.3.4"
+    file_meta.TransferSyntaxUID = '1.2.840.10008.1.2.1'
+
+    ds = FileDataset(path, Dataset(), file_meta=file_meta, preamble=b"\0" * 128)
+
+    # Dataset metadata
+    ds.PatientName = "Test_Firstname"
+    ds.PatientID = "123456"
+
+    # Set creation date/time
+    dt = datetime.now()
+    ds.ContentDate = dt.strftime('%Y%m%d')
+    timeStr = dt.strftime('%H%M%S.%f')  # long format with micro seconds
+    ds.ContentTime = timeStr
+
+    # Set the transfer syntax
+    ds.is_little_endian = True
+    ds.is_implicit_VR = True
+
+    ds.SamplesPerPixel = 1
+    ds.PhotometricInterpretation = "MONOCHROME2"
+    ds.PixelRepresentation = 0
+    ds.HighBit = 7
+    ds.BitsStored = 8
+    ds.BitsAllocated = 8
+    ds.Columns = image.shape[1]
+    ds.Rows = image.shape[0]
+
+    # Add the image data to dicom file
+    ds.PixelData = image.astype('uint8').tobytes()
+
+    ds.SmallestImagePixelValue = np.min(image).astype('uint8')
+    ds[0x00280106].VR = 'US'
+    ds.LargestImagePixelValue = np.min(image).astype('uint8')
+    ds[0x00280107].VR = 'US'
+
+    # Write dicom file to path
+    dcmwrite(path, ds)
+
+
+def save_images(path, file_names, data, n_jobs=12, dicom=False):
     """
     Save a set of RGB images in given directory.
 
@@ -298,9 +369,9 @@ def save_images(path, file_names, data, n_jobs=12, crop=False):
     nfiles = len(data)
 
     # Parallel saving (nonparallel if n_jobs = 1)
-    if crop:
-        Parallel(n_jobs=n_jobs)(delayed(cv2.imwrite)
-                                (path + '/' + file_names[k][:-4] + '.png', data[k][:512, :])
+    if dicom:
+        Parallel(n_jobs=n_jobs)(delayed(dcmwrite)
+                                (path + '/' + file_names[k][:-4] + '.dcm', data[k][:, :])
                                 for k in tqdm(range(nfiles), 'Saving images'))
     else:
         Parallel(n_jobs=n_jobs)(delayed(cv2.imwrite)

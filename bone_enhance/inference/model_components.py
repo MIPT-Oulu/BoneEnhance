@@ -22,10 +22,12 @@ class InferenceModel(nn.Module):
         preds = []
         for idx in range(self.n_folds):
             fold = self.__dict__['_modules'][f'fold_{idx}']
-            # Scale the tanh activation back to 0 and 1 during inference
-            pred = (fold(x) + 1) / 2
+
             if self.sigmoid:
-                pred = pred.sigmoid()
+                pred = fold(x).sigmoid()
+            # Scale the tanh activation back to 0 and 1 during inference
+            else:
+                pred = (fold(x) + 1) / 2
             res += pred
             preds.append(pred)
 

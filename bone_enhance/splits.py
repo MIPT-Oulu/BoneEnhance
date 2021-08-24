@@ -85,7 +85,10 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     metadata['subj_id'] = metadata.subj_id.apply(lambda x: '_'.join(x.split('-', 4)[:1]), 0)
 
     # Mean and std
-    crop = config['training']['crop_small']
+    crop = config.training.crop_small  # Input size
+    if config.training.segmentation:
+        crop = list([cr * config.training.magnification for cr in crop])  # Target size
+
     if config['training']['crossmodality']:
         cm = 'cm'
     else:

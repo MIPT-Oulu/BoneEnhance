@@ -25,6 +25,7 @@ cv2.setNumThreads(0)
 
 def main(args, config, args_experiment, sample_id=None, render=False):
     # Create save directory
+    args.save_dir.parent.mkdir(exist_ok=True)
     args.save_dir.mkdir(exist_ok=True)
     (args.save_dir / 'visualizations').mkdir(exist_ok=True)
 
@@ -69,7 +70,7 @@ def main(args, config, args_experiment, sample_id=None, render=False):
             with h5py.File(str(args.dataset_root / sample), 'r') as f:
                 data_xy = f['data'][:]
         else:
-            data_xy, files = load(str(args.dataset_root / sample), rgb=True, axis=(1, 2, 0))
+            data_xy, files = load(str(args.dataset_root / sample), rgb=False, axis=(1, 2, 0), dicom=args.dicom)
 
         # Channel dimension
         if len(data_xy.shape) != 4:
@@ -79,13 +80,23 @@ def main(args, config, args_experiment, sample_id=None, render=False):
 
         # Visualize input stack
         print_orthogonal(data_xy[:, :, :, 0], invert=True, res=args.res, title='Input', cbar=True,
-                         savepath=str(args.save_dir / 'visualizations' / (sample_stem + '_input.png')), scale_factor=10)
+                         savepath=str(args.save_dir / 'visualizations' / (sample_stem + '_input.png')), scale_factor=100)
 
         # Calculate mean and std from the sample
         if args.calculate_mean_std:
             print('Calculating mean and std from the input')
             mean = torch.Tensor([np.mean(data_xy) / 255])
             std = torch.Tensor([np.std(data_xy) / 255])
+
+        # In case of MRI, make the resolution isotropic
+        if args.mri:
+            slice_thickness = 1.0
+            anisotropy_factor = slice_thickness / args.res
+            data_xy = zoom(data_xy, zoom=(1, 1, anisotropy_factor, 1))
+            print_orthogonal(data_xy[:, :, :, 0], invert=True, res=args.res, title='Input (interpolated)',
+                             cbar=True,
+                             savepath=str(args.save_dir / 'visualizations' / (
+                                         sample_stem + f'_input_scaled.png')), scale_factor=100)
 
         # Calculate inference
         with torch.no_grad():  # Do not update gradients
@@ -121,7 +132,7 @@ def main(args, config, args_experiment, sample_id=None, render=False):
         # Visualize output
         print_orthogonal(prediction, invert=True, res=50 / 1000, title='Output', cbar=True,
                          savepath=str(args.save_dir / 'visualizations' / (sample_stem + '_prediction_final.png')),
-                         scale_factor=10)
+                         scale_factor=100)
 
     dur = time() - start
     print(f'Inference completed in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
@@ -147,10 +158,11 @@ if __name__ == "__main__":
 
     # List all snapshots from a path
     path = '../../Workdir/wacv_experiments_new'
+    path = '../../Workdir/IVD_experiments'
     snaps = os.listdir(path)
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(path, snap))]
     # List of specific snapshots
-    #snaps = ['2021_03_04_10_11_34_1_3D_mse_tv_1176']
+    #snaps = ['2021_06_29_15_08_12_3D_perceptual_tv_IVD_4x_pretrained_isotropic_seed42']
 
     for snap_id in range(len(snaps)):
         # Print snapshot info
@@ -160,10 +172,11 @@ if __name__ == "__main__":
         # Input arguments
         parser = argparse.ArgumentParser()
         #parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
-        parser.add_argument('--dataset_root', type=Path, default='../../Data/Test set (full)/input_3d')
-        #parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/ankle_experiments2/{snap}')
-        parser.add_argument('--save_dir', type=Path,
-                            default=f'../../Data/Test set (full)/predictions_wacv_new/{snap}')
+        #parser.add_argument('--dataset_root', type=Path, default='../../Data/Test set (full)/input_3d')
+        parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Repeatability/')
+        parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}')
+        #parser.add_argument('--save_dir', type=Path,
+        #                    default=f'../../Data/Test set (full)/predictions_wacv_meanstd/{snap}')
         parser.add_argument('--bs', type=int, default=16)
         parser.add_argument('--plot', type=bool, default=False)
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean'], default='gaussian')
@@ -171,9 +184,11 @@ if __name__ == "__main__":
         parser.add_argument('--step', type=int, default=3, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
         parser.add_argument('--cuda', type=bool, default=False, help='Whether to merge the inference tiles on GPU or CPU')
         parser.add_argument('--mask', type=bool, default=False, help='Whether to remove background with postprocessing')
-        parser.add_argument('--scale', type=bool, default=True, help='Whether to scale prediction to full dynamic range')
-        parser.add_argument('--res', type=float, default=0.2, help='Input image pixel size')
-        parser.add_argument('--calculate_mean_std', type=bool, default=True, help='Whether to calculate individual mean and std')
+        parser.add_argument('--scale', type=bool, default=False, help='Whether to scale prediction to full dynamic range')
+        parser.add_argument('--res', type=float, default=0.531, help='Input image pixel size')
+        parser.add_argument('--mri', type=bool, default=True, help='Is anisotropic MRI data used?')
+        parser.add_argument('--dicom', type=bool, default=True, help='Is DICOM format used for loading?')
+        parser.add_argument('--calculate_mean_std', type=bool, default=False, help='Whether to calculate individual mean and std')
         parser.add_argument('--snapshot', type=Path, default=os.path.join(path, snap))
         parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
         args = parser.parse_args()

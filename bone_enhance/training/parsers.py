@@ -119,7 +119,7 @@ def parse_segmentation(root, entry, transform, data_key, target_key, debug=False
     # Binarize µCT image, then downscale
     if not config.training.crossmodality:
         # Get the downscaled input image
-        new_size = (img.shape[1], img.shape[0])
+        new_size = (img.shape[1] // mag, img.shape[0] // mag)
         # Antialiasing and downscaling
         img = cv2.resize(cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0), new_size)
 
@@ -130,12 +130,16 @@ def parse_segmentation(root, entry, transform, data_key, target_key, debug=False
     # No modifications needed when using CBCT img
 
     # Segmentation target
-    threshold = 90
+    if type(config.training.threshold) is int:
+        threshold = config.training.threshold
+    else:  # Default segmentation threshold
+        threshold = 90
+
     target = (target > threshold).astype('uint8')
 
     # Set target size to 4x input
-    new_size = (img.shape[1] * mag, img.shape[0] * mag)
-    target = cv2.resize(target, new_size, interpolation=cv2.INTER_NEAREST)
+    #new_size = (img.shape[1] * mag, img.shape[0] * mag)
+    #target = cv2.resize(target, new_size, interpolation=cv2.INTER_NEAREST)
 
     # Set input size to match target
     new_size = (target.shape[1], target.shape[0])
