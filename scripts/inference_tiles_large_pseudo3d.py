@@ -144,17 +144,13 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
                     out_yz[:, :, slice_idx] = inference(model, args, config, data_yz[:, :, slice_idx, :],
                                                         weight=args.weight, step=args.step, mean=mean, std=std)
 
-        # Average probability maps
-        if args.avg_planes:
-            #out_xy = ((out_xy + np.transpose(out_xz, (0, 2, 1)) + np.transpose(out_yz, (2, 0, 1))) / 3).astype('float32')
-            out_xy += np.transpose(out_xz, (0, 2, 1))
-            del out_xz
-            out_xy += np.transpose(out_yz, (2, 0, 1))
-            del out_yz
-            out_xy = (out_xy / 3).astype('float32')
-
-            # Free memory
-            #del out_xz, out_yz
+                # Average probability maps
+                #out_xy = ((out_xy + np.transpose(out_xz, (0, 2, 1)) + np.transpose(out_yz, (2, 0, 1))) / 3).astype('float32')
+                out_xy += np.transpose(out_xz, (0, 2, 1))
+                del out_xz
+                out_xy += np.transpose(out_yz, (2, 0, 1))
+                del out_yz
+                out_xy = (out_xy / 3).astype('float32')
 
         # Scale the dynamic range
         pred_max = np.max(out_xy)
@@ -191,8 +187,8 @@ if __name__ == "__main__":
     snap = '2021_01_08_09_49_45_2D_perceptualnet_ds_16'  # 2D model, 3 working folds
 
     # List all snapshots from a path
-    #snap_path = '../../Workdir/wacv_experiments_new_2D'
-    snap_path = '../../Workdir/IVD_experiments_2D'
+    snap_path = '../../Workdir/wacv_experiments_new_2D'
+    #snap_path = '../../Workdir/IVD_experiments_2D'
     #snap_path = '../../Workdir/snapshots'
     snaps = os.listdir(snap_path)
     snaps.sort()
@@ -201,7 +197,8 @@ if __name__ == "__main__":
     #snaps = [snaps[-1]]
     # List of specific snapshots
     #snaps = ['2021_05_27_08_56_20_2D_perceptual_tv_IVD_4x_pretrained_seed42']
-    #snaps = ['2021_08_04_15_34_33_2D_perceptual_tv_IVD_4x_pretrained_isotropic_seed42']
+    snaps = ['2021_06_11_11_59_53_2D_perceptual_tv_1176_seed10', '2021_06_10_23_57_51_2D_ssim_1176_seed10',
+             '2021_06_10_23_24_54_2D_mse_tv_1176_seed10']
 
     for snap_id in range(len(snaps)):
 
@@ -210,23 +207,25 @@ if __name__ == "__main__":
 
         parser = argparse.ArgumentParser()
         #parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
+        #parser.add_argument('--dataset_root', type=Path, default='../../Data/Fantomi/H5B-fantomi/Series1/Series1/')
+        parser.add_argument('--dataset_root', type=Path, default='../../Data/dental/')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/Test_set_(full)/input_3d')
-        parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Repeatability/')
-        parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}_avg')
-        #parser.add_argument('--save_dir', type=Path,
-        #                    default=f'../../Data/Test_set_(full)/predictions_wacv_new/{snap}_single')
+        #parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Repeatability/')
+        #parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}_avg')
+        parser.add_argument('--save_dir', type=Path,
+                            default=f'../../Data/predictions_3D_clinical/dental_experiments/{snap}_single')
         parser.add_argument('--bs', type=int, default=64)
-        parser.add_argument('--step', type=int, default=2)
+        parser.add_argument('--step', type=int, default=3)
         parser.add_argument('--plot', type=bool, default=False)
         parser.add_argument('--calculate_mean_std', type=bool, default=True)
         parser.add_argument('--scale', type=bool, default=False)
         parser.add_argument('--dicom', type=bool, default=True, help='Is DICOM format used for loading?')
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
         parser.add_argument('--completed', type=int, default=0)
-        parser.add_argument('--res', type=float, default=0.531, help='Input image pixel size')
+        parser.add_argument('--res', type=float, default=0.200, help='Input image pixel size')
         parser.add_argument('--sample_id', type=list, default=None, help='Process specific samples unless None.')
-        parser.add_argument('--avg_planes', type=bool, default=True)
-        parser.add_argument('--mri', type=bool, default=True, help='Is anisotropic MRI data used?')
+        parser.add_argument('--avg_planes', type=bool, default=False)
+        parser.add_argument('--mri', type=bool, default=False, help='Is anisotropic MRI data used?')
         parser.add_argument('--snapshot', type=Path,
                             default=os.path.join(snap_path, snap))
         parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
@@ -243,4 +242,4 @@ if __name__ == "__main__":
         args.save_dir.parent.mkdir(exist_ok=True)
         args.save_dir.mkdir(exist_ok=True)
 
-        main(args, config, args_experiment, sample_id=None)
+        main(args, config, args_experiment, sample_id=args.sample_id)

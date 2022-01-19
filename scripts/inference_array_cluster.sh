@@ -6,10 +6,10 @@
 #SBATCH --partition=gpu
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
-#SBATCH --mem=64G
+#SBATCH --mem=256G  # Running inference on large stacks requires at least 128GB memory
 #SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:v100:1
-#SBATCH --array=1-3
+#SBATCH --array=1-6
 
 # Set up environment
 export SCRATCH=/scratch/project_2002147/rytkysan
@@ -22,8 +22,8 @@ echo "Start the job..."
 declare -i SEED=42  # Random seed
 declare -i NUM_THREADS=10
 # Data path
-DATA_PATH=../../Data
+DATA_PATH=${SCRATCH}/BoneEnhance/Data
+SNAP_PATH=${SCRATCH}/BoneEnhance/Workdir/models_200um
 
-#srun ./exp_csc_train.sh ${SLURM_ARRAY_TASK_ID} ${SEED} ${NUM_THREADS} ${DATA_PATH}
-srun ./exp_csc_train.sh ${SLURM_ARRAY_TASK_ID} ${SEED} ${NUM_THREADS} ${DATA_PATH}
+srun ./exp_csc_inference.sh ${SLURM_ARRAY_TASK_ID} ${SEED} ${NUM_THREADS} ${DATA_PATH} ${SNAP_PATH}
 echo "Done the job!"

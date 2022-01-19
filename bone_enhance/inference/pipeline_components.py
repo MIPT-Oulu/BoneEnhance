@@ -12,6 +12,7 @@ from time import time
 from pathlib import Path
 from skimage.transform import resize
 from copy import deepcopy
+from openpyxl import load_workbook
 from tqdm import tqdm
 from scipy.ndimage import zoom
 from skimage import measure
@@ -31,7 +32,7 @@ from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculat
 def inference(inference_model, args, config, img_full, device='cuda', weight='mean', plot=False, mean=None, std=None,
               step=2, cuda=True):
     """
-    Calculates inference on one image.
+    Calculates inference on one 2D image.
     """
 
     # Check for mean and std
@@ -133,7 +134,7 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
 def inference_3d(inference_model, args, config, img_full, device='cuda', plot=False,
                  mean=None, std=None, step=2, cuda=True, weight='mean'):
     """
-    Calculates inference on one image.
+    Calculates inference on one 3D image stack, using a 3D model.
     """
 
     # Check for mean and std
@@ -434,42 +435,60 @@ def evaluation_runner(args, config, save_dir, use_bvtv=True, suffix='_3d'):
 
         # Loop for samples
         for idx, sample in enumerate(samples):
-            try:
-                # Load image stacks
-                if samples_target[idx].endswith('.h5'):
-                    with h5py.File(str(args.target_path / samples_target[idx]), 'r') as f:
-                        target = f['data'][:]
-                else:
-                    target, files = load(str(args.target_path / samples_target[idx]), rgb=False, axis=(1, 2, 0))
+            #try:
+            # Load image stacks
+            if samples_target[idx].endswith('.h5'):
+                with h5py.File(str(args.target_path / samples_target[idx]), 'r') as f:
+                    target = f['data'][:]
+            else:
+                target, files = load(str(args.target_path / samples_target[idx]), rgb=False, axis=(1, 2, 0))
 
-                pred, files_pred = load(str(args.save_dir / snap.name / sample), axis=(1, 2, 0), rgb=False)
+            pred, files_pred = load(str(args.save_dir / snap.name / sample), axis=(1, 2, 0), rgb=False)
 
-                # Crop in case of inconsistency
-                crop = min(pred.shape, target.shape)
-                target = target[:crop[0], :crop[1], :crop[2]]
-                pred = pred[:crop[0], :crop[1], :crop[2]].squeeze()
+            # Crop in case of inconsistency
+            crop = min(pred.shape, target.shape)
+            target = target[:crop[0], :crop[1], :crop[2]]
+            pred = pred[:crop[0], :crop[1], :crop[2]].squeeze()
 
-                # Evaluate metrics
-                mse = mean_squared_error(target / 255., pred / 255.)
-                psnr = peak_signal_noise_ratio(target / 255., pred / 255.)
-                ssim = structural_similarity(target / 255., pred / 255.)
+            # Evaluate metrics
+            mse = mean_squared_error(target / 255., pred / 255.)
+            psnr = peak_signal_noise_ratio(target / 255., pred / 255.)
+            ssim = structural_similarity(target / 255., pred / 255.)
 
-                print(f'Sample {sample}: MSE = {mse}, PSNR = {psnr}, SSIM = {ssim}')
+            print(f'Sample {sample}: MSE = {mse}, PSNR = {psnr}, SSIM = {ssim}')
 
-                # Morphometric analysis
-                if use_bvtv:
-                    results = morphometric_analysis(pred, results)
-                    targets = morphometric_analysis(targets, targets)
+            # Update results
+            results['Sample'].append(sample)
+            results['MSE'].append(mse)
+            results['PSNR'].append(psnr)
+            results['SSIM'].append(ssim)
 
-                # Update results
-                results['Sample'].append(sample)
-                results['MSE'].append(mse)
-                results['PSNR'].append(psnr)
-                results['SSIM'].append(ssim)
+            # Morphometric analysis
+            if use_bvtv:
+                targets['Sample'].append(sample)
+                results = morphometric_analysis(pred, results)
+                targets = morphometric_analysis(target, targets)
 
-            except (AttributeError, ValueError):
-                print(f'Sample {sample} failing. Skipping to next one.')
-                continue
+            # Save morphometric results to excel
+            # Load existing file
+            savepath = str(args.eval_dir / ('metrics_' + str(snap.name))) + '.xlsx'
+            if os.path.isfile(savepath):
+                book = load_workbook(savepath)
+                writer = pd.ExcelWriter(savepath, engine='openpyxl', mode='w')
+                writer.book = book
+            else:
+                writer = pd.ExcelWriter(savepath, engine='openpyxl')
+            # Append new results
+            df1 = pd.DataFrame(results)
+            df1.to_excel(writer, sheet_name='Predictions')
+            if use_bvtv:
+                df2 = pd.DataFrame(targets)
+                df2.to_excel(writer, sheet_name='Targets')
+            writer.save()
+
+            #except (AttributeError, ValueError):
+            #    print(f'Sample {sample} failing. Skipping to next one.')
+            #    continue
 
         # Add average value
         results['Sample'].append('Average values')
@@ -483,12 +502,18 @@ def evaluation_runner(args, config, save_dir, use_bvtv=True, suffix='_3d'):
             results['Trabecular separation'].append(np.average(results['Trabecular separation']))
             results['Trabecular number'].append(np.average(results['Trabecular number']))
 
-        # Write to excel
-        metric_value = str(round(results['SSIM'][-1], 3)).replace('.', '-')
-        writer = pd.ExcelWriter(str(args.eval_dir / ('metrics_SSIM_' + metric_value + '_' + str(snap.name))) + '.xlsx')
+        # Save morphometric results to excel
+        # Load existing file
+        savepath = str(args.eval_dir / ('metrics_' + str(snap.name))) + '.xlsx'
+        if os.path.isfile(savepath):
+            book = load_workbook(savepath)
+            writer = pd.ExcelWriter(savepath, engine='openpyxl', mode='a')
+            writer.book = book
+        else:
+            writer = pd.ExcelWriter(savepath, engine='openpyxl')
+        # Append new results # TODO overwrite instead for append
         df1 = pd.DataFrame(results)
-        df1.to_excel(writer, sheet_name='Metrics')
-
+        df1.to_excel(writer, sheet_name='Predictions')
         if use_bvtv:
             df2 = pd.DataFrame(targets)
             df2.to_excel(writer, sheet_name='Targets')
@@ -535,41 +560,47 @@ def largest_object(input_mask, area_limit=None):
     return output_mask
 
 
-def morphometric_analysis(pred, results, mode='med2d_dist3d_lth3d', resolution=(50, 50, 50), max_th=None, tb_n='rod'):
+def morphometric_analysis(array, parameters,
+                          mode='med2d_dist3d_lth3d', resolution=(50, 50, 50), max_th=None, tb_n='rod'):
     #                       #
     # Morphometric analysis #
     #                       #
 
-    voi = np.ones(pred.shape)
+    voi = np.ones(array.shape)
+
+    # Binarize the array
+    if len(np.unique(array)) != 2:
+        pred, _ = threshold(array, method='otsu')
+
+    # Bone volume fraction
+    bvtv = calculate_bvtv(array, voi)
 
     # Thickness map
-    th_map = _local_thickness(pred, mode=mode, spacing_mm=resolution, stack_axis=1,
+    th_map = _local_thickness(array, mode=mode, spacing_mm=resolution, stack_axis=1,
                               thickness_max_mm=max_th, verbose=False)
-    # Bone volume fraction
-    bvtv = calculate_bvtv(pred, voi)
 
     # Update results
     th_map = th_map[np.nonzero(th_map)].flatten()
     tb_th = np.mean(th_map)
-    results['Trabecular thickness'].append(tb_th)
-    results['BVTV'].append(bvtv)
+    parameters['Trabecular thickness'].append(tb_th)
+    parameters['BVTV'].append(bvtv)
 
     # Separation map
-    pred = np.logical_and(np.invert(pred), voi).astype(np.uint8) * 255
-    th_map = _local_thickness(pred, mode=mode, spacing_mm=resolution, stack_axis=1,
+    array = np.logical_and(np.invert(array), voi).astype(np.uint8) * 255
+    th_map = _local_thickness(array, mode=mode, spacing_mm=resolution, stack_axis=1,
                               thickness_max_mm=max_th, verbose=False)
     th_map = th_map[np.nonzero(th_map)].flatten()
     tb_sep = np.mean(th_map)
-    results['Trabecular separation'].append(tb_sep)
+    parameters['Trabecular separation'].append(tb_sep)
 
     # Trabecular number
     if tb_n == '3d':  # 3D model
-        results['Trabecular number'].append(1 / (tb_sep + tb_th))
+        parameters['Trabecular number'].append(1 / (tb_sep + tb_th))
     elif tb_n == 'plate':  # 2D plate model
-        results['Trabecular number'].append(bvtv / tb_th)
+        parameters['Trabecular number'].append(bvtv / tb_th)
     elif tb_n == 'rod':  # 2D cylinder rod model
-        results['Trabecular number'].append(np.sqrt((4 / np.pi) * bvtv) / tb_th)
+        parameters['Trabecular number'].append(np.sqrt((4 / np.pi) * bvtv) / tb_th)
     else:  # Append 0 for compatibility
-        results['Trabecular number'].append(0)
+        parameters['Trabecular number'].append(0)
 
-    return results
+    return parameters

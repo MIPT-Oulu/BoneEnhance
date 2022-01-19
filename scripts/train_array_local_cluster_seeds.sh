@@ -7,7 +7,7 @@
 #SBATCH --time=48:00:00
 #SBATCH --ntasks=1
 #SBATCH --mem=64G
-#SBATCH --cpus-per-task=36
+#SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:v100:1,nvme:20
 #SBATCH --array=1-2
 
@@ -35,7 +35,7 @@ tar -xf ${DATA_PATH}/input_1176_HR_ds.tar.gz -C ${DATA_PATH}
 # Random seeds
 declare -a SEEDS=(50 10 20 30 40)
 # Number of CPUs (match above)
-declare -i NUM_THREADS=36
+declare -i NUM_THREADS=10
 
 for SEED in "${SEEDS[@]}"
 do

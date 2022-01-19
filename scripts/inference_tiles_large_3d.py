@@ -16,7 +16,7 @@ from omegaconf import OmegaConf
 from skimage.transform import resize
 import h5py
 
-from bone_enhance.utilities import load, save, print_orthogonal, render_volume, threshold
+from bone_enhance.utilities import load, save, print_orthogonal, render_volume, threshold, calculate_mean_std
 from bone_enhance.inference import InferenceModel, inference, largest_object, load_models, inference_3d
 
 cv2.ocl.setUseOpenCL(False)
@@ -85,8 +85,7 @@ def main(args, config, args_experiment, sample_id=None, render=False):
         # Calculate mean and std from the sample
         if args.calculate_mean_std:
             print('Calculating mean and std from the input')
-            mean = torch.Tensor([np.mean(data_xy) / 255])
-            std = torch.Tensor([np.std(data_xy) / 255])
+            mean, std = calculate_mean_std(data_xy, config.training.rgb)
 
         # In case of MRI, make the resolution isotropic
         if args.mri:
@@ -110,7 +109,7 @@ def main(args, config, args_experiment, sample_id=None, render=False):
             prediction /= pred_max
         elif pred_max > 1:
             print(f'Maximum value {pred_max} will be scaled to one')
-            prediction /= pred_max
+            prediction[prediction > 1] = 1
 
         # Convert to uint8
         prediction = (prediction * 255).astype('uint8')
@@ -130,9 +129,8 @@ def main(args, config, args_experiment, sample_id=None, render=False):
                           white=True, use_outline=False)
 
         # Visualize output
-        print_orthogonal(prediction, invert=True, res=50 / 1000, title='Output', cbar=True,
-                         savepath=str(args.save_dir / 'visualizations' / (sample_stem + '_prediction_final.png')),
-                         scale_factor=100)
+        print_orthogonal(prediction, invert=True, res=args.res / config.training.magnification, title='Output', cbar=True,
+                         savepath=str(args.save_dir / 'visualizations' / (sample_stem + '_prediction_final.png')), scale_factor=100)
 
     dur = time() - start
     print(f'Inference completed in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
@@ -158,11 +156,13 @@ if __name__ == "__main__":
 
     # List all snapshots from a path
     path = '../../Workdir/wacv_experiments_new'
-    path = '../../Workdir/IVD_experiments'
+    #path = '../../Workdir/IVD_experiments'
+    #path = '../../Workdir/ankle_experiments'
     snaps = os.listdir(path)
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(path, snap))]
     # List of specific snapshots
-    #snaps = ['2021_06_29_15_08_12_3D_perceptual_tv_IVD_4x_pretrained_isotropic_seed42']
+    #snaps = ['2021_05_05_11_05_36_3D_perceptual_tv_1176_seed10', '2021_05_05_11_05_36_3D_ssim_1176_seed10',
+    #         '2021_05_05_11_05_36_3D_mse_tv_1176_seed10']
 
     for snap_id in range(len(snaps)):
         # Print snapshot info
@@ -173,8 +173,11 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser()
         #parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/Test set (full)/input_3d')
-        parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Repeatability/')
-        parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}')
+        #parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Repeatability/')
+        parser.add_argument('--dataset_root', type=Path, default='../../Data/Fantomi/H5B-fantomi/Series1/Series1/PNG/')
+        #parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}')
+        parser.add_argument('--save_dir', type=Path,
+                            default=f'../../Data/predictions_3D_clinical/phantom_experiments/{snap}')
         #parser.add_argument('--save_dir', type=Path,
         #                    default=f'../../Data/Test set (full)/predictions_wacv_meanstd/{snap}')
         parser.add_argument('--bs', type=int, default=16)
@@ -185,10 +188,10 @@ if __name__ == "__main__":
         parser.add_argument('--cuda', type=bool, default=False, help='Whether to merge the inference tiles on GPU or CPU')
         parser.add_argument('--mask', type=bool, default=False, help='Whether to remove background with postprocessing')
         parser.add_argument('--scale', type=bool, default=False, help='Whether to scale prediction to full dynamic range')
-        parser.add_argument('--res', type=float, default=0.531, help='Input image pixel size')
-        parser.add_argument('--mri', type=bool, default=True, help='Is anisotropic MRI data used?')
-        parser.add_argument('--dicom', type=bool, default=True, help='Is DICOM format used for loading?')
-        parser.add_argument('--calculate_mean_std', type=bool, default=False, help='Whether to calculate individual mean and std')
+        parser.add_argument('--res', type=float, default=0.400, help='Input image pixel size')
+        parser.add_argument('--mri', type=bool, default=False, help='Is anisotropic MRI data used?')
+        parser.add_argument('--dicom', type=bool, default=False, help='Is DICOM format used for loading?')
+        parser.add_argument('--calculate_mean_std', type=bool, default=True, help='Whether to calculate individual mean and std')
         parser.add_argument('--snapshot', type=Path, default=os.path.join(path, snap))
         parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
         args = parser.parse_args()
@@ -201,4 +204,4 @@ if __name__ == "__main__":
         with open(args.snapshot / 'args.dill', 'rb') as f:
             args_experiment = dill.load(f)
 
-        main(args, config, args_experiment, sample_id=None)
+        main(args, config, args_experiment, sample_id=2)

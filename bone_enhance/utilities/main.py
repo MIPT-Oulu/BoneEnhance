@@ -6,6 +6,7 @@ import torch
 import os
 import cv2
 from pydicom import dcmread, dcmwrite, Dataset
+from pydicom.pixel_data_handlers.util import apply_modality_lut
 from pydicom.dataset import FileDataset, FileMetaDataset
 from datetime import datetime
 from tqdm import tqdm
@@ -217,7 +218,7 @@ def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False, dicom=False):
         return data, files
 
     # Transpose array
-    if axis != (0, 1, 2) and rgb:
+    if axis != (0, 1, 2) and rgb and data.ndim == 4:
         return np.transpose(data, axis + (3,)), files
     elif axis != (0, 1, 2):
         data = np.transpose(data, axis)
@@ -229,8 +230,8 @@ def read_image_gray(path, file):
     """Reads image from given path."""
     # Image
     f = os.path.join(path, file)
-    #image = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
-    image = cv2.imread(f, -1)
+    image = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
+    #image = cv2.imread(f, -1)  # Might read a 3-channel image
     return image
 
 
@@ -239,7 +240,8 @@ def read_image_dicom(path, file):
     # Image
     f = os.path.join(path, file)
     image = dcmread(f)
-    return image.pixel_array
+
+    return apply_modality_lut(image.pixel_array, image)
 
 
 def read_image_rgb(path, file):

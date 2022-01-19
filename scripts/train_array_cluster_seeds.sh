@@ -7,7 +7,7 @@
 #SBATCH --time=36:00:00
 #SBATCH --ntasks=1
 #SBATCH --mem=64G
-#SBATCH --cpus-per-task=36
+#SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:v100:1
 #SBATCH --array=1-8
 
@@ -21,7 +21,7 @@ conda activate bone-enhance-env
 # Random seeds
 declare -a SEEDS=(10 20 30 40 50)
 # Number of CPUs (match above)
-declare -i NUM_THREADS=36
+declare -i NUM_THREADS=10
 # Data path
 DATA_PATH=../../Data
 

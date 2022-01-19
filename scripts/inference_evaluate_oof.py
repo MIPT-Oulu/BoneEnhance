@@ -33,8 +33,9 @@ if __name__ == "__main__":
     # Snapshots to be evaluated
     # µCT models
 
-    path = '../../Workdir/wacv_experiments_new'
-    #path = args.snapshots
+    #path = '../../Workdir/wacv_experiments_new'
+    #path = '../../Workdir/IVD_experiments_2D'
+    path = args.snapshots
     snaps = os.listdir(path)
     suffixes = ['']
     snaps = [Path(os.path.join(path, snap)) for snap in snaps if os.path.isdir(os.path.join(path, snap))]
@@ -77,7 +78,7 @@ if __name__ == "__main__":
         #save_d = Path('../../Data/predictions_oof_wacv') / str(config['training']['snapshot'] + '_oof')
 
         # Evaluate predictions on validation images
-        evaluation_runner(args_experiment, config, save_d, suffix=config.training.suffix)
+        evaluation_runner(args_experiment, config, save_d, suffix=config.training.suffix, use_bvtv=True)
 
         dur = time() - start
         print(f'Inference completed in {(dur % 3600) // 60} minutes, {dur % 60} seconds.')

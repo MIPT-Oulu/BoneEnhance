@@ -4,10 +4,10 @@
 #SBATCH --account=project_2002147
 #SBATCH --mail-type=END #Send email when job is finished
 #SBATCH --partition=gpu
-#SBATCH --time=48:00:00
+#SBATCH --time=72:00:00
 #SBATCH --ntasks=1
 #SBATCH --mem=64G
-#SBATCH --cpus-per-task=36
+#SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:v100:1,nvme:50
 #SBATCH --array=1-15
 
@@ -39,7 +39,7 @@ tar -xf ${DATA_PATH}/input_1176_HR_ds.tar.gz -C ${DATA_PATH}
 tar -xf ${DATA_PATH}/input_1176_HR_2D.tar.gz -C ${DATA_PATH}
 
 # Number of CPUs (match above)
-declare -i NUM_THREADS=36
+declare -i NUM_THREADS=10
 declare -i SEED=42  # Random seed
 
 echo "Start the job..."

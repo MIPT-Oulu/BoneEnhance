@@ -131,7 +131,7 @@ def main(args, config, args_experiment, sample_id=None, render=False, res=0.2, d
 if __name__ == "__main__":
     start = time()
 
-    snap_path = '../../Workdir/IVD_experiments'
+    snap_path = '../../Workdir/phantom_experiments'
     snaps = os.listdir(snap_path)
     snaps.sort()
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(snap_path, snap))]
@@ -144,19 +144,20 @@ if __name__ == "__main__":
         print(f'Calculating inference for snapshot: {snap} {snap_id+1}/{len(snaps)}')
 
         parser = argparse.ArgumentParser()
-        parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Repeatability/')
-        parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}_sparse')
+        parser.add_argument('--dataset_root', type=Path, default='../../Data/dental/')
+        parser.add_argument('--save_dir', type=Path,
+                            default=f'../../Data/predictions_3D_clinical/phantom_experiments/{snap}_single')
         parser.add_argument('--visualizations', type=Path,
-                            default=f'../../Data/predictions_3D_clinical/IVD_experiments/visualization')
+                            default=f'../../Data/predictions_3D_clinical/phantom_experiments/visualization')
         parser.add_argument('--bs', type=int, default=64)
         parser.add_argument('--step', type=int, default=3)
         parser.add_argument('--plot', type=bool, default=False)
         parser.add_argument('--calculate_mean_std', type=bool, default=True)
-        parser.add_argument('--scale', type=bool, default=True)
+        parser.add_argument('--scale', type=bool, default=False)
         parser.add_argument('--dicom', type=bool, default=True, help='Is DICOM format used for loading?')
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
         parser.add_argument('--completed', type=int, default=0)
-        parser.add_argument('--sample_id', type=list, default=None, help='Process specific samples unless None.')
+        parser.add_argument('--sample_id', type=list, default=5, help='Process specific samples unless None.')
         parser.add_argument('--snapshot', type=Path,
                             default=os.path.join(snap_path, snap))
         parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
@@ -175,4 +176,4 @@ if __name__ == "__main__":
         args.save_dir.mkdir(exist_ok=True)
         args.visualizations.mkdir(exist_ok=True)
 
-        main(args, config, args_experiment, sample_id=None, res=0.2)
+        main(args, config, args_experiment, sample_id=args.sample_id, res=0.2)
