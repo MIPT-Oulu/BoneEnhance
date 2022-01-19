@@ -144,7 +144,7 @@ if __name__ == "__main__":
         print(f'Calculating inference for snapshot: {snap} {snap_id+1}/{len(snaps)}')
 
         parser = argparse.ArgumentParser()
-        parser.add_argument('--dataset_root', type=Path, default='../../Data/dental/')
+        parser.add_argument('--dataset_root', type=Path, default='../../Data/Fantomi/')
         parser.add_argument('--save_dir', type=Path,
                             default=f'../../Data/predictions_3D_clinical/phantom_experiments/{snap}_single')
         parser.add_argument('--visualizations', type=Path,
@@ -157,7 +157,7 @@ if __name__ == "__main__":
         parser.add_argument('--dicom', type=bool, default=True, help='Is DICOM format used for loading?')
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
         parser.add_argument('--completed', type=int, default=0)
-        parser.add_argument('--sample_id', type=list, default=5, help='Process specific samples unless None.')
+        parser.add_argument('--sample_id', type=list, default=3, help='Process specific samples unless None.')
         parser.add_argument('--snapshot', type=Path,
                             default=os.path.join(snap_path, snap))
         parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')

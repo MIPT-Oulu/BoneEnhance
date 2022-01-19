@@ -217,6 +217,10 @@ def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False, dicom=False):
         Warning('Image dimensions are not consistent! Returning a list of images.')
         return data, files
 
+    # Zero the data (remove negative values from HU units)
+    if np.min(data) < 0:
+        data -= np.min(data)
+
     # Transpose array
     if axis != (0, 1, 2) and rgb and data.ndim == 4:
         return np.transpose(data, axis + (3,)), files
