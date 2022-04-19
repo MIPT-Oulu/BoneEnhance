@@ -5,9 +5,12 @@ import random
 import torch
 import os
 import cv2
+from copy import deepcopy
+from functools import partial
 from pydicom import dcmread, dcmwrite, Dataset
 from pydicom.pixel_data_handlers.util import apply_modality_lut
 from pydicom.dataset import FileDataset, FileMetaDataset
+from pydicom.uid import UID
 from datetime import datetime
 from tqdm import tqdm
 from joblib import Parallel, delayed
@@ -257,7 +260,7 @@ def read_image_rgb(path, file):
     return image
 
 
-def save(path, file_name, data, n_jobs=12, dtype='.png', verbose=True):
+def save(path, file_name, data, n_jobs=12, dtype='.png', verbose=True, template='../../BoneEnhance/template.dcm'):
     """
     Save a volumetric 3D dataset in given directory.
 
@@ -292,7 +295,12 @@ def save(path, file_name, data, n_jobs=12, dtype='.png', verbose=True):
 
     # Save as dicom or image
     if dtype == '.dcm' or dtype == '':
-        writer = write_image_dicom
+        #writer = write_image_dicom
+        writer = write_dicom_template
+        # Read template image
+        dcm_template = dcmread(template)
+        # Save as default
+        writer = partial(writer, template=dcm_template)
     else:
         writer = cv2.imwrite
 
@@ -313,16 +321,17 @@ def save(path, file_name, data, n_jobs=12, dtype='.png', verbose=True):
 def write_image_dicom(path, image):
     # Create a DICOM dataset with filler values (except for the image file)
     file_meta = FileMetaDataset()
-    file_meta.MediaStorageSOPClassUID = '1.2.840.10008.5.1.4.1.1.2'
-    file_meta.MediaStorageSOPInstanceUID = "1.2.3"
-    file_meta.ImplementationClassUID = "1.2.3.4"
-    file_meta.TransferSyntaxUID = '1.2.840.10008.1.2.1'
+    file_meta.MediaStorageSOPClassUID = UID('1.2.840.10008.5.1.4.1.1.2')
+    file_meta.MediaStorageSOPInstanceUID = UID("1.2.3")
+    file_meta.ImplementationClassUID = UID("1.2.3.4")
+    file_meta.TransferSyntaxUID = UID('1.2.840.10008.1.2')  # Little endian implicit
 
     ds = FileDataset(path, Dataset(), file_meta=file_meta, preamble=b"\0" * 128)
 
     # Dataset metadata
-    ds.PatientName = "Test_Firstname"
-    ds.PatientID = "123456"
+    ds.PatientName = "Bone Enhance"
+    ds.PatientID = "240322-1111"
+    ds.PatientBirthDate = datetime.now().strftime('%Y%m%d')
 
     # Set creation date/time
     dt = datetime.now()
@@ -333,6 +342,8 @@ def write_image_dicom(path, image):
     # Set the transfer syntax
     ds.is_little_endian = True
     ds.is_implicit_VR = True
+    ds.Modality = 'CT'
+    ds.PixelSpacing = [0.05, 0.05]
 
     ds.SamplesPerPixel = 1
     ds.PhotometricInterpretation = "MONOCHROME2"
@@ -342,14 +353,64 @@ def write_image_dicom(path, image):
     ds.BitsAllocated = 8
     ds.Columns = image.shape[1]
     ds.Rows = image.shape[0]
+    ds.WindowCenter = 1060
 
     # Add the image data to dicom file
     ds.PixelData = image.astype('uint8').tobytes()
-
+    ds[0x7fe00010].maxBytesToDisplay = 8
+    ds[0x7fe00010].VR = 'OW'
     ds.SmallestImagePixelValue = np.min(image).astype('uint8')
     ds[0x00280106].VR = 'US'
-    ds.LargestImagePixelValue = np.min(image).astype('uint8')
+    ds.LargestImagePixelValue = np.max(image).astype('uint8')
     ds[0x00280107].VR = 'US'
+
+    # Write dicom file to path
+    dcmwrite(path, ds)
+
+
+def write_dicom_template(path, image, template, slice_idx=0, res=0.05):
+    """
+    Write a dicom image based on an existing image template for metadata.
+    :param path:
+    :param image:
+    :param template:
+    :return:
+    """
+    # Make sure the template is not altered
+    ds = deepcopy(template)
+
+    # Set creation date/time
+    dt = datetime.now()
+    ds.ContentDate = dt.strftime('%Y%m%d')
+    timeStr = dt.strftime('%H%M%S.%f')  # long format with micro seconds
+    ds.ContentTime = timeStr
+
+    # Image metadata
+
+    ds.PixelSpacing = [res, res]
+    ds.SliceThickness = res
+    ds.HighBit = 7
+    ds.BitsStored = 8
+    ds.BitsAllocated = 8
+    ds.Columns = image.shape[1]
+    ds.Rows = image.shape[0]
+
+    # Add the image data to dicom file
+    ds.PixelData = image.astype('uint8').tobytes()
+    ds[0x7fe00010].maxBytesToDisplay = 8
+    ds[0x7fe00010].VR = 'OW'
+    ds.SmallestImagePixelValue = np.min(image).astype('uint8')
+    ds[0x00280106].VR = 'US'
+    ds.LargestImagePixelValue = np.max(image).astype('uint8')
+    ds[0x00280107].VR = 'US'
+
+    # Set the slice position
+    slice_idx = str.rsplit(path, '_', 1)[1]  # Slice idx separated by _
+    slice_idx = int(os.path.splitext(slice_idx)[0])  # Remove extension
+
+    ds.SOPInstanceUID = ds.SOPInstanceUID[:-3] + str(slice_idx + 1)
+    ds.file_meta.MediaStorageSOPInstanceUID = ds.file_meta.MediaStorageSOPInstanceUID[:-3] + str(slice_idx + 1)
+    ds.ImagePositionPatient[2] = res * slice_idx
 
     # Write dicom file to path
     dcmwrite(path, ds)

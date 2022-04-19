@@ -13,22 +13,25 @@ if __name__ == "__main__":
     args, config, _, device = init_experiment()
     snap = '2021_08_04_09_10_16_2D_ssim_IVD_4x_seed42'
     #images_loc = Path('/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
-    images_loc = Path('/media/santeri/data/BoneEnhance/Data/target_1176_HR_2D')
-    images_loc = Path('/media/santeri/data/BoneEnhance/Data/MRI_IVD/9.4T MRI Scans')
-    images_loc = Path(f'../../Data/predictions_3D_clinical/IVD_experiments/Repeatability/{snap}')
+    #images_loc = Path('/media/santeri/data/BoneEnhance/Data/target_1176_HR_2D')
+    #images_loc = Path('/media/santeri/data/BoneEnhance/Data/MRI_IVD/9.4T MRI Scans')
+    #images_loc = Path(f'../../Data/dental/Hampaat_rec')
+    images_loc = Path(f'../../Data/predictions_3D_clinical/dental_experiments/test/')
+    #images_loc = Path(f'../../Data/dental/')
     #images_loc = Path('/media/santeri/data/BoneEnhance/Data/MRI_IVD/3T scans dicom')
 
     images_save = Path('/media/santeri/data/BoneEnhance/Data/target_IVD_2D_HR')
-    images_save = Path(f'../../Data/predictions_3D_clinical/IVD_experiments/Repeatability_dcm/{snap}')
+    #images_save = Path(f'../../Data/dental/Hampaat_dataset')
+    images_save = Path(f'../../Data/predictions_3D_clinical/dental_experiments/test_dcm')
 
     images_save.mkdir(exist_ok=True)
 
     #subdir = 'trabecular_data/Binned4x/bonemask'
     resample = False
     normalize = False
-    factor = 90/132.75
+    factor = 50/19.8
     #factor = 4
-    factor_slice = 1361.4/90
+    #factor_slice = 1361.4/90
     sigma = 1
     dtype = '.dcm'
     k = 3
@@ -38,6 +41,8 @@ if __name__ == "__main__":
     samples = os.listdir(images_loc)
     #samples = [name for name in samples if os.path.isdir(os.path.join(images_loc, name))]
     samples.sort()
+    #samples = [samples[6]]
+    samples = [samples[0]]
     if 'visualizations' in samples:
         samples.remove('visualizations')
     for sample in samples:
@@ -55,13 +60,13 @@ if __name__ == "__main__":
                 # Make MRI data "isotropic"
                 #new_size = (data.shape[0], data.shape[1], int(data.shape[2] * factor_slice))
                 #data = resize(data, new_size, order=3, preserve_range=True)
-                new_size = (int(data.shape[0] * factor), int(data.shape[1] * factor), int(data.shape[2]))
-                data = resize(data, new_size, order=3, preserve_range=True)
+                #new_size = (int(data.shape[0] * factor), int(data.shape[1] * factor), int(data.shape[2]))
+                #data = resize(data, new_size, order=3, preserve_range=True)
                 #data = (data / 2 ** 8).astype('uint8')
                 # Downscale
-                #new_size = (data.shape[0] // factor, data.shape[1] // factor, data.shape[2])
-                #data = resize(data, new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=sigma)
-                #data = median_filter(data, size=5)
+                new_size = (data.shape[0] // factor, data.shape[1] // factor, data.shape[2] // factor)
+                data = resize(data, new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=sigma)
+                data = median_filter(data, size=3)
                 if normalize:
                     min_data = np.min(data)
                     max_data = np.max(data)

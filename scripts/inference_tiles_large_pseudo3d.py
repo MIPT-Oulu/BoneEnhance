@@ -219,11 +219,11 @@ if __name__ == "__main__":
         parser.add_argument('--plot', type=bool, default=False)
         parser.add_argument('--calculate_mean_std', type=bool, default=True)
         parser.add_argument('--scale', type=bool, default=False)
-        parser.add_argument('--dicom', type=bool, default=True, help='Is DICOM format used for loading?')
+        parser.add_argument('--dicom', type=bool, default=False, help='Is DICOM format used for loading?')
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
         parser.add_argument('--completed', type=int, default=0)
         parser.add_argument('--res', type=float, default=0.200, help='Input image pixel size')
-        parser.add_argument('--sample_id', type=list, default=None, help='Process specific samples unless None.')
+        parser.add_argument('--sample_id', type=list, default=11, help='Process specific samples unless None.')
         parser.add_argument('--avg_planes', type=bool, default=False)
         parser.add_argument('--mri', type=bool, default=False, help='Is anisotropic MRI data used?')
         parser.add_argument('--snapshot', type=Path,

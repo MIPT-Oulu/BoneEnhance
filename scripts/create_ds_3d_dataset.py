@@ -10,9 +10,10 @@ from skimage.transform import resize
 if __name__ == "__main__":
     # Initialize experiment
     images_loc = Path('/media/santeri/data/BoneEnhance/Data/target_IVD_isotropic_3D_HR_largecrop')
-
+    images_loc = Path(f'../../Data/dental/Hampaat_target')
     # Save path
     images_save = Path('/media/santeri/data/BoneEnhance/Data/input_IVD_isotropic_3D_HR_largecrop')
+    images_save = Path(f'../../Data/dental/Hampaat_input')
     images_save.mkdir(exist_ok=True)
     # Output resolution
 
@@ -21,7 +22,7 @@ if __name__ == "__main__":
     save_h5 = True
     resize_3d = True
     # Antialiasing sigma
-    sigma = 0
+    sigma = 1
     k = 5
 
     # List samples

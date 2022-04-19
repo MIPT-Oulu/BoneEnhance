@@ -11,14 +11,14 @@ from skimage.transform import resize
 if __name__ == "__main__":
     # Initialize experiment
     parser = argparse.ArgumentParser()
-    parser.add_argument('--images_loc', type=Path, default='/media/santeri/data/BoneEnhance/Data/target_IVD_isotropic_2D_HR')
+    parser.add_argument('--images_loc', type=Path, default='../../Data/dental/Hampaat_rec')
     #'/media/santeri/Transcend/1176 Reconstructions')
-    parser.add_argument('--images_save', type=Path, default='/media/santeri/data/BoneEnhance/Data/target_IVD_isotropic_3D_HR')
-    parser.add_argument('--res_out', type=int, default=132.75, help='Target resolution for training data (in µm)')
+    parser.add_argument('--images_save', type=Path, default='../../Data/dental/Hampaat_target')
+    parser.add_argument('--res_out', type=int, default=50, help='Target resolution for training data (in µm)')
     parser.add_argument('--completed', type=int, default=0, help='Samples already processed and skipped.')
     parser.add_argument('--crop_size', type=list, default=[100, 100, 100], help='Size of one training patch')
     parser.add_argument('--sigma', type=float, default=0.5, help='Standard deviation of gaussian blur (antialiasing).')
-    parser.add_argument('--hdf5', type=bool, default=True, help='Save as 3D data (True) or a stack of 2D images.')
+    parser.add_argument('--hdf5', type=bool, default=False, help='Save as 3D data (True) or a stack of 2D images.')
 
     args = parser.parse_args()
 
@@ -39,9 +39,9 @@ if __name__ == "__main__":
         #try:
         # Load log file to check resolution
         im_path = args.images_loc / sample
-        #log = load_logfile(str(im_path))
-        #res = float(log['Image Pixel Size (um)'])
-        res = 132.75
+        log = load_logfile(str(im_path))
+        res = float(log['Image Pixel Size (um)'])
+        #res = 132.75
 
         # Scale factors and scaled crops
         factor = args.res_out / res
@@ -51,7 +51,7 @@ if __name__ == "__main__":
         data, files = load(im_path, axis=(1, 2, 0))
 
         # Visualize full stack
-        print_orthogonal(data, res=res/1e3, invert=True, cbar=True, scale_factor=10)
+        #print_orthogonal(data, res=res/1e3, invert=True, cbar=True, scale_factor=10)
 
         # Create Save directory
         #(images_save / sample).mkdir(exist_ok=True)

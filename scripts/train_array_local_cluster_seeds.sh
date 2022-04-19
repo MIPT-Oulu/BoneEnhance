@@ -9,7 +9,7 @@
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:v100:1,nvme:20
-#SBATCH --array=1-2
+#SBATCH --array=1-3
 
 # Set up environment
 export SCRATCH=/scratch/project_2002147/rytkysan
@@ -24,16 +24,19 @@ DATA_PATH=${LOCAL_SCRATCH}/Data
 # Create data folder
 mkdir -p ${DATA_PATH}
 # Move data
-rsync --inplace ${ARCHIVED_DATA}/target_1176_HR_2D.tar.gz ${DATA_PATH}
-rsync --inplace ${ARCHIVED_DATA}/target_1176_HR.tar.gz ${DATA_PATH}
-rsync --inplace ${ARCHIVED_DATA}/input_1176_HR_ds.tar.gz ${DATA_PATH}
+#rsync --inplace ${ARCHIVED_DATA}/target_1176_HR_2D.tar.gz ${DATA_PATH}
+#rsync --inplace ${ARCHIVED_DATA}/target_1176_HR.tar.gz ${DATA_PATH}
+#rsync --inplace ${ARCHIVED_DATA}/input_1176_HR_ds.tar.gz ${DATA_PATH}
+rsync --inplace ${ARCHIVED_DATA}/target_1176_dental_2D.tar.gz ${DATA_PATH}
+
 # Extract
-tar -xf ${DATA_PATH}/target_1176_HR_2D.tar.gz -C ${DATA_PATH}
-tar -xf ${DATA_PATH}/target_1176_HR.tar.gz -C ${DATA_PATH}
-tar -xf ${DATA_PATH}/input_1176_HR_ds.tar.gz -C ${DATA_PATH}
+#tar -xf ${DATA_PATH}/target_1176_HR_2D.tar.gz -C ${DATA_PATH}
+#tar -xf ${DATA_PATH}/target_1176_HR.tar.gz -C ${DATA_PATH}
+#tar -xf ${DATA_PATH}/input_1176_HR_ds.tar.gz -C ${DATA_PATH}
+tar -xf ${DATA_PATH}/target_1176_dental_2D.tar.gz -C ${DATA_PATH}
 
 # Random seeds
-declare -a SEEDS=(50 10 20 30 40)
+declare -a SEEDS=(10)
 # Number of CPUs (match above)
 declare -i NUM_THREADS=10
 

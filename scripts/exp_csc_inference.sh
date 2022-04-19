@@ -17,4 +17,5 @@ PRED_PATH=$4/predictions_oof_wacv  # Save images to local scratch
 # 5 = Snap directory
 
 # Run inference
-python -m inference_cluster --dataset_root $4/Clinical_data --save_dir $4/Results --bs ${BS} --snapshot $5 --sample_id ${SAMPLE_ID} --step ${STEP} --snap_id $1
+#python -m inference_cluster --dataset_root $4/Clinical_data --save_dir $4/Results --bs ${BS} --snapshot $5 --sample_id ${SAMPLE_ID} --step ${STEP} --snap_id $1
+python -m inference_cluster --dataset_root $4/Clinical_data --save_dir $4/Results --bs ${BS} --snapshot $5 --step ${STEP} --snap_id $1
