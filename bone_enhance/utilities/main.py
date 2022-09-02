@@ -318,11 +318,11 @@ def save(path, file_name, data, n_jobs=12, dtype='.png', verbose=True, template=
                                 for k in tqdm(range(nfiles), 'Saving dataset', disable=not verbose))
 
 
-def write_image_dicom(path, image):
+def write_image_dicom(path, image, res=0.05):
     # Create a DICOM dataset with filler values (except for the image file)
     file_meta = FileMetaDataset()
     file_meta.MediaStorageSOPClassUID = UID('1.2.840.10008.5.1.4.1.1.2')
-    file_meta.MediaStorageSOPInstanceUID = UID("1.2.3")
+    file_meta.MediaStorageSOPInstanceUID = UID("1.2.3.123")
     file_meta.ImplementationClassUID = UID("1.2.3.4")
     file_meta.TransferSyntaxUID = UID('1.2.840.10008.1.2')  # Little endian implicit
 
@@ -343,7 +343,8 @@ def write_image_dicom(path, image):
     ds.is_little_endian = True
     ds.is_implicit_VR = True
     ds.Modality = 'CT'
-    ds.PixelSpacing = [0.05, 0.05]
+    ds.PixelSpacing = [res, res]
+    ds.SliceThickness = res
 
     ds.SamplesPerPixel = 1
     ds.PhotometricInterpretation = "MONOCHROME2"
@@ -354,6 +355,14 @@ def write_image_dicom(path, image):
     ds.Columns = image.shape[1]
     ds.Rows = image.shape[0]
     ds.WindowCenter = 1060
+
+    # Set the slice position
+    slice_idx = str.rsplit(path, '_', 1)[1]  # Slice idx separated by _
+    slice_idx = int(os.path.splitext(slice_idx)[0])  # Remove extension
+
+    ds.file_meta.MediaStorageSOPInstanceUID = ds.file_meta.MediaStorageSOPInstanceUID[:-3] + str(slice_idx + 1)
+    ds.SOPInstanceUID = ds.file_meta.MediaStorageSOPInstanceUID
+    ds.ImagePositionPatient = [0, 0, np.round(res * slice_idx, 3)]
 
     # Add the image data to dicom file
     ds.PixelData = image.astype('uint8').tobytes()
@@ -368,12 +377,13 @@ def write_image_dicom(path, image):
     dcmwrite(path, ds)
 
 
-def write_dicom_template(path, image, template, slice_idx=0, res=0.05):
+def write_dicom_template(path, image, template, res=0.05):
     """
     Write a dicom image based on an existing image template for metadata.
     :param path:
     :param image:
     :param template:
+    :param res: Resolution of the reconstructed image (assumed isotropic)
     :return:
     """
     # Make sure the template is not altered
@@ -389,6 +399,7 @@ def write_dicom_template(path, image, template, slice_idx=0, res=0.05):
 
     ds.PixelSpacing = [res, res]
     ds.SliceThickness = res
+    #ds.SpacingBetweenSlices = res
     ds.HighBit = 7
     ds.BitsStored = 8
     ds.BitsAllocated = 8
@@ -403,14 +414,36 @@ def write_dicom_template(path, image, template, slice_idx=0, res=0.05):
     ds[0x00280106].VR = 'US'
     ds.LargestImagePixelValue = np.max(image).astype('uint8')
     ds[0x00280107].VR = 'US'
+    ds.WindowCenter = 1060
+    ds.WindowWidth = 4080
+    ds.RescaleIntercept = -1000
+    ds.RescaleSlope = 1
 
     # Set the slice position
+    diff = 1  # Difference in numbering?
     slice_idx = str.rsplit(path, '_', 1)[1]  # Slice idx separated by _
     slice_idx = int(os.path.splitext(slice_idx)[0])  # Remove extension
+    hundreds = (slice_idx - diff) // 100  # UID changes every hundred slices
 
-    ds.SOPInstanceUID = ds.SOPInstanceUID[:-3] + str(slice_idx + 1)
-    ds.file_meta.MediaStorageSOPInstanceUID = ds.file_meta.MediaStorageSOPInstanceUID[:-3] + str(slice_idx + 1)
-    ds.ImagePositionPatient[2] = res * slice_idx
+    # Patient name
+    ds.PatientName = str.rsplit(path, '/')[-2]  # Folder name is also sample/patient name
+    ds.PatientID = dt.strftime('%d%m') + dt.strftime('%Y')[2:] + '-' + str(ds.PatientName)  # Savedata-samplename
+
+    # UID
+    uid = ds.SOPInstanceUID.rsplit('.', 2)
+    uid[1] = str.rsplit(path, '/')[-2]  # Folder name is also sample/patient name
+    sample_id = [str(ord(x)) for x in uid[1]]  # Convert text to numbers
+    uid[1] = ''.join(sample_id)
+    ms_uid = ds.file_meta.MediaStorageSOPInstanceUID.rsplit('.', 2)
+    ds.SOPInstanceUID = f'{uid[0]}.{int(uid[1]) + hundreds}.{str(slice_idx + 1).zfill(5)}'
+    ds.FrameOfReferenceUID = f'{uid[0]}.{int(uid[1]) + hundreds}.{str(slice_idx + 1).zfill(5)}'
+    ds.StudyInstanceUID = f'{uid[0]}.{int(uid[1])}'
+    ds.SeriesInstanceUID = f'{uid[0]}.{int(uid[1])}'
+    ds.file_meta.MediaStorageSOPInstanceUID = f'{ms_uid[0]}.{int(ms_uid[1]) + hundreds}.{str(slice_idx + 1).zfill(5)}'
+
+    # Position
+    ds.ImagePositionPatient[2] = np.round(res * (slice_idx + diff), 3)
+    ds.SliceLocation = np.round(res * (slice_idx + diff), 3)
 
     # Write dicom file to path
     dcmwrite(path, ds)

@@ -16,24 +16,27 @@ if __name__ == "__main__":
     #images_loc = Path('/media/santeri/data/BoneEnhance/Data/target_1176_HR_2D')
     #images_loc = Path('/media/santeri/data/BoneEnhance/Data/MRI_IVD/9.4T MRI Scans')
     #images_loc = Path(f'../../Data/dental/Hampaat_rec')
-    images_loc = Path(f'../../Data/predictions_3D_clinical/dental_experiments/test/')
+
+    images_loc = Path(f'../../Data/extra/')  # Small stack for testing
+    #images_loc = Path(f'../../Data/predictions_3D_clinical/dental_experiments/tooth_limitedknee_model/')  # Full stack
+
     #images_loc = Path(f'../../Data/dental/')
     #images_loc = Path('/media/santeri/data/BoneEnhance/Data/MRI_IVD/3T scans dicom')
 
     images_save = Path('/media/santeri/data/BoneEnhance/Data/target_IVD_2D_HR')
     #images_save = Path(f'../../Data/dental/Hampaat_dataset')
-    images_save = Path(f'../../Data/predictions_3D_clinical/dental_experiments/test_dcm')
+    images_save = Path(f'../../Data/extra/WRIST_SCALED_SMALLVOI_tricubic')
 
     images_save.mkdir(exist_ok=True)
 
     #subdir = 'trabecular_data/Binned4x/bonemask'
-    resample = False
+    resample = True
     normalize = False
-    factor = 50/19.8
-    #factor = 4
+    #factor = 50/19.8
+    factor = 1/4
     #factor_slice = 1361.4/90
     sigma = 1
-    dtype = '.dcm'
+    dtype = '.png'
     k = 3
     hdf5 = False
 
@@ -42,7 +45,7 @@ if __name__ == "__main__":
     #samples = [name for name in samples if os.path.isdir(os.path.join(images_loc, name))]
     samples.sort()
     #samples = [samples[6]]
-    samples = [samples[0]]
+    samples = [samples[1]]
     if 'visualizations' in samples:
         samples.remove('visualizations')
     for sample in samples:
@@ -65,8 +68,8 @@ if __name__ == "__main__":
                 #data = (data / 2 ** 8).astype('uint8')
                 # Downscale
                 new_size = (data.shape[0] // factor, data.shape[1] // factor, data.shape[2] // factor)
-                data = resize(data, new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=sigma)
-                data = median_filter(data, size=3)
+                data = resize(data, new_size, order=3, anti_aliasing=False, preserve_range=True, anti_aliasing_sigma=sigma)
+                #data = median_filter(data, size=3)
                 if normalize:
                     min_data = np.min(data)
                     max_data = np.max(data)
