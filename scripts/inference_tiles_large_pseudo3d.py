@@ -188,6 +188,7 @@ if __name__ == "__main__":
 
     # List all snapshots from a path
     snap_path = '../../Workdir/wacv_experiments_new_2D'
+    #snap_path = '../../Workdir/dental_experiments'
     #snap_path = '../../Workdir/IVD_experiments_2D'
     #snap_path = '../../Workdir/snapshots'
     snaps = os.listdir(snap_path)
@@ -197,8 +198,11 @@ if __name__ == "__main__":
     #snaps = [snaps[-1]]
     # List of specific snapshots
     #snaps = ['2021_05_27_08_56_20_2D_perceptual_tv_IVD_4x_pretrained_seed42']
-    snaps = ['2021_06_11_11_59_53_2D_perceptual_tv_1176_seed10', '2021_06_10_23_57_51_2D_ssim_1176_seed10',
-             '2021_06_10_23_24_54_2D_mse_tv_1176_seed10']
+    snaps = ['2022_02_11_01_21_26_2D_ssim_dental_seed10']
+    snaps = [#'2021_06_11_11_59_53_2D_perceptual_tv_1176_seed10',
+             '2021_06_10_23_57_51_2D_ssim_1176_seed10',
+             #'2021_06_10_23_24_54_2D_mse_tv_1176_seed10'
+    ]
 
     for snap_id in range(len(snaps)):
 
@@ -206,16 +210,16 @@ if __name__ == "__main__":
         print(f'Calculating inference for snapshot: {snap} {snap_id+1}/{len(snaps)}')
 
         parser = argparse.ArgumentParser()
-        #parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
+        parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/Fantomi/H5B-fantomi/Series1/Series1/')
-        parser.add_argument('--dataset_root', type=Path, default='../../Data/dental/')
+        #parser.add_argument('--dataset_root', type=Path, default='../../Data/dental/')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/Test_set_(full)/input_3d')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Repeatability/')
         #parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}_avg')
         parser.add_argument('--save_dir', type=Path,
-                            default=f'../../Data/predictions_3D_clinical/dental_experiments/{snap}_single')
+                            default=f'../../Data/predictions_3D_clinical/wrist_experiments/{snap}_single')
         parser.add_argument('--bs', type=int, default=64)
-        parser.add_argument('--step', type=int, default=3)
+        parser.add_argument('--step', type=int, default=2)
         parser.add_argument('--plot', type=bool, default=False)
         parser.add_argument('--calculate_mean_std', type=bool, default=True)
         parser.add_argument('--scale', type=bool, default=False)
@@ -223,12 +227,12 @@ if __name__ == "__main__":
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
         parser.add_argument('--completed', type=int, default=0)
         parser.add_argument('--res', type=float, default=0.200, help='Input image pixel size')
-        parser.add_argument('--sample_id', type=list, default=11, help='Process specific samples unless None.')
+        parser.add_argument('--sample_id', type=list, default=10, help='Process specific samples unless None.')
         parser.add_argument('--avg_planes', type=bool, default=False)
         parser.add_argument('--mri', type=bool, default=False, help='Is anisotropic MRI data used?')
         parser.add_argument('--snapshot', type=Path,
                             default=os.path.join(snap_path, snap))
-        parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
+        parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.png')
         args = parser.parse_args()
 
         # Load snapshot configuration

@@ -249,6 +249,7 @@ def read_image_dicom(path, file):
     image = dcmread(f)
 
     return apply_modality_lut(image.pixel_array, image)
+    #return image.SOPInstanceUID
 
 
 def read_image_rgb(path, file):
@@ -401,12 +402,13 @@ def write_dicom_template(path, image, template, res=0.05):
     ds.SliceThickness = res
     #ds.SpacingBetweenSlices = res
     ds.HighBit = 7
-    ds.BitsStored = 8
-    ds.BitsAllocated = 8
+    ds.BitsStored = 8  # Standard requires 12-16
+    ds.BitsAllocated = 8  # Standard requires 16 for CT
     ds.Columns = image.shape[1]
     ds.Rows = image.shape[0]
 
     # Add the image data to dicom file
+
     ds.PixelData = image.astype('uint8').tobytes()
     ds[0x7fe00010].maxBytesToDisplay = 8
     ds[0x7fe00010].VR = 'OW'
@@ -414,16 +416,17 @@ def write_dicom_template(path, image, template, res=0.05):
     ds[0x00280106].VR = 'US'
     ds.LargestImagePixelValue = np.max(image).astype('uint8')
     ds[0x00280107].VR = 'US'
-    ds.WindowCenter = 1060
-    ds.WindowWidth = 4080
-    ds.RescaleIntercept = -1000
-    ds.RescaleSlope = 1
+    ds.WindowCenter = 500  # Display settings (-1000 to 2000)
+    ds.WindowWidth = 3000
+    ds.RescaleIntercept = -1000  # How the output is rescaled (-1000 to 2000)
+    ds.RescaleSlope = 13.5
 
     # Set the slice position
     diff = 1  # Difference in numbering?
     slice_idx = str.rsplit(path, '_', 1)[1]  # Slice idx separated by _
     slice_idx = int(os.path.splitext(slice_idx)[0])  # Remove extension
     hundreds = (slice_idx - diff) // 100  # UID changes every hundred slices
+    tens = (slice_idx - diff) // 10  # UID changes every ten slices
 
     # Patient name
     ds.PatientName = str.rsplit(path, '/')[-2]  # Folder name is also sample/patient name
@@ -435,11 +438,17 @@ def write_dicom_template(path, image, template, res=0.05):
     sample_id = [str(ord(x)) for x in uid[1]]  # Convert text to numbers
     uid[1] = ''.join(sample_id)
     ms_uid = ds.file_meta.MediaStorageSOPInstanceUID.rsplit('.', 2)
-    ds.SOPInstanceUID = f'{uid[0]}.{int(uid[1]) + hundreds}.{str(slice_idx + 1).zfill(5)}'
-    ds.FrameOfReferenceUID = f'{uid[0]}.{int(uid[1]) + hundreds}.{str(slice_idx + 1).zfill(5)}'
+    #ds.SOPInstanceUID = f'{uid[0]}.{int(uid[1]) + hundreds}.{str(slice_idx + 1).zfill(5)}'
+    ds.SOPInstanceUID = f'{uid[0]}.{int(uid[1])}.{str(slice_idx + 1).zfill(5)}'
+    ds.FrameOfReferenceUID = f'{uid[0]}.{int(uid[1])}1'
     ds.StudyInstanceUID = f'{uid[0]}.{int(uid[1])}'
-    ds.SeriesInstanceUID = f'{uid[0]}.{int(uid[1])}'
-    ds.file_meta.MediaStorageSOPInstanceUID = f'{ms_uid[0]}.{int(ms_uid[1]) + hundreds}.{str(slice_idx + 1).zfill(5)}'
+    ds.SeriesInstanceUID = f'{uid[0]}.{int(uid[1])}2'
+    ds.InstanceNumber = slice_idx + 1
+    #ds.file_meta.MediaStorageSOPInstanceUID = f'{ms_uid[0]}.{int(ms_uid[1]) + hundreds}.{str(slice_idx + 1).zfill(5)}'
+    ds.file_meta.MediaStorageSOPInstanceUID = f'{ms_uid[0]}.{int(ms_uid[1])}.{str(slice_idx + 1).zfill(5)}'
+
+    #del ds.SOPInstanceUID
+    #del ds.file_meta.MediaStorageSOPInstanceUID
 
     # Position
     ds.ImagePositionPatient[2] = np.round(res * (slice_idx + diff), 3)
