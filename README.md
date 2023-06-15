@@ -3,6 +3,8 @@ Methods for improving image quality on computed tomography -imaged bone
 
 (c) Santeri Rytky, University of Oulu, 2021-2023
 
+[![DOI](https://zenodo.org/badge/277459848.svg)](https://zenodo.org/badge/latestdoi/277459848)
+
 ![Analysis pipeline](https://github.com/MIPT-Oulu/BoneEnhance/blob/master/images/Flowchart.png)
 
 ## Background
