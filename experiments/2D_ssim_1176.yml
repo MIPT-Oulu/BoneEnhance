@@ -12,11 +12,12 @@ strategy:
 training:
   # General
   calc_meanstd: True
-  suffix: '_1176_HR'  # Options: _curated _reduced
+  suffix: '_1176_HR_2D'  # Options: _curated _reduced
   parse_color: False
-  crop_small: [16, 16, 16]
+  crop_small: [16, 16]
   crossmodality: False
   rgb: False
+  parser: 'parse_grayscale'  # Options: parse_3ch, parse_segmentation, parse_grayscale, parse_3d
   # Model
   architecture: perceptualnet
   upscale_input: True  # In PerceptualNet = resize-convolution
@@ -34,9 +35,9 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 50
-  bs: 32
+  bs: 128
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: combined_tv
+  loss: ssim
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False

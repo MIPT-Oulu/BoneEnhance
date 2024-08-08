@@ -86,9 +86,18 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
             data_xy = resize(data_xy, factor, order=0, anti_aliasing=True, preserve_range=True)
 
         # Channel dimension
-        if len(data_xy.shape) != 4:
+
+        # 3-channel neighborhood (requires z-dimension as first dimension)
+        if config.training.parser == 'parse_3ch':
+            data_xy = np.stack([
+                np.pad(data_xy[:, :, :-1], ((0, 0), (0, 0), (1, 0)), 'edge'),
+                data_xy,
+                np.pad(data_xy[:, :, 1:], ((0, 0), (0, 0), (0, 1)), 'edge')
+            ],
+                axis=-1)
+        elif len(data_xy.shape) != 4:
             data_xy = np.expand_dims(data_xy, -1)
-        if config.training.rgb:
+        if config.training.rgb and not config.training.parser == 'parse_3ch':
             data_xy = np.repeat(data_xy, 3, axis=-1)
 
         # Visualize input stack
@@ -187,10 +196,10 @@ if __name__ == "__main__":
     snap = '2021_01_08_09_49_45_2D_perceptualnet_ds_16'  # 2D model, 3 working folds
 
     # List all snapshots from a path
-    snap_path = '../../Workdir/wacv_experiments_new_2D'
+    #snap_path = '../../Workdir/wacv_experiments_new_2D'
     #snap_path = '../../Workdir/dental_experiments'
     #snap_path = '../../Workdir/IVD_experiments_2D'
-    #snap_path = '../../Workdir/snapshots'
+    snap_path = '../../Workdir/snapshots'
     snaps = os.listdir(snap_path)
     snaps.sort()
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(snap_path, snap))]
@@ -203,6 +212,7 @@ if __name__ == "__main__":
              '2021_06_10_23_57_51_2D_ssim_1176_seed10',
              #'2021_06_10_23_24_54_2D_mse_tv_1176_seed10'
     ]
+    snaps = ['2024_07_24_14_53_50_3D_ssim_3channel_seed42']  # 3-channel model
 
     for snap_id in range(len(snaps)):
 
@@ -217,7 +227,7 @@ if __name__ == "__main__":
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Repeatability/')
         #parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}_avg')
         parser.add_argument('--save_dir', type=Path,
-                            default=f'../../Data/predictions_3D_clinical/wrist_experiments/{snap}_single')
+                            default=f'../../Data/predictions_3D_clinical/wrist_experiments/{snap}_avg')
         parser.add_argument('--bs', type=int, default=64)
         parser.add_argument('--step', type=int, default=2)
         parser.add_argument('--plot', type=bool, default=False)
@@ -228,7 +238,7 @@ if __name__ == "__main__":
         parser.add_argument('--completed', type=int, default=0)
         parser.add_argument('--res', type=float, default=0.200, help='Input image pixel size')
         parser.add_argument('--sample_id', type=list, default=10, help='Process specific samples unless None.')
-        parser.add_argument('--avg_planes', type=bool, default=False)
+        parser.add_argument('--avg_planes', type=bool, default=True)
         parser.add_argument('--mri', type=bool, default=False, help='Is anisotropic MRI data used?')
         parser.add_argument('--snapshot', type=Path,
                             default=os.path.join(snap_path, snap))

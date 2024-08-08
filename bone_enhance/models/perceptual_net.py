@@ -144,7 +144,7 @@ class PerceptualNet(nn.Module):
         # Pass through the model
         x = self.net(x)
 
-        # Duplicate 1-channel image to represent RGB
+        # Duplicate 1-channel image to represent RGB TODO Should the target be 1-ch or 3-ch?
         if self.rgb:
             if len(x.size()) == 5:
                 x = x.repeat(1, 3, 1, 1, 1)

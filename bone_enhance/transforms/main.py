@@ -32,7 +32,7 @@ def normalize_channel_wise(tensor: torch.Tensor, mean: torch.Tensor, std: torch.
         raise Exception('Tensor in incorrect format!')
 
     # 3D
-    if len(tensor.size()) == 4:
+    if tensor.ndim == 4:
         # Modified shape
         for channel in range(tensor.size(0)):
             tensor[channel, :, :, :] -= mean[channel]
@@ -40,10 +40,15 @@ def normalize_channel_wise(tensor: torch.Tensor, mean: torch.Tensor, std: torch.
 
         return tensor
     # Noncompatible
-    elif len(tensor.size()) != 3:
+    elif tensor.ndim != 3:
         raise ValueError
     # 2D
     else:
+        # Channel dimensions mismatch: copy the mean and std to all channels
+        if mean.ndim == 1 and tensor.size(0) == 3:
+            mean = mean.repeat(3)
+            std = std.repeat(3)
+
         # Modified shape
         for channel in range(tensor.size(0)):
             tensor[channel, :, :] -= mean[channel]

@@ -11,7 +11,7 @@ from collagen.strategies import Strategy
 
 from bone_enhance.training.session import create_data_provider, init_experiment, init_callbacks, \
     save_transforms, init_loss, init_model
-from bone_enhance.training import parse_grayscale, parse_3d, parse_3d_debug, parse_segmentation
+from bone_enhance.training import parse_grayscale, parse_3d, parse_3d_debug, parse_segmentation, parse_3ch
 from bone_enhance.splits import build_splits
 from bone_enhance.inference.pipeline_components import inference_runner_oof, evaluation_runner
 
@@ -34,20 +34,29 @@ if __name__ == "__main__":
         config = OmegaConf.create(config_list[experiment])
         print(f'Running experiment: {config_paths[experiment]}')
 
-        # Update arguments according to the configuration file
-        if len(config.training.crop_small) == 3:
-            parser = partial(parse_3d, config=config)
+        # Dictionary of possible parsers
+        parsers = {
+            'parse_3d': parse_3d,
+            'parse_segmentation': parse_segmentation,
+            'parse_3ch': parse_3ch,
+            'parse_grayscale': parse_grayscale
+        }
+        # Select parser from log file if available
+        if config.training.parser is not None:
+            parser = partial(parsers[config.training.parser], config=config)
         else:
-            if config.training.segmentation:
-                parser = partial(parse_segmentation, config=config)
-            else:
-                parser = partial(parse_grayscale, config=config)
+            parser = partial(parse_grayscale, config=config)
 
         # Split training folds
         parser_debug = partial(parser, debug=True)  # Display figures
         splits_metadata = build_splits(args.data_location, args, config, parser_debug,
                                        args.snapshots_dir, config.training.snapshot)
+
+        # Mean and std in 1- or 3-channel format
         mean, std = splits_metadata['mean'], splits_metadata['std']
+        if len(mean) == 1 and config.training.parser == 'parse_3ch':
+            mean = mean.repeat(3)
+            std = std.repeat(3)
 
         # Loss
         loss_criterion = init_loss(config.training.loss, config, device=device, mean=mean, std=std, args=args)

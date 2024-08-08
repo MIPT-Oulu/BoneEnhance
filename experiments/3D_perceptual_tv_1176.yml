@@ -17,6 +17,7 @@ training:
   crop_small: [16, 16, 16]
   crossmodality: False
   rgb: False
+  parser: 'parse_3d'  # Options: parse_3ch, parse_segmentation, parse_grayscale, parse_3d
   # Model
   architecture: perceptualnet
   upscale_input: True  # In PerceptualNet = resize-convolution
@@ -36,7 +37,7 @@ training:
   epochs: 50
   bs: 32
   # Loss parameters: possible losses are "mse", "bce", "jaccard", "perceptual", "l1" and "combined"
-  loss: ssim
+  loss: combined_tv
   train_loss: True
   log_jaccard: True
   imagenet_normalize_loss: False

@@ -5,6 +5,7 @@ import h5py
 import numpy as np
 from matplotlib import pyplot as plt
 from skimage.transform import resize
+from pathlib import Path
 
 from bone_enhance.utilities import print_images, print_orthogonal
 
@@ -80,6 +81,98 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
 
     # Target is scaled to -1 to +1 range
     target = (target / 255. - 0.5) * 2
+
+    # Plot a small random portion of image-target pairs during debug
+    if debug and uniform(0, 1) >= 0.999:
+        fig = plt.figure(dpi=300)
+        ax1 = fig.add_subplot(121)
+        im = ax1.imshow(np.asarray(img[0, :, :] / 255.), cmap='gray')
+        plt.colorbar(im, orientation='horizontal')
+        plt.title('Input')
+
+        ax2 = fig.add_subplot(122)
+        im2 = ax2.imshow(np.asarray(target[0, :, :]), cmap='gray')
+        plt.colorbar(im2, orientation='horizontal')
+        plt.title('Target')
+        plt.show()
+
+    return {data_key: img, target_key: target}
+
+
+def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=None):
+
+    # Load the correct target slice
+    target = cv2.imread(str(entry.target_fname), -1)
+    target = cv2.cvtColor(target, cv2.COLOR_GRAY2RGB)
+
+    # Try to load neighbouring slices
+
+    # Neighbour filenames
+    n_1 = entry.target_fname
+    n_1 = Path(n_1.parent, str(int(n_1.stem[-8:]) - 1).zfill(8) + n_1.suffix)
+    if n_1.exists():
+        target[:, :, 0] = cv2.imread(str(n_1), cv2.IMREAD_GRAYSCALE)
+    n_2 = entry.target_fname
+    n_2 = Path(n_2.parent, str(int(n_2.stem[-8:]) + 1).zfill(8) + n_2.suffix)
+    if n_2.exists():
+        target[:, :, 2] = cv2.imread(str(n_2), cv2.IMREAD_GRAYSCALE)
+
+    # Magnification
+    mag = config.training.magnification
+    # Antialiasing kernel size
+    if config.training.antialiasing is not None:
+        k = config.training.antialiasing
+    else:
+        k = 5
+    if config.training.sigma is not None:
+        s = config.training.sigma
+    else:
+        s = 0
+
+    # Resize target to 4x magnification respect to input
+    if config is not None and not config.training.crossmodality:
+
+        new_size = (target.shape[1] // mag, target.shape[0] // mag)
+
+        # No antialias
+        #img = cv2.resize(target, new_size, interpolation=cv2.INTER_LANCZOS4)
+        # Antialias
+        img = cv2.resize(cv2.GaussianBlur(target, ksize=(k, k), sigmaX=s, sigmaY=s), new_size)
+        #img = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=k).astype('uint8')
+    elif config is not None:
+
+        # Read image and target
+        if config.training.rgb:
+            img = cv2.imread(str(entry.fname), -1)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img[:, :, 1] = img[:, :, 0]
+            img[:, :, 2] = img[:, :, 0]
+        else:
+            img = cv2.imread(str(entry.fname), cv2.IMREAD_GRAYSCALE)
+
+
+        new_size = (img.shape[1] * mag, img.shape[0] * mag)
+        target = cv2.GaussianBlur(target, ksize=(k, k), sigmaX=s, sigmaY=s)
+        target = cv2.resize(target, new_size)
+        #target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=k).astype('uint8')
+    else:
+        raise NotImplementedError
+
+    # Make sure that grayscale images also possess channel dimension
+    if len(img.shape) != 3:
+        img = np.expand_dims(img, -1)
+    if len(target.shape) != 3:
+        target = np.expand_dims(target, -1)
+
+    # Apply random transforms. Images are returned in format 3xHxW
+    img, target = transform((img, target))
+
+    # Target is scaled to -1 to +1 range
+    target = (target / 255. - 0.5) * 2
+
+    # Keep only the center slice of target TODO should this be optional?
+    target = target[[1], :, :]
+    target = target.repeat(3, 1, 1)
 
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.999:
@@ -181,9 +274,6 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
 
     # Magnification
     mag = config.training.magnification
-
-    #cm = choice([True, False])
-    cm = config.training.crossmodality
 
     # Downscaling should be done outside training
     if config is not None:
