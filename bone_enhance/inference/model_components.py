@@ -68,7 +68,8 @@ def load_models(model_path, config, n_gpus=1, magnification=4, fold=None):
             model = PerceptualNet(config.training.magnification,
                                   resize_convolution=config.training.upscale_input,
                                   norm=config.training.normalization,
-                                  vol=vol, rgb=config.training.rgb)
+                                  vol=vol, rgb=config.training.rgb,
+                                  residual_layers=config.training.residual_layers)
         else:
             raise Exception('Model architecture unavailable.')
 

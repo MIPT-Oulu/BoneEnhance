@@ -247,7 +247,8 @@ def init_model(config, device='cuda', gpus=1, args=None):
         model = PerceptualNet(config.training.magnification,
                               resize_convolution=config.training.upscale_input,
                               norm=config.training.normalization,
-                              vol=vol, rgb=config.training.rgb)
+                              vol=vol, rgb=config.training.rgb,
+                              residual_layers=config.training.residual_layers)
     else:
         raise Exception('Model architecture unavailable.')
 

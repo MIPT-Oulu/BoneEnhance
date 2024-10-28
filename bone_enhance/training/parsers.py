@@ -79,7 +79,7 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     # Apply random transforms. Images are returned in format 3xHxW
     img, target = transform((img, target))
 
-    # Target is scaled to -1 to +1 range
+    # Target is scaled to -1 to +1 range (for tanh activation)
     target = (target / 255. - 0.5) * 2
 
     # Plot a small random portion of image-target pairs during debug

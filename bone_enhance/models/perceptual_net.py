@@ -52,7 +52,7 @@ class PerceptualNet(nn.Module):
     by Johnson et al, https://arxiv.org/abs/1603.08155
     """
     def __init__(self, magnification, activation='relu', resize_convolution=False, norm='bn', vol=False,
-                 final_activation=False, rgb=True):
+                 final_activation=False, rgb=True, residual_layers=4):
         super(PerceptualNet, self).__init__()
 
         # Variables
@@ -104,12 +104,11 @@ class PerceptualNet(nn.Module):
             self.norm(f_maps[1], affine=True),
             self.activation
         ]
-        mid_block = [
-            ResidualBlock(f_maps[1], norm=norm, vol=vol),
-            ResidualBlock(f_maps[1], norm=norm, vol=vol),
-            ResidualBlock(f_maps[1], norm=norm, vol=vol),
-            ResidualBlock(f_maps[1], norm=norm, vol=vol)
-        ]
+
+        # Residual blocks
+        residual_layers = 4 if residual_layers is None else residual_layers
+        mid_block = [ResidualBlock(f_maps[1], norm=norm, vol=vol)] * residual_layers
+
         if resize_convolution:
             upscale_block = [
                 upsampling(scale_factor=2),
@@ -151,5 +150,5 @@ class PerceptualNet(nn.Module):
             else:
                 x = x.repeat(1, 3, 1, 1)
 
-        # Scaled Tanh activation
+        # Sigmoid activation
         return x.tanh()

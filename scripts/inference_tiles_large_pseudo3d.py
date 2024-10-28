@@ -213,6 +213,8 @@ if __name__ == "__main__":
              #'2021_06_10_23_24_54_2D_mse_tv_1176_seed10'
     ]
     snaps = ['2024_07_24_14_53_50_3D_ssim_3channel_seed42']  # 3-channel model
+    snaps = ['2024_08_30_08_35_46_2D_ssim_residual_depth_seed42']  # Deeper model
+    snaps = ['2024_09_12_17_26_06_2D_ssim_deep_3ch_seed42'] # Deeper 3-ch model
 
     for snap_id in range(len(snaps)):
 
