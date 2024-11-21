@@ -1,5 +1,7 @@
 from random import choice, uniform
 
+from skimage.filters import gaussian
+from skimage.transform import rescale
 import cv2
 import h5py
 import numpy as np
@@ -117,6 +119,9 @@ def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=
     if n_2.exists():
         target[:, :, 2] = cv2.imread(str(n_2), cv2.IMREAD_GRAYSCALE)
 
+    # Convert to float
+    #target = ((target - target.min()) / target.max()).astype(np.float32)
+
     # Magnification
     mag = config.training.magnification
     # Antialiasing kernel size
@@ -132,13 +137,70 @@ def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=
     # Resize target to 4x magnification respect to input
     if config is not None and not config.training.crossmodality:
 
-        new_size = (target.shape[1] // mag, target.shape[0] // mag)
+        # Gaussian filter and downscaling
+        # Load the correct target slice
+        target = cv2.imread(str(entry.target_fname), -1)
+        target = cv2.cvtColor(target, cv2.COLOR_GRAY2RGB)
 
-        # No antialias
-        #img = cv2.resize(target, new_size, interpolation=cv2.INTER_LANCZOS4)
-        # Antialias
-        img = cv2.resize(cv2.GaussianBlur(target, ksize=(k, k), sigmaX=s, sigmaY=s), new_size)
-        #img = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=k).astype('uint8')
+        # Try to load neighbouring slices
+
+        # Neighbour filenames
+        n_1 = entry.target_fname
+        n_1 = Path(n_1.parent, str(int(n_1.stem[-8:]) - 1).zfill(8) + n_1.suffix)
+        if n_1.exists():
+            target[:, :, 0] = cv2.imread(str(n_1), cv2.IMREAD_GRAYSCALE)
+        n_2 = entry.target_fname
+        n_2 = Path(n_2.parent, str(int(n_2.stem[-8:]) + 1).zfill(8) + n_2.suffix)
+        if n_2.exists():
+            target[:, :, 2] = cv2.imread(str(n_2), cv2.IMREAD_GRAYSCALE)
+
+        # Convert to float
+        # target = ((target - target.min()) / target.max()).astype(np.float32)
+
+        # Magnification
+        mag = config.training.magnification
+        # Antialiasing kernel size
+        if config.training.antialiasing is not None:
+            k = config.training.antialiasing
+        else:
+            k = 5
+        if config.training.sigma is not None:
+            s = config.training.sigma
+        else:
+            s = 0
+
+        # Resize target to 4x magnification respect to input
+        if config is not None and not config.training.crossmodality:
+
+            # Gaussian filter and downscaling
+            img = rescale(
+                gaussian(target, sigma=3, preserve_range=True), 1 / mag, order=1, channel_axis=2, preserve_range=True).astype('uint16')
+
+        # Co-registered images
+        elif config is not None:
+
+            # Read image and target
+            if config.training.rgb:
+                img = cv2.imread(str(entry.fname), -1)
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                img[:, :, 1] = img[:, :, 0]
+                img[:, :, 2] = img[:, :, 0]
+            else:
+                img = cv2.imread(str(entry.fname), cv2.IMREAD_GRAYSCALE)
+
+            new_size = (img.shape[1] * mag, img.shape[0] * mag)
+            target = cv2.GaussianBlur(target, ksize=(k, k), sigmaX=s, sigmaY=s)
+            target = cv2.resize(target, new_size)
+            # target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=k).astype('uint8')
+        else:
+            raise NotImplementedError
+
+        # Make sure that grayscale images also possess channel dimension
+        if len(img.shape) != 3:
+            img = np.expand_dims(img, -1)
+        if len(target.shape) != 3:
+            target = np.expand_dims(target, -1)
+    # Co-registered images
     elif config is not None:
 
         # Read image and target
@@ -164,10 +226,10 @@ def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=
     if len(target.shape) != 3:
         target = np.expand_dims(target, -1)
 
-    # Apply random transforms. Images are returned in format 3xHxW
+    # Apply random transforms. Images are returned in format 3xHxW TODO conserve dynamic range with transforms
     img, target = transform((img, target))
 
-    # Target is scaled to -1 to +1 range
+    # Target is scaled to -1 to +1 range (tanh activation)
     target = (target / 255. - 0.5) * 2
 
     # Keep only the center slice of target TODO should this be optional?
@@ -176,16 +238,18 @@ def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=
 
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.999:
-        fig = plt.figure(dpi=300)
-        ax1 = fig.add_subplot(121)
-        im = ax1.imshow(np.asarray(img[0, :, :] / 255.), cmap='gray')
-        plt.colorbar(im, orientation='horizontal')
-        plt.title('Input')
+        fig, ax = plt.subplots(2, 2)
+        im = ax[0, 0].imshow(np.asarray(img[0, :, :] / 255.), cmap='gray')
+        fig.colorbar(im, ax=ax[0, 0], orientation='horizontal')
+        ax[0, 0].set_title('Input')
 
-        ax2 = fig.add_subplot(122)
-        im2 = ax2.imshow(np.asarray(target[0, :, :]), cmap='gray')
-        plt.colorbar(im2, orientation='horizontal')
-        plt.title('Target')
+        im = ax[0, 1].imshow(np.asarray(target[0, :, :]), cmap='gray')
+        fig.colorbar(im, ax=ax[0, 1], orientation='horizontal')
+        ax[0, 1].set_title('Target')
+
+        # Histogram
+        ax[1, 0].hist(np.asarray(img).ravel(), bins=2 ** 10)
+        ax[1, 1].hist(np.asarray(target).ravel(), bins=2 ** 10)
         plt.show()
 
     return {data_key: img, target_key: target}

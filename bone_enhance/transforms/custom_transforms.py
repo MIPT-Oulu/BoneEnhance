@@ -265,11 +265,14 @@ class Brightness(ImageTransform):
 
     def sample_transform(self, data):
         brightness_fact = random.uniform(self.brightness_range[0], self.brightness_range[1])
-        lut = np.arange(0, 256) + brightness_fact
-        lut = np.clip(lut, 0, 255).astype("uint8")
+
+        # Data type (uint8 or uint16)
+        dtype = data.data[0].dtype
+        lut = np.arange(0, np.iinfo(dtype).max + 1) + brightness_fact
+        lut = np.clip(lut, 0, np.iinfo(dtype).max).astype(dtype)
         self.state_dict = {"brightness_fact": brightness_fact, "LUT": lut}
 
-    @ensure_valid_image(num_dims_spatial=(3,))
+    @ensure_valid_image()
     def _apply_img(self, img: np.ndarray, settings: dict):
         return cv2.LUT(img, self.state_dict["LUT"])
 
@@ -305,11 +308,13 @@ class Contrast(ImageTransform):
 
     def sample_transform(self, data):
         contrast_mul = random.uniform(self.contrast_range[0], self.contrast_range[1])
-        lut = np.arange(0, 256) * contrast_mul
-        lut = np.clip(lut, 0, 255).astype("uint8")
+
+        dtype = data.data[0].dtype
+        lut = np.arange(0, np.iinfo(dtype).max + 1) * contrast_mul
+        lut = np.clip(lut, 0, np.iinfo(dtype).max).astype(dtype)
         self.state_dict = {"contrast_mul": contrast_mul, "LUT": lut}
 
-    @ensure_valid_image(num_dims_spatial=(3,))
+    @ensure_valid_image()
     def _apply_img(self, img: np.ndarray, settings: dict):
         return cv2.LUT(img, self.state_dict["LUT"])
 
@@ -386,7 +391,7 @@ class Blur(ImageTransform):
             kernel = kernel / np.sum(kernel)
             self.state_dict.update({"motion_kernel": kernel})
 
-    @ensure_valid_image(num_dims_spatial=(3,))
+    @ensure_valid_image()
     def _apply_img(self, img: np.ndarray, settings: dict):
         if self.blur == "g":
             return gaussian(img, sigma=self.state_dict["sigma"])
@@ -550,13 +555,15 @@ class Noise(ImageTransform):
         gain = random.uniform(self.gain_range[0], self.gain_range[1])
         self.state_dict = {"gain": gain}
 
-    @ensure_valid_image(num_dims_spatial=(3,))
+    @ensure_valid_image()
     def _apply_img(self, img: np.ndarray, settings: dict):
+        dtype = img.dtype
+
         if self.type == 'gaussian' or self.type == 'speckle':
-            return random_noise(img, mode=self.type, var=self.state_dict['gain']) * 255
+            return random_noise(img, mode=self.type, var=self.state_dict['gain']) * np.iinfo(dtype).max
         elif self.type == 's&p':
-            return random_noise(img, mode=self.type, amount=self.state_dict['gain']) * 255
+            return random_noise(img, mode=self.type, amount=self.state_dict['gain']) * np.iinfo(dtype).max
         else:
-            return random_noise(img, mode=self.type) * 255
+            return random_noise(img, mode=self.type) * np.iinfo(dtype).max
 
 

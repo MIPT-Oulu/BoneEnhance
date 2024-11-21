@@ -131,7 +131,7 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
 
 def estimate_mean_std(config, args, metadata, parse_item_cb):
     mean_std_loader = ItemLoader(meta_data=metadata,
-                                 transform=train_test_transforms(config, args)['train'],
+                                 transform=train_test_transforms(config)['train'],
                                  parse_item_cb=parse_item_cb,
                                  batch_size=config.training.bs, num_workers=args.num_threads,
                                  shuffle=False)

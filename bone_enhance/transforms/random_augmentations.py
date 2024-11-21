@@ -26,11 +26,6 @@ def return_transforms(prob, trf, magnification, crop_small, config, vol=False):
                 Crop(magnification, crop_mode='r', crop_to=(crop_small, crop_large)),
                 Pad(pad_to=(crop_small, crop_large)),
 
-                # 50% Chance for Brightness & contrast adjustment
-                slc.Stream([
-                    Brightness(brightness_range=tuple(trf.brightness), p=prob),
-                    Contrast(contrast_range=trf.contrast, p=prob)]),
-
                 # 50% Chance for smoothing/blurring
                 slc.SelectiveStream([
                     Blur(p=prob, blur_type='g', k_size=3, gaussian_sigma=tuple(trf.sigma)),
@@ -38,12 +33,12 @@ def return_transforms(prob, trf, magnification, crop_small, config, vol=False):
                     ]),
 
                 # 50% Chance for Added noise
-                #slc.SelectiveStream([
-                #    Noise(p=prob, mode='gaussian', gain_range=trf['gain_gn']),
-                #    Noise(p=prob, mode='poisson', gain_range=trf['gain_gn']),
-                #    Noise(p=prob, mode='s&p', gain_range=trf['gain_sp']),
-                #    Noise(p=prob, mode='speckle', gain_range=trf['gain_sp']),
-                #])
+                slc.SelectiveStream([
+                    Noise(p=prob, mode='gaussian', gain_range=trf['gain_gn']),
+                    Noise(p=prob, mode='poisson', gain_range=trf['gain_gn']),
+                    Noise(p=prob, mode='s&p', gain_range=trf['gain_sp']),
+                    Noise(p=prob, mode='speckle', gain_range=trf['gain_sp']),
+                ])
             ]),
 
             # Empty stream
@@ -74,8 +69,8 @@ def return_transforms(prob, trf, magnification, crop_small, config, vol=False):
 
                 # 50% Chance for Brightness & contrast adjustment
                 slc.SelectiveStream([
-                    slt.Brightness(brightness_range=tuple(trf['brightness']), p=prob),
-                    slt.Contrast(contrast_range=trf['contrast'], p=prob)]),
+                    Brightness(brightness_range=tuple(trf['brightness']), p=prob),
+                    Contrast(contrast_range=trf['contrast'], p=prob)]),
                 # Noise
                 slc.SelectiveStream([
                     # slt.SaltAndPepper(p=prob, gain_range=trf['gain_sp']),
@@ -112,17 +107,14 @@ def return_transforms(prob, trf, magnification, crop_small, config, vol=False):
                 Crop(magnification, crop_mode='r', crop_to=(crop_small, crop_large)),
                 Pad(pad_to=(crop_small, crop_large)),
 
-                # 50% Chance for Brightness & contrast adjustment
-                slc.SelectiveStream([
-                    slt.Brightness(brightness_range=tuple(trf['brightness']), p=prob),
-                    slt.Contrast(contrast_range=trf['contrast'], p=prob)]),
                 # Noise
                 slc.SelectiveStream([
-                    # slt.SaltAndPepper(p=prob, gain_range=trf['gain_sp']),
-                    # slt.Noise(p=prob, gain_range=trf['gain_gn']),
+                    Noise(p=prob, gain_range=trf['gain_gn']),
+                    slt.SaltAndPepper(p=prob, gain_range=trf['gain_sp']),
                     slc.SelectiveStream([
                         slt.Blur(p=prob, blur_type='g', k_size=(3, 5), gaussian_sigma=tuple(trf['sigma'])),
-                        slt.Blur(p=prob, blur_type='m', k_size=(3, 5), gaussian_sigma=tuple(trf['sigma']))])
+                        slt.Blur(p=prob, blur_type='m', k_size=(3, 5), gaussian_sigma=tuple(trf['sigma']))
+                    ])
                 ])
             ]),
 

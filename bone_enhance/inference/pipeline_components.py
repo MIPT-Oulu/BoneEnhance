@@ -241,7 +241,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
     start_inf = time()
 
     # Inference arguments
-    if args.save_dir is None:
+    if not hasattr(args, 'save_dir'):
         args.save_dir = args.data_location / 'predictions_oof'
     args.save_dir.mkdir(exist_ok=True)
     sigma = 0.5  # Antialiasing filter for downscaling

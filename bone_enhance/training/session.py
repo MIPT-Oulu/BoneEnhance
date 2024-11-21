@@ -284,7 +284,7 @@ def create_data_provider(args, config, parser, metadata, mean, std):
     item_loaders = dict()
     for stage in ['train', 'eval']:
         item_loaders[f'loader_{stage}'] = ItemLoader(meta_data=metadata[stage],
-                                                     transform=train_test_transforms(config, args, mean, std)[stage],
+                                                     transform=train_test_transforms(config, mean, std)[stage],
                                                      parse_item_cb=parser,
                                                      batch_size=config.training.bs, num_workers=args.num_threads,
                                                      shuffle=True if stage == "train" else False)
@@ -316,7 +316,7 @@ def save_transforms(path, config, args, mean, std):
     :return:
     """
     # Build the augmentations
-    transforms = train_test_transforms(config, args, mean, std)
+    transforms = train_test_transforms(config, mean, std)
     # Save the experiment parameters
     with open(path / 'transforms.yaml', 'w') as f:
         yaml.dump(transforms['train_list'][1].to_yaml(), f)

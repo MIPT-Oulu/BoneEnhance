@@ -107,7 +107,7 @@ def unwrap_solt(dc):
     return dc.data
 
 
-def train_test_transforms(conf, args, mean=None, std=None):
+def train_test_transforms(conf, mean=None, std=None):
     trf = conf.transforms
     training = conf.training
     crop_small = tuple(training.crop_small)
