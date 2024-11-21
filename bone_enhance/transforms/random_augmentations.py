@@ -93,6 +93,7 @@ def return_transforms(prob, trf, magnification, crop_small, config, vol=False):
             slt.Crop(crop_mode='r', crop_to=crop_large),
         ])
 
+    # 2D super-resolution
     else:
         transforms = slc.SelectiveStream([
             slc.Stream([

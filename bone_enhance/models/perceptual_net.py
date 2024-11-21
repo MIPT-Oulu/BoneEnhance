@@ -150,5 +150,5 @@ class PerceptualNet(nn.Module):
             else:
                 x = x.repeat(1, 3, 1, 1)
 
-        # Sigmoid activation
+        # Hyperbolic tangent activation
         return x.tanh()

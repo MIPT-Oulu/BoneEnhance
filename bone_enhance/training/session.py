@@ -37,8 +37,8 @@ def init_experiment(experiments='../experiments/run'):
 
     # Input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_location', type=Path, default='../../Data', help='Location of input and target images')
-    parser.add_argument('--workdir', type=Path, default='../../Workdir/', help='Location of snapshots folder')
+    parser.add_argument('--data_location', type=Path, default='../Data', help='Location of input and target images')
+    parser.add_argument('--workdir', type=Path, default='../Workdir/', help='Location of snapshots folder')
     parser.add_argument('--experiment', type=Path, default=experiments, help='Location of the experiments folder')
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     parser.add_argument('--num_threads', type=int, default=16, help='Number of CPUs')
@@ -47,6 +47,8 @@ def init_experiment(experiments='../experiments/run'):
     args = parser.parse_args()
 
     # Initialize working directories
+    args.data_location.mkdir(exist_ok=True)
+    args.workdir.mkdir(exist_ok=True)
     args.snapshots_dir = args.workdir / 'snapshots'
     args.snapshots_dir.mkdir(exist_ok=True)
 

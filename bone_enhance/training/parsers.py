@@ -136,87 +136,32 @@ def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=
 
     # Resize target to 4x magnification respect to input
     if config is not None and not config.training.crossmodality:
-
         # Gaussian filter and downscaling
-        # Load the correct target slice
-        target = cv2.imread(str(entry.target_fname), -1)
-        target = cv2.cvtColor(target, cv2.COLOR_GRAY2RGB)
+        img = rescale(
+            gaussian(target, sigma=3, preserve_range=True), 1 / mag, order=1, channel_axis=2, preserve_range=True).astype('uint16')
 
-        # Try to load neighbouring slices
+    # Co-registered images
+    elif config is not None:
+
+        img = cv2.imread(str(entry.fname), -1)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         # Neighbour filenames
-        n_1 = entry.target_fname
+        n_1 = entry.fname
         n_1 = Path(n_1.parent, str(int(n_1.stem[-8:]) - 1).zfill(8) + n_1.suffix)
         if n_1.exists():
             target[:, :, 0] = cv2.imread(str(n_1), cv2.IMREAD_GRAYSCALE)
-        n_2 = entry.target_fname
+        n_2 = entry.fname
         n_2 = Path(n_2.parent, str(int(n_2.stem[-8:]) + 1).zfill(8) + n_2.suffix)
         if n_2.exists():
             target[:, :, 2] = cv2.imread(str(n_2), cv2.IMREAD_GRAYSCALE)
 
-        # Convert to float
-        # target = ((target - target.min()) / target.max()).astype(np.float32)
-
-        # Magnification
-        mag = config.training.magnification
-        # Antialiasing kernel size
-        if config.training.antialiasing is not None:
-            k = config.training.antialiasing
-        else:
-            k = 5
-        if config.training.sigma is not None:
-            s = config.training.sigma
-        else:
-            s = 0
-
-        # Resize target to 4x magnification respect to input
-        if config is not None and not config.training.crossmodality:
-
-            # Gaussian filter and downscaling
-            img = rescale(
-                gaussian(target, sigma=3, preserve_range=True), 1 / mag, order=1, channel_axis=2, preserve_range=True).astype('uint16')
-
-        # Co-registered images
-        elif config is not None:
-
-            # Read image and target
-            if config.training.rgb:
-                img = cv2.imread(str(entry.fname), -1)
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                img[:, :, 1] = img[:, :, 0]
-                img[:, :, 2] = img[:, :, 0]
-            else:
-                img = cv2.imread(str(entry.fname), cv2.IMREAD_GRAYSCALE)
-
+        # If the image sizes do not match, rescale the target image to match the input image
+        if target.shape != tuple([mag * x for x in img.shape]):  # TODO Check that resizing works properly
             new_size = (img.shape[1] * mag, img.shape[0] * mag)
-            target = cv2.GaussianBlur(target, ksize=(k, k), sigmaX=s, sigmaY=s)
             target = cv2.resize(target, new_size)
-            # target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=k).astype('uint8')
-        else:
-            raise NotImplementedError
 
-        # Make sure that grayscale images also possess channel dimension
-        if len(img.shape) != 3:
-            img = np.expand_dims(img, -1)
-        if len(target.shape) != 3:
-            target = np.expand_dims(target, -1)
-    # Co-registered images
-    elif config is not None:
-
-        # Read image and target
-        if config.training.rgb:
-            img = cv2.imread(str(entry.fname), -1)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img[:, :, 1] = img[:, :, 0]
-            img[:, :, 2] = img[:, :, 0]
-        else:
-            img = cv2.imread(str(entry.fname), cv2.IMREAD_GRAYSCALE)
-
-
-        new_size = (img.shape[1] * mag, img.shape[0] * mag)
-        target = cv2.GaussianBlur(target, ksize=(k, k), sigmaX=s, sigmaY=s)
-        target = cv2.resize(target, new_size)
-        #target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=k).astype('uint8')
+        # target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=k).astype('uint8')
     else:
         raise NotImplementedError
 
