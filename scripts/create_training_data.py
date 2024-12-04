@@ -11,12 +11,12 @@ from skimage.transform import resize
 if __name__ == "__main__":
     # Initialize experiment
     parser = argparse.ArgumentParser()
-    parser.add_argument('--images_loc', type=Path, default='../../Data/dental/Hampaat_rec')
+    parser.add_argument('--images_loc', type=Path, default='/media/data/BoneEnhance/Data/target')
     #'/media/santeri/Transcend/1176 Reconstructions')
-    parser.add_argument('--images_save', type=Path, default='../../Data/dental/Hampaat_target')
-    parser.add_argument('--res_out', type=int, default=50, help='Target resolution for training data (in µm)')
+    parser.add_argument('--images_save', type=Path, default='/media/data/BoneEnhance/Data/Training dataset/')
+    parser.add_argument('--res_out', type=int, default=6, help='Target resolution for training data (in µm)')
     parser.add_argument('--completed', type=int, default=0, help='Samples already processed and skipped.')
-    parser.add_argument('--crop_size', type=list, default=[100, 100, 100], help='Size of one training patch')
+    parser.add_argument('--crop_size', type=list, default=[10, 696, 696], help='Size of one training patch')
     parser.add_argument('--sigma', type=float, default=0.5, help='Standard deviation of gaussian blur (antialiasing).')
     parser.add_argument('--hdf5', type=bool, default=False, help='Save as 3D data (True) or a stack of 2D images.')
 
@@ -39,9 +39,11 @@ if __name__ == "__main__":
         #try:
         # Load log file to check resolution
         im_path = args.images_loc / sample
-        log = load_logfile(str(im_path))
-        res = float(log['Image Pixel Size (um)'])
+        #log = load_logfile(str(im_path))
+        #res = float(log['Image Pixel Size (um)'])
         #res = 132.75
+
+        res = 6.0
 
         # Scale factors and scaled crops
         factor = args.res_out / res
@@ -62,7 +64,6 @@ if __name__ == "__main__":
         for x in range(n_crops[0]):
             for y in range(n_crops[1]):
                 for z in range(n_crops[2]):
-
                     # Crop according to scale of crop_large
                     data_out = data[
                                x * crop_large[0] + crop_begin[0]:(x + 1) * crop_large[0] + crop_begin[0],

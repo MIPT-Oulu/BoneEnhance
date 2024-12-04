@@ -40,6 +40,7 @@ def build_meta_from_files(base_path, config):
         target_loc = base_path / 'target'
         input_loc = base_path / 'input'
 
+    print(input_loc)
     # For autoencoder, use same input and target
     if config.autoencoder:
         input_loc = target_loc
@@ -64,7 +65,6 @@ def build_meta_from_files(base_path, config):
     # Sort alphabetically
     input_images.sort()
     target_images.sort()
-
     # Check for data consistency
     assert len(input_images), len(target_images)
 
@@ -131,7 +131,7 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
 
 def estimate_mean_std(config, args, metadata, parse_item_cb):
     mean_std_loader = ItemLoader(meta_data=metadata,
-                                 transform=train_test_transforms(config)['train'],
+                                 transform=train_test_transforms(config)['eval'],
                                  parse_item_cb=parse_item_cb,
                                  batch_size=config.training.bs, num_workers=args.num_threads,
                                  shuffle=False)

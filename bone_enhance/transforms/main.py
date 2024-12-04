@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from functools import partial
 
-from solt import DataContainer
+from solt.core import DataContainer
 import solt.transforms as slt
 import solt.core as slc
 from bone_enhance.transforms.custom_transforms import Crop, Pad, Brightness, Contrast, Blur, Flip, Rotate90, \
@@ -89,7 +89,7 @@ def numpy2tens(x: np.ndarray, dtype='f') -> torch.Tensor:
     else:
         raise NotImplementedError
 
-
+'''
 def wrap_solt_double(entry):
     return DataContainer(entry, 'II', allow_inconsistency=True, transform_settings={0: {'interpolation': 'bilinear'},
                                                                                     1: {'interpolation': 'bilinear'}})
@@ -101,6 +101,21 @@ def wrap_solt_segmentation(entry):
 
 def wrap_solt_single(entry):
     return DataContainer(entry, 'I', allow_inconsistency=False, transform_settings={0: {'interpolation': 'bilinear'}})
+
+'''
+def wrap_solt_double(entry):
+    return DataContainer(entry, 'II', transform_settings={0: {'interpolation': 'bilinear'},
+                                                                                    1: {'interpolation': 'bilinear'}})
+
+
+def wrap_solt_segmentation(entry):
+    return DataContainer(entry, 'IM', transform_settings={0: {'interpolation': 'bilinear'},
+                                                                                     1: {'interpolation': 'nearest'}})
+
+def wrap_solt_single(entry):
+    return DataContainer(entry, 'I', transform_settings={0: {'interpolation': 'bilinear'}})
+
+
 
 
 def unwrap_solt(dc):

@@ -17,27 +17,32 @@ if __name__ == "__main__":
     #images_loc = Path('/media/santeri/data/BoneEnhance/Data/MRI_IVD/9.4T MRI Scans')
     #images_loc = Path(f'../../Data/dental/Hampaat_rec')
 
-    images_loc = Path(f'/home/santeri/Downloads/')  # Small stack for testing
-    images_loc = Path(f'../../Data/predictions_3D_clinical/dental_experiments/tooth_limitedknee_model/')  # Full stack
+    #images_loc = Path(f'/home/santeri/Downloads/')  # Small stack for testing
+    #images_loc = Path(f'../../Data/predictions_3D_clinical/dental_experiments/tooth_limitedknee_model/')  # Full stack
+
+    #Test with own data
+    images_loc = Path(f'/media/dios3/Lassi/BBS/Superresolution/test/')
 
     #images_loc = Path(f'../../Data/dental/')
     #images_loc = Path('/media/santeri/data/BoneEnhance/Data/MRI_IVD/3T scans dicom')
 
-    images_save = Path('/media/santeri/data/BoneEnhance/Data/target_IVD_2D_HR')
-    images_save = Path(f'../../Data/extra/Dicom_testing/save')
+    #images_save = Path('/media/santeri/data/BoneEnhance/Data/target_IVD_2D_HR')
+   #images_save = Path(f'../../Data/extra/Dicom_testing/save')
+
+    images_save = Path(f'/media/dios3/Lassi/BBS/Superresolution/test/test_res')
     #images_save = Path(f'../../Data/dental/Hampaat_dataset')
     #images_save = Path(f'../../Data/extra/WRIST_SCALED_SMALLVOI_tricubic')
 
     images_save.mkdir(exist_ok=True)
 
     #subdir = 'trabecular_data/Binned4x/bonemask'
-    resample = False
+    resample = True
     normalize = False
     #factor = 50/19.8
     factor = 1/4
     #factor_slice = 1361.4/90
     sigma = 1
-    dtype = '.dcm'
+    dtype = '.png'
     k = 3
     hdf5 = False
 
@@ -57,8 +62,7 @@ if __name__ == "__main__":
                     data = f['data'][:]
             else:
                 data, files = load(str(images_loc / sample), rgb=False, axis=(1, 2, 0))
-
-
+            print(str(images_loc / sample))
             # Upscale
             # Make MRI data "isotropic"
             #new_size = (data.shape[0], data.shape[1], int(data.shape[2] * factor_slice))
@@ -105,5 +109,4 @@ if __name__ == "__main__":
                 sample = sample[:-3]
             else:
                 data, files = load(str(images_loc / sample), rgb=False, axis=(1, 2, 0))#, dicom=True)
-
             save(str(images_save / sample), sample, data[:, :, :200], dtype=dtype)

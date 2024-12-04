@@ -107,6 +107,8 @@ def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=
     target = cv2.imread(str(entry.target_fname), -1)
     target = cv2.cvtColor(target, cv2.COLOR_GRAY2RGB)
 
+    data_max = np.iinfo(target.dtype).max
+
     # Try to load neighbouring slices
 
     # Neighbour filenames
@@ -175,7 +177,7 @@ def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=
     img, target = transform((img, target))
 
     # Target is scaled to -1 to +1 range (tanh activation)
-    target = (target / 255. - 0.5) * 2
+    target = (target / float(data_max) - 0.5) * 2
 
     # Keep only the center slice of target TODO should this be optional?
     target = target[[1], :, :]
@@ -184,7 +186,7 @@ def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.999:
         fig, ax = plt.subplots(2, 2)
-        im = ax[0, 0].imshow(np.asarray(img[0, :, :] / 255.), cmap='gray')
+        im = ax[0, 0].imshow(np.asarray(img[0, :, :] / float(data_max)), cmap='gray')
         fig.colorbar(im, ax=ax[0, 0], orientation='horizontal')
         ax[0, 0].set_title('Input')
 
@@ -317,13 +319,6 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
 
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.98:
-        #res = 0.2  # In mm
-        #print_orthogonal(img[0, :, :, :].numpy() / 255, title='Input', res=res)
-
-        #print_orthogonal(target[0, :, :, :].numpy(), title='Target', res=res / mag)
-        dims = img.size()
-        #print_images([img[0, dims[1] // 2, :, :].numpy() / 255., img[0, :, dims[2] // 2, :].numpy() / 255.,
-        #              target[0, dims[1] // 2 * mag, :, :].numpy(), target[0, :, dims[2] // 2 * mag, :].numpy()])
         print_images([img[0, 7, :, :].numpy() / 255., img[0, :, 7, :].numpy() / 255.,
                       target[0, 7 * mag, :, :].numpy(), target[0, :, 7 * mag, :].numpy()])
 

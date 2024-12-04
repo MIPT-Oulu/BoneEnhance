@@ -37,12 +37,12 @@ def init_experiment(experiments='../experiments/run'):
 
     # Input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_location', type=Path, default='../Data', help='Location of input and target images')
-    parser.add_argument('--workdir', type=Path, default='../Workdir/', help='Location of snapshots folder')
-    parser.add_argument('--experiment', type=Path, default=experiments, help='Location of the experiments folder')
+    parser.add_argument('--data_location', type=Path, default='/media/data/BoneEnhance/Data', help='Location of input and target images')
+    parser.add_argument('--workdir', type=Path, default='/media/data/BoneEnhance/Workdir/', help='Location of snapshots folder')
+    parser.add_argument('--experiment', type=Path, default='/media/data/BoneEnhance/BoneEnhance/experiments/run', help='Location of the experiments folder')
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
-    parser.add_argument('--num_threads', type=int, default=16, help='Number of CPUs')
-    parser.add_argument('--gpus', type=int, default=2, help='Number of GPUs')
+    parser.add_argument('--num_threads', type=int, default=12, help='Number of CPUs')
+    parser.add_argument('--gpus', type=int, default=1, help='Number of GPUs')
     parser.add_argument('--exp_idx', type=int, default=None, help='Index for the corresponding training experiment')
     args = parser.parse_args()
 
