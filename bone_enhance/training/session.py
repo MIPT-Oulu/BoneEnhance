@@ -250,7 +250,7 @@ def init_model(config, device='cuda', gpus=1, args=None):
                               resize_convolution=config.training.upscale_input,
                               norm=config.training.normalization,
                               vol=vol, rgb=config.training.rgb,
-                              residual_layers=config.training.residual_layers)
+                              residual_layers=config.training.n_blocks)
     else:
         raise Exception('Model architecture unavailable.')
 
@@ -317,6 +317,23 @@ def save_transforms(path, config, args, mean, std):
     :param path: Path for the augmentation list.
     :return:
     """
+    #
+    # def convert_tensor_to_list(obj):          # HOXHOX
+    #     if isinstance(obj, torch.Tensor):
+    #         return obj.tolist()  # Converts a tensor to a list
+    #     elif isinstance(obj, list):
+    #         return [convert_tensor_to_list(item) for item in obj]  # Recursively convert elements
+    #     elif isinstance(obj, dict):
+    #         return {key: convert_tensor_to_list(value) for key, value in obj.items()}  # Recursively convert dict items
+    #     else:
+    #         return obj  # Return the object as is if it’s not a tensor
+    #
+    # transforms = train_test_transforms(config, mean, std)
+    # # Convert the object before saving it
+    # train_list_serializable = convert_tensor_to_list(transforms['train_list'][1])
+    # with open(path / 'transforms.yaml', 'w') as f:
+    #     yaml.dump(train_list_serializable, f)
+
     # Build the augmentations
     transforms = train_test_transforms(config, mean, std)
     # Save the experiment parameters

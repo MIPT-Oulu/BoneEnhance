@@ -69,7 +69,7 @@ def load_models(model_path, config, n_gpus=1, magnification=4, fold=None):
                                   resize_convolution=config.training.upscale_input,
                                   norm=config.training.normalization,
                                   vol=vol, rgb=config.training.rgb,
-                                  residual_layers=config.training.residual_layers)
+                                  residual_layers=config.training.n_blocks)
         else:
             raise Exception('Model architecture unavailable.')
 
