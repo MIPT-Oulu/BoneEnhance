@@ -115,7 +115,7 @@ if __name__ == "__main__":
             args.bs = config.training.bs
             save_dir = inference_runner_oof(args, config, splits_metadata, device)
 
-            evaluation_runner(args, config, save_dir, suffix=config.training.suffix)
+            #evaluation_runner(args, config, save_dir, suffix=config.training.suffix)
 
     # Duration of the whole script
     dur = time() - start

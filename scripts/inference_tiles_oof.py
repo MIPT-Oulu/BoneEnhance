@@ -27,8 +27,8 @@ cv2.setNumThreads(0)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='../../Data/images')
-    parser.add_argument('--save_dir', type=Path, default='../../Data/predictions')
+    parser.add_argument('--dataset_root', type=Path, default='/media/dios3/Lassi/BBS/Other/599/tetsi')
+    parser.add_argument('--save_dir', type=Path, default='/media/data/BoneEnhance/Workdir/')
     parser.add_argument('--bs', type=int, default=4)
     parser.add_argument('--magnification', type=int, default=4)
     parser.add_argument('--plot', type=bool, default=False)
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     # Snapshots to be evaluated
     # µCT models
 
-    snaps = ['2021_05_14_13_50_15_2D_perceptual_tv_1176_HR_seed42']
+    snaps = ['2024_12_12_17_48_58_BBS_2D_ssim_3ch_ssim_n_blocks_20_LR_red_FALSE_seed42']
     #snaps = ['dios-erc-gpu_2020_10_12_12_50_52_perceptualnet_newsplit_cm_bg']
 
 

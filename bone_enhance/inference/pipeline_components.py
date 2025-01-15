@@ -21,10 +21,10 @@ from torch.utils.data import DataLoader
 from pytorch_toolbelt.inference.tiles import CudaTileMerger
 from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
 
-from .tiler3d import Tiler3D, TileMerger3D, ImageSlicer
-from .model_components import InferenceModel, load_models
-from .thickness_analysis import _local_thickness
-from ..utilities import load, save, print_orthogonal, print_images, threshold, calculate_bvtv
+from bone_enhance.inference.tiler3d import Tiler3D, TileMerger3D, ImageSlicer
+from bone_enhance.inference.model_components import InferenceModel, load_models
+from bone_enhance.inference.thickness_analysis import _local_thickness
+from bone_enhance.utilities import load, save, print_orthogonal, print_images, threshold, calculate_bvtv
 from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculate_dice, \
     calculate_volumetric_similarity, calculate_confusion_matrix_from_arrays as calculate_conf
 
@@ -44,9 +44,10 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     x, y, ch = img_full.shape
 
     # Scale mean and std to appropriate range (float instead of uint8)
+    data_max = float(np.iinfo(img_full.dtype).max)
     if mean.mean() > 1 or std.mean() > 1:
-        mean /= 255.
-        std /= 255.
+        mean /= data_max
+        std /= data_max
 
     # Segmentation model does not upscale the image
     if config.training.segmentation:
@@ -81,10 +82,10 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
         if mean is not None and std is not None:
             tiles_batch = tiles_batch.float()
             for c in range(tiles_batch.size(1)):
-                tiles_batch[:, c, :, :] = (((tiles_batch[:, c, :, :] / 255.) - mean[c]) / std[c])
+                tiles_batch[:, c, :, :] = (((tiles_batch[:, c, :, :] / data_max) - mean[c]) / std[c])
             tiles_batch = tiles_batch.to(device)
         else:
-            tiles_batch = (tiles_batch.float() / 255.).to(device)
+            tiles_batch = (tiles_batch.float() / data_max).to(device)
         # Predict and move back to CPU
         pred_batch = inference_model(tiles_batch)
 
@@ -399,10 +400,15 @@ def evaluation_runner(args, config, save_dir, use_bvtv=True, suffix='_3d'):
 
     # Evaluation arguments
     args.target_path = args.data_location / f'target{suffix}'
+
     if args.save_dir is None:
         args.save_dir = args.data_location / 'predictions_oof'
-    if args.eval_dir is None:
-        args.eval_dir = args.data_location / 'evaluation_oof'
+
+    #if args.eval_dir is None:
+    #    args.eval_dir = args.data_location / 'evaluation_oof'
+    #args.eval_dir.mkdir(exist_ok=True)
+
+    args.eval_dir = args.data_location / 'evaluation_oof'
     args.eval_dir.mkdir(exist_ok=True)
 
     # Snapshots to be evaluated

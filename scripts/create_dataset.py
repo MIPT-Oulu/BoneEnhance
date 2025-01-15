@@ -21,7 +21,7 @@ if __name__ == "__main__":
     #images_loc = Path(f'../../Data/predictions_3D_clinical/dental_experiments/tooth_limitedknee_model/')  # Full stack
 
     #Test with own data
-    images_loc = Path(f'/media/dios3/Lassi/BBS/Superresolution/test/')
+    images_loc = Path(f'/media/data/BoneEnhance/Data/target')
 
     #images_loc = Path(f'../../Data/dental/')
     #images_loc = Path('/media/santeri/data/BoneEnhance/Data/MRI_IVD/3T scans dicom')
@@ -29,17 +29,17 @@ if __name__ == "__main__":
     #images_save = Path('/media/santeri/data/BoneEnhance/Data/target_IVD_2D_HR')
    #images_save = Path(f'../../Data/extra/Dicom_testing/save')
 
-    images_save = Path(f'/media/dios3/Lassi/BBS/Superresolution/test/test_res')
+    images_save = Path(f'/media/data/BoneEnhance/Data/testi_data')
     #images_save = Path(f'../../Data/dental/Hampaat_dataset')
     #images_save = Path(f'../../Data/extra/WRIST_SCALED_SMALLVOI_tricubic')
 
     images_save.mkdir(exist_ok=True)
 
     #subdir = 'trabecular_data/Binned4x/bonemask'
-    resample = True
+    resample = False
     normalize = False
     #factor = 50/19.8
-    factor = 1/4
+    factor = 4
     #factor_slice = 1361.4/90
     sigma = 1
     dtype = '.png'
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     samples = os.listdir(images_loc)
     #samples = [name for name in samples if os.path.isdir(os.path.join(images_loc, name))]
     samples.sort()
-    samples = [samples[0]]
+    #samples = [samples[0]]
     #samples = [samples[1]]
     if 'visualizations' in samples:
         samples.remove('visualizations')
@@ -109,4 +109,11 @@ if __name__ == "__main__":
                 sample = sample[:-3]
             else:
                 data, files = load(str(images_loc / sample), rgb=False, axis=(1, 2, 0))#, dicom=True)
-            save(str(images_save / sample), sample, data[:, :, :200], dtype=dtype)
+                # Downscale
+                new_size = (data.shape[0] // factor, data.shape[1] // factor, data.shape[2] // 1)
+
+                data = resize(data, new_size, order=3, anti_aliasing=True, preserve_range=True,
+                              anti_aliasing_sigma=sigma)
+            #(str(images_save / sample), sample, data[:, :, :200], dtype=dtype)
+            save(str(images_save / sample), sample, data[:, :, :], dtype=dtype)
+

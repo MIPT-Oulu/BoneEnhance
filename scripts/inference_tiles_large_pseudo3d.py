@@ -79,7 +79,6 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
                 data_xy = f['data'][:]
         else:
             data_xy, files = load(str(args.dataset_root / sample), rgb=False, axis=(1, 2, 0), dicom=args.dicom)
-
         # Downscale input image
         if ds:
             factor = (data_xy.shape[0] // mag, data_xy.shape[1] // mag, data_xy.shape[2] // mag)
@@ -169,8 +168,15 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
         elif pred_max > 1:
             print(f'Maximum value {pred_max} will be scaled to one')
             out_xy /= pred_max
-
-        out_xy = (out_xy * 255).astype('uint8')
+        data_max = float(np.iinfo(data_xy.dtype).max)
+        if data_max == 65535:
+            out_xy = (out_xy * data_max).astype('uint16')
+        elif data_max == 255:
+            out_xy = (out_xy * data_max).astype('uint8')
+        elif data_max == 4095:
+            out_xy = (out_xy * data_max).astype('uint12')  # TODO Should this read uint16?
+        else:
+            raise NotImplementedError
 
         # Save predicted full mask
         save(str(args.save_dir / sample_stem), sample_stem, out_xy, dtype=args.dtype)
@@ -207,29 +213,37 @@ if __name__ == "__main__":
     #snaps = [snaps[-1]]
     # List of specific snapshots
     #snaps = ['2021_05_27_08_56_20_2D_perceptual_tv_IVD_4x_pretrained_seed42']
-    snaps = ['2022_02_11_01_21_26_2D_ssim_dental_seed10']
-    snaps = [#'2021_06_11_11_59_53_2D_perceptual_tv_1176_seed10',
-             '2021_06_10_23_57_51_2D_ssim_1176_seed10',
+    #snaps = ['2022_02_11_01_21_26_2D_ssim_dental_seed10']
+    #snaps = [#'2021_06_11_11_59_53_2D_perceptual_tv_1176_seed10',
+    #         '2021_06_10_23_57_51_2D_ssim_1176_seed10',
              #'2021_06_10_23_24_54_2D_mse_tv_1176_seed10'
-    ]
-    snaps = ['2024_07_24_14_53_50_3D_ssim_3channel_seed42']  # 3-channel model
-    snaps = ['2024_08_30_08_35_46_2D_ssim_residual_depth_seed42']  # Deeper model
-    snaps = ['2024_09_12_17_26_06_2D_ssim_deep_3ch_seed42'] # Deeper 3-ch model
-
+    #]
+    #snaps = ['2024_07_24_14_53_50_3D_ssim_3channel_seed42']  # 3-channel model
+    #snaps = ['2024_08_30_08_35_46_2D_ssim_residual_depth_seed42']  # Deeper model
+    #snaps = ['2024_09_12_17_26_06_2D_ssim_deep_3ch_seed42'] # Deeper 3-ch model
+    #snaps = ['2024_12_18_12_32_12_BBS_2D_ssim_3ch_100epochs_seed42'] # Trial
+    #snaps = ['2025_01_08_11_19_05_BBS_2D_ssim_3ch_seed42'] # Simulated data model
+    #snaps = ['2025_01_08_17_35_19_BBS_2D_ssim_n_blocks_20_SIMUDATA_seed42']
+    #snaps = ['2025_01_10_10_11_11_BBS_2D_perceptual_n_blocks_10_gamma_seed42']
+    #snaps = ['2025_01_10_17_19_17_BBS_2D_mse_tv_3ch_n_blocks_10_seed42']
+    #snaps = ['2025_01_10_17_19_17_BBS_2D_mse_tv_3ch_n_blocks_10_seed42','2025_01_10_17_19_17_BBS_2D_perceptual_3ch_n_blocks_10_seed42','2025_01_10_17_19_17_BBS_2D_mse_tv_3ch_n_blocks_10_seed42','2025_01_10_17_19_17_BBS_2D_combined_3ch_n_blocks_10_seed42' ]
+    snaps = ['2025_01_10_17_19_17_BBS_2D_perceptual_3chl_n_blocks_20_seed42']
+    snaps = ['2025_01_10_17_19_17_BBS_2D_combined_3ch_n_blocks_10_seed42']
     for snap_id in range(len(snaps)):
 
         snap = snaps[snap_id]
         print(f'Calculating inference for snapshot: {snap} {snap_id+1}/{len(snaps)}')
 
         parser = argparse.ArgumentParser()
-        parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
+        parser.add_argument('--dataset_root', type=Path, default='/media/dios3/Lassi/BBS/Inference_trials/testidata')
+        #parser.add_argument('--dataset_root', type=Path, default='/media/data/BoneEnhance/Data/testidata')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/Fantomi/H5B-fantomi/Series1/Series1/')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/dental/')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/Test_set_(full)/input_3d')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Repeatability/')
         #parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}_avg')
         parser.add_argument('--save_dir', type=Path,
-                            default=f'../../Data/predictions_3D_clinical/wrist_experiments/{snap}_avg')
+                            default=f'/media/dios3/Lassi/BBS/Inference_trials/results/{snap}_single')
         parser.add_argument('--bs', type=int, default=64)
         parser.add_argument('--step', type=int, default=2)
         parser.add_argument('--plot', type=bool, default=False)
@@ -238,13 +252,13 @@ if __name__ == "__main__":
         parser.add_argument('--dicom', type=bool, default=False, help='Is DICOM format used for loading?')
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
         parser.add_argument('--completed', type=int, default=0)
-        parser.add_argument('--res', type=float, default=0.200, help='Input image pixel size')
-        parser.add_argument('--sample_id', type=list, default=10, help='Process specific samples unless None.')
-        parser.add_argument('--avg_planes', type=bool, default=True)
+        parser.add_argument('--res', type=float, default=20, help='Input image pixel size')
+        parser.add_argument('--sample_id', type=list, default=None, help='Process specific samples unless None.')
+        parser.add_argument('--avg_planes', type=bool, default=False)
         parser.add_argument('--mri', type=bool, default=False, help='Is anisotropic MRI data used?')
         parser.add_argument('--snapshot', type=Path,
                             default=os.path.join(snap_path, snap))
-        parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.png')
+        parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.tif') # orig .png
         args = parser.parse_args()
 
         # Load snapshot configuration

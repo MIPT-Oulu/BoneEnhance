@@ -155,7 +155,7 @@ if __name__ == "__main__":
     #snap = '2021_03_04_10_11_34_1_3D_mse_tv_1176'  # Low resolution 1176 model (mse+tv)
 
     # List all snapshots from a path
-    path = '../../Workdir/wacv_experiments_new'
+    path = '/media/data/BoneEnhance/Workdir/snapshots/'
     #path = '../../Workdir/IVD_experiments'
     #path = '../../Workdir/ankle_experiments'
     snaps = os.listdir(path)
@@ -174,10 +174,10 @@ if __name__ == "__main__":
         #parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/Test set (full)/input_3d')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Repeatability/')
-        parser.add_argument('--dataset_root', type=Path, default='../../Data/Fantomi/H5B-fantomi/Series1/Series1/PNG/')
+        parser.add_argument('--dataset_root', type=Path, default='/media/dios3/Lassi/BBS/Other/650_testi/testi')
         #parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}')
         parser.add_argument('--save_dir', type=Path,
-                            default=f'../../Data/predictions_3D_clinical/phantom_experiments/{snap}')
+                            default=f'/media/data/BoneEnhance/Workdir/{snap}_single{snap}')
         #parser.add_argument('--save_dir', type=Path,
         #                    default=f'../../Data/Test set (full)/predictions_wacv_meanstd/{snap}')
         parser.add_argument('--bs', type=int, default=16)
@@ -204,4 +204,4 @@ if __name__ == "__main__":
         with open(args.snapshot / 'args.dill', 'rb') as f:
             args_experiment = dill.load(f)
 
-        main(args, config, args_experiment, sample_id=2)
+        main(args, config, args_experiment, sample_id=0)

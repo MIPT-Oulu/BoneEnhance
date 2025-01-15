@@ -16,8 +16,12 @@ class Tiler3D:
         self.mag = mag
         self.out = out
         self.dim = dim
-        self.tile = tile
-        self.tile = np.min((tile, self.input[:-1]), axis=0)  # Remove channel dimension
+        tile = np.array(tile) if not isinstance(tile, np.ndarray) else tile
+        input_shape = np.array(self.input[:-1]) if not isinstance(self.input[:-1], np.ndarray) else self.input[:-1]
+        self.tile = np.minimum(tile, input_shape)
+
+        #self.tile = tile
+        #self.tile = np.min((tile, self.input[:-1]), axis=0)  # Remove channel dimension
         self.step = tuple([s // step for s in tile])
         self.tile_out = np.min((tile_out, out), axis=0)
         self.step_out = tuple([s // step for s in tile_out])

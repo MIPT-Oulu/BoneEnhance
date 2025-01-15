@@ -36,21 +36,27 @@ if __name__ == "__main__":
     #snap = '2021_02_04_13_02_05_rn34_fpn'  # Gives error
 
     # List all snapshots from a path
-    snap_path = '../../Workdir/wacv_experiments_segmentation'
+    snap_path = '/media/data/BoneEnhance/Workdir/snapshots/'
     snaps = os.listdir(snap_path)
     snaps.sort()
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(snap_path, snap))]
+    #snaps = ['2024_12_18_12_32_12_BBS_2D_ssim_3ch_100epochs_seed42']
     #snap = snaps[0]
+    snaps = ['2025_01_08_17_35_19_BBS_2D_ssim_n_blocks_20_SIMUDATA_seed42']
     for snap in snaps:
         start = time()
 
         parser = argparse.ArgumentParser()
         #parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/Test_set_(full)/input_3d')
-        parser.add_argument('--dataset_root', type=Path, default='../../Data/input_1176_HR_2D')
+        #parser.add_argument('--dataset_root', type=Path, default='/media/data/BoneEnhance/Data/input/')
+        parser.add_argument('--dataset_root', type=Path, default='/media/dios3/Lassi/BBS/Inference_trials/testidata')
+
+
+
         #parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_2D/{snap}')
         parser.add_argument('--save_dir', type=Path,
-                            default=f'../../Data/Test_set_(full)/predictions_wacv_new/{snap}_single')
+                            default=f'/media/dios3/Lassi/BBS/Inference_trials/results/{snap}_single')
         parser.add_argument('--bs', type=int, default=12)
         parser.add_argument('--tile', type=int, default=3)
         parser.add_argument('--plot', type=bool, default=False)
@@ -72,7 +78,12 @@ if __name__ == "__main__":
         with open(args.snapshot / 'args.dill', 'rb') as f:
             args_experiment = dill.load(f)
 
+
+
+
         with open(args.snapshot / 'split_config.dill', 'rb') as f:
+       # with open(Path(snap_path) / 'split_config.dill', 'rb') as f:
+
             split_config = dill.load(f)
         args.save_dir.mkdir(exist_ok=True)
         (args.save_dir / 'visualizations').mkdir(exist_ok=True)

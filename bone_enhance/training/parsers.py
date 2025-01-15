@@ -21,7 +21,7 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
         target[:, :, 2] = target[:, :, 0]
     else:
         target = cv2.imread(str(entry.target_fname), cv2.IMREAD_GRAYSCALE)
-
+    data_max = np.iinfo(target.dtype).max
     # Magnification
     mag = config.training.magnification
     # Antialiasing kernel size
@@ -82,7 +82,7 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     img, target = transform((img, target))
 
     # Target is scaled to -1 to +1 range (for tanh activation)
-    target = (target / 255. - 0.5) * 2
+    target = (target / float(data_max) - 0.5) * 2
 
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.999:
@@ -108,7 +108,6 @@ def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=
     target = cv2.cvtColor(target, cv2.COLOR_GRAY2RGB)
 
     data_max = np.iinfo(target.dtype).max
-
     # Try to load neighbouring slices
 
     # Neighbour filenames
@@ -283,6 +282,7 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
     with h5py.File(entry.target_fname, 'r') as f:
         target = f['data'][:]
 
+    data_max = float(np.iinfo(target.dtype).max)
     # Magnification
     mag = config.training.magnification
 
@@ -296,7 +296,10 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
         # Resize the target to match input in case of a mismatch
         new_size = (int(img.shape[0] * mag), int(img.shape[1] * mag), int(img.shape[2] * mag))
         if target.shape != new_size:
-            target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True).astype('uint8')
+            if data_max == 65535:
+                target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True).astype('uint16')
+            elif data_max == 255:
+                target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True).astype('uint8')
     else:
         raise NotImplementedError
 
@@ -315,7 +318,7 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
     # and scaled to 0-1 range
     #img /= 255.
     # Target is scaled to -1 to +1 range
-    target = (target / 255. - 0.5) * 2
+    target = (target / data_max - 0.5) * 2
 
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.98:

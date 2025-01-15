@@ -648,3 +648,29 @@ class rand_gamma(ImageTransform):
         image = image * (max_ - min_ + 1e-9) + min_
         image = image.astype("uint16")
         return image
+
+def im_gamma(image: np.ndarray, gamma: float):
+    """
+    Adjusts the gamma of an image.
+
+    Parameters
+    ----------
+    image : np.ndarray
+        Input image array.
+    gamma : float
+        Gamma correction factor.
+
+    Returns
+    -------
+    np.ndarray
+        Gamma-corrected image.
+    """
+    # Normalize image to [0, 1]
+    min_, max_ = image.min(), image.max()
+    image = (image.astype(float) - min_) / (max_ - min_ + 1e-9)
+    # Apply gamma correction
+    image = image ** gamma
+    # Scale back to original range
+    image = image * (max_ - min_ + 1e-9) + min_
+    image = image.astype("uint16")
+    return image
