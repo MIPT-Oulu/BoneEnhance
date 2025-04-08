@@ -44,9 +44,10 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     x, y, ch = img_full.shape
 
     # Scale mean and std to appropriate range (float instead of uint8)
+    data_max = float(np.iinfo(img_full.dtype).max)
     if mean.mean() > 1 or std.mean() > 1:
-        mean /= 255.
-        std /= 255.
+        mean /= data_max
+        std /= data_max
 
     # Segmentation model does not upscale the image
     if config.training.segmentation:
@@ -81,10 +82,10 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
         if mean is not None and std is not None:
             tiles_batch = tiles_batch.float()
             for c in range(tiles_batch.size(1)):
-                tiles_batch[:, c, :, :] = (((tiles_batch[:, c, :, :] / 255.) - mean[c]) / std[c])
+                tiles_batch[:, c, :, :] = (((tiles_batch[:, c, :, :] / data_max) - mean[c]) / std[c])
             tiles_batch = tiles_batch.to(device)
         else:
-            tiles_batch = (tiles_batch.float() / 255.).to(device)
+            tiles_batch = (tiles_batch.float() / data_max).to(device)
         # Predict and move back to CPU
         pred_batch = inference_model(tiles_batch)
 
@@ -149,9 +150,10 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
     out = (x * mag, y * mag, z * mag)
 
     # Scale mean and std to appropriate range (float instead of uint8)
+    data_max = float(np.iinfo(img_full.dtype).max)
     if mean.mean() > 1 or std.mean() > 1:
-        mean /= 255.
-        std /= 255.
+        mean /= data_max
+        std /= data_max
 
     # Check the number of channels
     if ch == 3 and not config.training.rgb:

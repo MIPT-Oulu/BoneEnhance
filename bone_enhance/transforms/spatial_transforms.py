@@ -75,7 +75,7 @@ class MatrixTransform(BaseTransform, InterpolationPropertyHolder, PaddingPropert
         None
 
         """
-        super(MatrixTransform, self).sample_transform(data)
+        #super(MatrixTransform, self).sample_transform(data)
         self.sample_transform_matrix(data)  # Only this method needs to be implemented!
 
         # If we are in fast mode, we do not have to recompute the the new coordinate frame!
@@ -344,7 +344,7 @@ class Rotate(ImageTransform):
         self.vol = vol
 
     def sample_transform(self, data: DataContainer):
-        super(Rotate, self).sample_transform(data)
+        #super(Rotate, self).sample_transform(data)
         self.state_dict['rot'] = random.uniform(self.angle_range[0], self.angle_range[1])
         self.state_dict['axes'] = random.sample([0, 1, 2], k=2)
 
@@ -414,7 +414,7 @@ class Translate(ImageTransform):
         self.frame_lrg = None
 
     def sample_transform(self, data: DataContainer):
-        super(Translate, self).sample_transform(data)
+        #super(Translate, self).sample_transform(data)
 
         self.frame_sml = data.data[0].shape[:-1]
         self.frame_lrg = data.data[1].shape[:-1]

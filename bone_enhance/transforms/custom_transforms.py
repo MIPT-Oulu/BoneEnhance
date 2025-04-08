@@ -567,3 +567,80 @@ class Noise(ImageTransform):
             return random_noise(img, mode=self.type) * np.iinfo(dtype).max
 
 
+class rand_gamma(ImageTransform):
+    """
+    Transform to apply random gamma correction to images.
+
+    Parameters
+    ----------
+    gamma : float or tuple
+        Range for gamma adjustment. If a single float, gamma will be sampled from [-gamma, gamma].
+        If a tuple, gamma will be sampled within the range (min_gamma, max_gamma).
+    p : float
+        Probability of applying this transform.
+    apply_all : bool
+        Whether to apply the same gamma adjustment to all images in a container.
+    data_indices : tuple or None
+        Indices of the images within the data container to which this transform needs to be applied.
+        If None, the transform will be applied to all images within the container.
+    """
+
+    serializable_name = "gamma"
+    _default_range = (0, 1)
+
+    def __init__(self, gamma, p=0.5, data_indices=None):
+        super(rand_gamma, self).__init__(p=p, data_indices=data_indices)
+        self.gamma = validate_numeric_range_parameter(gamma, self._default_range, 0.5)
+        self.p = p
+
+    def sample_transform(self, data: DataContainer):
+        """Samples a random gamma value for the transformation."""
+        # Generate a random gamma value within the specified range
+        sampled_gamma = np.random.uniform(self.gamma[0], self.gamma[1])
+        self.state_dict = {"gamma": sampled_gamma}
+
+    def _apply_img(self, img: np.ndarray, settings: dict):
+        """
+        Applies gamma correction to an image.
+
+        Parameters
+        ----------
+        img : np.ndarray
+            Input image array.
+        settings : dict
+            Transformation settings, including sampled gamma value.
+
+        Returns
+        -------
+        np.ndarray
+            Gamma-corrected image.
+        """
+        gamma = self.state_dict["gamma"]
+        return self.im_gamma(img, gamma)
+
+    @staticmethod
+    def im_gamma(image: np.ndarray, gamma: float):
+        """
+        Adjusts the gamma of an image.
+
+        Parameters
+        ----------
+        image : np.ndarray
+            Input image array.
+        gamma : float
+            Gamma correction factor.
+
+        Returns
+        -------
+        np.ndarray
+            Gamma-corrected image.
+        """
+        # Normalize image to [0, 1]
+        min_, max_ = image.min(), image.max()
+        image = (image.astype(float) - min_) / (max_ - min_ + 1e-9)
+        # Apply gamma correction
+        image = image ** gamma
+        # Scale back to original range
+        image = image * (max_ - min_ + 1e-9) + min_
+        image = image.astype("uint16")
+        return image

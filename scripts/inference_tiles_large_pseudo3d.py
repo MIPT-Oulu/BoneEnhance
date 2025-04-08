@@ -170,7 +170,16 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
             print(f'Maximum value {pred_max} will be scaled to one')
             out_xy /= pred_max
 
-        out_xy = (out_xy * 255).astype('uint8')
+        # Keep the original data type of the image
+        data_max = float(np.iinfo(data_xy.dtype).max)
+        if data_max == 65535:
+            out_xy = (out_xy * data_max).astype('uint16')
+        elif data_max == 255:
+            out_xy = (out_xy * data_max).astype('uint8')
+        elif data_max == 4095:
+            out_xy = (out_xy * data_max).astype('uint12')  # TODO Should this read uint16?
+        else:
+            raise NotImplementedError
 
         # Save predicted full mask
         save(str(args.save_dir / sample_stem), sample_stem, out_xy, dtype=args.dtype)

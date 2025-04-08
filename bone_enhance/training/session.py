@@ -37,9 +37,9 @@ def init_experiment(experiments='../experiments/run'):
 
     # Input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_location', type=Path, default='/media/data/BoneEnhance/Data', help='Location of input and target images')
-    parser.add_argument('--workdir', type=Path, default='/media/data/BoneEnhance/Workdir/', help='Location of snapshots folder')
-    parser.add_argument('--experiment', type=Path, default='/media/data/BoneEnhance/BoneEnhance/experiments/run', help='Location of the experiments folder')
+    parser.add_argument('--data_location', type=Path, default='../../Data', help='Location of input and target images')
+    parser.add_argument('--workdir', type=Path, default='../../Workdir/', help='Location of snapshots folder')
+    parser.add_argument('--experiment', type=Path, default='../experiments/run', help='Location of the experiments folder')
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     parser.add_argument('--num_threads', type=int, default=12, help='Number of CPUs')
     parser.add_argument('--gpus', type=int, default=1, help='Number of GPUs')
@@ -250,7 +250,7 @@ def init_model(config, device='cuda', gpus=1, args=None):
                               resize_convolution=config.training.upscale_input,
                               norm=config.training.normalization,
                               vol=vol, rgb=config.training.rgb,
-                              residual_layers=config.training.residual_layers)
+                              residual_layers=config.training.n_blocks)
     else:
         raise Exception('Model architecture unavailable.')
 

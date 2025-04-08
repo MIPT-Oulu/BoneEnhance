@@ -2,7 +2,7 @@ from solt import DataContainer
 import solt.transforms as slt
 import solt.core as slc
 from bone_enhance.transforms.custom_transforms import Crop, Pad, Brightness, Contrast, Blur, Flip, Rotate90, \
-    Noise
+    Noise, rand_gamma
 from bone_enhance.transforms.spatial_transforms import Rotate, Translate
 
 
@@ -107,6 +107,9 @@ def return_transforms(prob, trf, magnification, crop_small, config, vol=False):
                 # Make sure the batch is the correct size
                 Crop(magnification, crop_mode='r', crop_to=(crop_small, crop_large)),
                 Pad(pad_to=(crop_small, crop_large)),
+
+                # 50% Chance for gamma transfer
+                rand_gamma(gamma=tuple(trf.get('gamma', 0.2)), p=trf.get('p_gamma', 0.5)),
 
                 # Noise
                 slc.SelectiveStream([

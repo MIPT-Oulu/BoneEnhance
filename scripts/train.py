@@ -48,7 +48,7 @@ if __name__ == "__main__":
             parser = partial(parse_grayscale, config=config)
 
         # Split training folds
-        parser_debug = partial(parser, debug=True)  # Display figures
+        parser_debug = partial(parser)#, debug=True)  # Display figures
         splits_metadata = build_splits(args.data_location, args, config, parser_debug,
                                        args.snapshots_dir, config.training.snapshot)
 

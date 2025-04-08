@@ -9,20 +9,26 @@ from scipy.ndimage import gaussian_filter
 class Tiler3D:
     def __init__(self, image_shape, tile, step, out, mag=4, weight='mean'):
 
-        tile_out = tuple([s * mag for s in tile])
-        dim = len(tile)
-
+        # Input image
         self.input = image_shape
+        input_shape = np.array(self.input[:-1]) if not isinstance(self.input[:-1], np.ndarray) else self.input[:-1]
+
+        # Size of the analysis patch
+        self.tile = np.array(tile) if not isinstance(tile, np.ndarray) else tile
+        self.tile = np.minimum(tile, input_shape)
+        self.dim = len(tile)
+
         self.mag = mag
         self.out = out
-        self.dim = dim
-        self.tile = tile
-        self.tile = np.min((tile, self.input[:-1]), axis=0)  # Remove channel dimension
+
         self.step = tuple([s // step for s in tile])
+
+        # Sizes for magnified image
+        tile_out = tuple([s * mag for s in tile])
         self.tile_out = np.min((tile_out, out), axis=0)
         self.step_out = tuple([s // step for s in tile_out])
 
-        overlap = [(self.tile[x] - self.step[x]) for x in range(dim)]
+        overlap = [(self.tile[x] - self.step[x]) for x in range(self.dim)]
 
         if weight == 'mean':
             self.weight = self._mean(self.tile_out)
@@ -32,13 +38,13 @@ class Tiler3D:
             raise Exception('Weight not implemented!')
 
         # Margins
-        n_tiles = [max(1, math.ceil((self.input[x] - overlap[x]) / self.step[x])) for x in range(dim)]
-        residuals = [self.step[x] * n_tiles[x] - (self.input[x] - overlap[x]) for x in range(dim)]
+        n_tiles = [max(1, math.ceil((self.input[x] - overlap[x]) / self.step[x])) for x in range(self.dim)]
+        residuals = [self.step[x] * n_tiles[x] - (self.input[x] - overlap[x]) for x in range(self.dim)]
 
-        self.margin_begin = [residuals[x] // 2 for x in range(dim)]
-        self.margin_end = [residuals[x] - self.margin_begin[x] for x in range(dim)]
-        self.margin_begin_out = [(residuals[x] * mag) // 2 for x in range(dim)]
-        self.margin_end_out = [residuals[x] * mag - self.margin_begin_out[x] for x in range(dim)]
+        self.margin_begin = [residuals[x] // 2 for x in range(self.dim)]
+        self.margin_end = [residuals[x] - self.margin_begin[x] for x in range(self.dim)]
+        self.margin_begin_out = [(residuals[x] * mag) // 2 for x in range(self.dim)]
+        self.margin_end_out = [residuals[x] * mag - self.margin_begin_out[x] for x in range(self.dim)]
 
         crops = []
         crops_out = []

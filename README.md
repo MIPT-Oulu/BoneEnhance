@@ -10,10 +10,23 @@ Clinical cone-beam computed tomography (CBCT) devices are limited to imaging tis
 
 ## Prerequisites
 - [Anaconda installation](https://docs.anaconda.com/anaconda/install/) 
+
+Environment setup
 ```
 git clone https://github.com/MIPT-Oulu/BoneEnhance.git
 cd BoneEnhance
 conda env create -f environment.yml
+
+cd ..
+git clone https://github.com/imedslab/solt.git
+cd solt
+git checkout 4201cd15
+pip install -e .
+```
+Modify solt datacontainer to account for different frame sizes
+```
+self.state_dict["frame"] = data.validate()
+self.state_dict["frame"] = data.data[0].shape[:-1]
 ```
 
 ## Usage
