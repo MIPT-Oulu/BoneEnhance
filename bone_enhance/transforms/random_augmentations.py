@@ -105,11 +105,12 @@ def return_transforms(prob, trf, magnification, crop_small, config, vol=False):
                 slc.SelectiveStream([slt.Rotate90(k=1, p=prob), slt.Rotate90(k=-1, p=prob), slt.Rotate90(k=2, p=prob)]),
 
                 # Make sure the batch is the correct size
-                Crop(magnification, crop_mode='r', crop_to=(crop_small, crop_large)),
                 Pad(pad_to=(crop_small, crop_large)),
+                Crop(magnification, crop_mode='r', crop_to=(crop_small, crop_large)),
 
                 # 50% Chance for gamma transfer
-                rand_gamma(gamma=tuple(trf.get('gamma', 0.2)), p=trf.get('p_gamma', 0.5)),
+                # TODO Gamma transfer breaks the training with over 900 loss values
+                #rand_gamma(gamma=tuple(trf.get('gamma', 0.2)), p=trf.get('p_gamma', 0.5)),
 
                 # Noise
                 slc.SelectiveStream([
@@ -124,8 +125,8 @@ def return_transforms(prob, trf, magnification, crop_small, config, vol=False):
 
             # Empty stream
             slc.Stream([
-                Crop(magnification, crop_mode='r', crop_to=(crop_small, crop_large)),
                 Pad(pad_to=(crop_small, crop_large)),
+                Crop(magnification, crop_mode='r', crop_to=(crop_small, crop_large)),
             ])
         ])
 

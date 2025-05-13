@@ -24,7 +24,7 @@ from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
 from .tiler3d import Tiler3D, TileMerger3D, ImageSlicer
 from .model_components import InferenceModel, load_models
 from .thickness_analysis import _local_thickness
-from ..utilities import load, save, print_orthogonal, print_images, threshold, calculate_bvtv
+from ..utilities import load, save, print_orthogonal, load_neighbor_slices, threshold, calculate_bvtv, downscale_image
 from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculate_dice, \
     calculate_volumetric_similarity, calculate_confusion_matrix_from_arrays as calculate_conf
 
@@ -246,18 +246,16 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
     if not hasattr(args, 'save_dir'):
         args.save_dir = args.data_location / 'predictions_oof'
     args.save_dir.mkdir(exist_ok=True)
-    sigma = 0.5  # Antialiasing filter for downscaling
 
+    # Antialiasing filter for downscaling
+    if config.training.sigma is None:
+        config.training.sigma = 0.5
     # Tiling weight
-    if config.inference.weight is not None:
-        weight = config.inference.weight
-    else:
-        weight = 'mean'
+    if config.inference.weight is None:
+        config.inference.weight = 'mean'
     # Tile step
-    if config.inference.step is not None:
-        step = config.inference.step
-    else:
-        step = 2
+    if config.inference.step is None:
+        config.inference.step = 2
 
     # Create save directories
     save_dir = args.save_dir / str(config['training']['snapshot'] + '_oof')
@@ -266,15 +264,18 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
 
     # Load models
     crop = config.training.crop_small
-    ds = not config.training.crossmodality
     mag = config.training.magnification
-    if ds:
-        mean_std_path = args.snapshots_dir / f"mean_std_{crop}_ds.pth"
-    else:
+    if config.training.crossmodality:
         mean_std_path = args.snapshots_dir / f"mean_std_{crop}_cm.pth"
+    else:
+        mean_std_path = args.snapshots_dir / f"mean_std_{crop}_ds.pth"
 
-    ms = torch.load(mean_std_path)
-    mean, std = ms['mean'], ms['std']
+    if mean_std_path.exists():
+        ms = torch.load(mean_std_path)
+        mean, std = ms['mean'], ms['std']
+    else:
+        print('Mean and std do not exist')
+        return None
 
     # List the models
     model_list = load_models(str(args.snapshots_dir / config.training.snapshot), config, n_gpus=args.gpus)
@@ -284,10 +285,10 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
     for fold in range(len(model_list)):
 
         # List validation images
-        if ds:
-            validation_files = split_config[f'fold_{fold}']['eval'].target_fname.values
-        else:
+        if config.training.crossmodality:
             validation_files = split_config[f'fold_{fold}']['eval'].fname.values
+        else:
+            validation_files = split_config[f'fold_{fold}']['eval'].target_fname.values
 
         # Model corresponding to the validation fold images
         model = InferenceModel([model_list[fold]]).to(device)
@@ -303,53 +304,64 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
                 # 2D -> Sample folder included
                 sample = args.data_location / sample.parent.parent.name / sample.parent.name / sample.name
 
-
-            ### Replace target with input ### # TODO
-            sample = Path(str(sample).replace('target', 'input'))
-            ds = False
+            ### Replace target with input ###
+            #sample = Path(str(sample).replace('target', 'input'))
 
             # Do not calculate inference for data copies
             if 'copy' in str(sample):
                 continue
 
-            # Load image stacks
+            # Load 3D image stack
             if str(sample).endswith('.h5'):
                 with h5py.File(str(sample), 'r') as f:
                     data = f['data'][:]
 
                 # Resize target with the given magnification to provide the input image
-                if ds:
-                    orig_size = data.shape
+                if not config.training.crossmodality:
                     factor = (data.shape[0] // mag, data.shape[1] // mag, data.shape[2] // mag)
-                    data = resize(data.astype('float64'), factor, order=0, anti_aliasing=True, preserve_range=True,
-                                  anti_aliasing_sigma=sigma)
-                else:
-                    orig_size = (data.shape[0] * mag, data.shape[1] * mag, data.shape[2] * mag)
+                    data = downscale_image(data, factor=factor,
+                                    add_noise=config.training.noise,
+                                    blur=True, sigma=config.training.sigma)
 
                 if config.training.segmentation:
-                    data = resize(data.astype('float64'), orig_size, order=3, preserve_range=True)
-
+                    # Resize in segmentation if needed
+                    if config.training.crossmodality:
+                        orig_size = (data.shape[0] * mag, data.shape[1] * mag, data.shape[2] * mag)
+                    else:
+                        orig_size = data.shape
+                    data = resize(data, orig_size, order=3, preserve_range=True)
+            # 2D image stack
             else:
-                data = cv2.imread(str(sample), cv2.IMREAD_GRAYSCALE)
-
-                if ds:
-                    orig_size = data.shape
-                    # Get the downscaled input image
-                    k = 5
-
-                    # Antialiasing and downscaling to input size
-                    new_size = (data.shape[1] // mag, data.shape[0] // mag)
-                    data = cv2.resize(cv2.GaussianBlur(data, ksize=(k, k), sigmaX=0), new_size)
+                if config.training.parser == 'parse_3ch':
+                    load_neighbor_slices(str(sample))
                 else:
-                    orig_size = (data.shape[1] * mag, data.shape[0] * mag)
+                    data = cv2.imread(str(sample), -1)
+                    # Make sure the target is in grayscale
+                    if data.ndim == 3:
+                        data = cv2.cvtColor(data, cv2.COLOR_BGR2GRAY)
+
+                # Resize target with the given magnification to provide the input image
+                if not config.training.crossmodality:
+                    factor = (data.shape[1] // mag, data.shape[0] // mag)
+                    data = downscale_image(data, factor=factor,
+                                           add_noise=config.training.noise,
+                                           blur=True, sigma=config.training.sigma)
 
                 if config.training.segmentation:
+                    # Resize in segmentation if needed
+                    if config.training.crossmodality:
+                        orig_size = (data.shape[1] * mag, data.shape[0] * mag)
+                    else:
+                        orig_size = data.shape
                     data = cv2.resize(data, orig_size, interpolation=cv2.INTER_CUBIC)
 
+            # Save bit depth before it is changed in the pipeline
+            image_type = np.iinfo(data.dtype)
+            data_min, data_max = np.min(data), np.max(data)
             # 3-channel or 1-channel
-            if config.training.rgb:
+            if config.training.rgb and str(sample).endswith('.h5') and data.ndim == 3 or config.training.rgb and data.ndim == 2:
                 data = np.stack((data,) * 3, axis=-1)
-            else:
+            elif not config.training.rgb and str(sample).endswith('.h5') and data.ndim == 3 or not config.training.rgb and data.ndim == 2:
                 data = np.expand_dims(data, axis=-1)
 
             if len(data.shape) == 4 and plot:
@@ -361,20 +373,23 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
             # 1st orientation
             with torch.no_grad():  # Do not update gradients
                 if len(data.shape) == 4:
-                    data = inference_3d(model, args, config, data, step=step, mean=mean, std=std, plot=plot,
-                                        weight=weight)
+                    data = inference_3d(model, args, config, data, step=config.inference.step,
+                                        mean=mean, std=std, plot=plot,
+                                        weight=config.inference.weight)
                 else:
-                    data = inference(model, args, config, data, step=step, mean=mean, std=std, plot=plot,
-                                     weight=weight)
+                    data = inference(model, args, config, data, step=config.inference.step,
+                                     mean=mean, std=std, plot=plot,
+                                     weight=config.inference.weight)
 
             # Scale the dynamic range
             #data -= np.min(data)
             #data /= np.max(data)
 
-            # Convert to uint8
-            data = (data * 255).astype('uint8')
-
-            # Save predicted full mask
+            # Convert from 0-1 to proper bit depth
+            #data = (data * image_type.max).astype(image_type)
+            data = ((data + data_min) * (data_max - data_min)).astype(image_type)
+            #print('Output', np.min(data), np.max(data))
+            # Save predicted image
             if len(data.shape) == 3:
                 (save_dir / sample.stem).mkdir(exist_ok=True)
                 save(str(save_dir / sample.stem), str(sample.stem), data, dtype='.png', verbose=False)
@@ -401,10 +416,11 @@ def evaluation_runner(args, config, save_dir, use_bvtv=True, suffix='_3d'):
 
     # Evaluation arguments
     args.target_path = args.data_location / f'target{suffix}'
-    if args.save_dir is None:
+    if not hasattr(args, 'save_dir'):
         args.save_dir = args.data_location / 'predictions_oof'
-    if args.eval_dir is None:
+    if not hasattr(args, 'eval_dir'):
         args.eval_dir = args.data_location / 'evaluation_oof'
+    args.save_dir.mkdir(exist_ok=True)
     args.eval_dir.mkdir(exist_ok=True)
 
     # Snapshots to be evaluated

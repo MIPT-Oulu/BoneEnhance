@@ -98,7 +98,7 @@ def wrap_solt_segmentation(entry):
                          transform_settings={0: {'interpolation': 'bilinear'}, 1: {'interpolation': 'nearest'}})
 
 def wrap_solt_single(entry):
-    return DataContainer(entry, 'I', allow_inconsistency=False,
+    return DataContainer(entry, 'I', allow_inconsistency=True,
                          transform_settings={0: {'interpolation': 'bilinear'}})
 
 def unwrap_solt(dc):

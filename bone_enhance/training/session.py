@@ -42,7 +42,7 @@ def init_experiment(experiments='../experiments/run'):
     parser.add_argument('--experiment', type=Path, default='../experiments/run', help='Location of the experiments folder')
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     parser.add_argument('--num_threads', type=int, default=12, help='Number of CPUs')
-    parser.add_argument('--gpus', type=int, default=1, help='Number of GPUs')
+    parser.add_argument('--gpus', type=int, default=2, help='Number of GPUs')
     parser.add_argument('--exp_idx', type=int, default=None, help='Index for the corresponding training experiment')
     args = parser.parse_args()
 

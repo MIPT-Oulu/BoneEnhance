@@ -52,7 +52,7 @@ class PerceptualNet(nn.Module):
     by Johnson et al, https://arxiv.org/abs/1603.08155
     """
     def __init__(self, magnification, activation='relu', resize_convolution=False, norm='bn', vol=False,
-                 final_activation=False, rgb=True, residual_layers=4):
+                 final_activation=False, rgb=True, parser=None, residual_layers=4):
         super(PerceptualNet, self).__init__()
 
         # Variables
@@ -91,8 +91,10 @@ class PerceptualNet(nn.Module):
             padding = nn.ReflectionPad2d
 
         # Kernel
-        if rgb:
+        if not rgb and parser == 'parse_3ch':
             f_maps = [3, 64, 1]  # RGB
+        elif rgb:
+            f_maps = [3, 64, 3]  # RGB
         else:
             f_maps = [1, 64, 1]  # One-channel
         kernel = 3
@@ -143,12 +145,12 @@ class PerceptualNet(nn.Module):
         # Pass through the model
         x = self.net(x)
 
-        # Duplicate 1-channel image to represent RGB TODO Should the target be 1-ch or 3-ch?
-        if self.rgb:
+        # Duplicate 1-channel image to represent RGB
+        if self.rgb and x.size(1) == 1:
             if len(x.size()) == 5:
                 x = x.repeat(1, 3, 1, 1, 1)
             else:
-                x = x.repeat(1, 3, 1, 1)
+               x = x.repeat(1, 3, 1, 1)
 
         # Hyperbolic tangent activation
         return x.tanh()

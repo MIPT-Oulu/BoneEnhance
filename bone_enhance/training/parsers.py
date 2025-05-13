@@ -1,7 +1,7 @@
 from random import choice, uniform
 
 from skimage.filters import gaussian
-from skimage.transform import rescale
+
 import cv2
 import h5py
 import numpy as np
@@ -9,8 +9,11 @@ from matplotlib import pyplot as plt
 from skimage.transform import resize
 from pathlib import Path
 
-from bone_enhance.utilities import print_images, print_orthogonal
+from bone_enhance.utilities import print_images, print_orthogonal, downscale_image, load_neighbor_slices
 
+_DEFAULT_ANTIALIASING_KERNEL = 5
+_DEFAULT_ANTIALIASING_SIGMA = 0.5
+_DEFAULT_SEGMENTATION_THRESHOLD = 90
 
 def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, config=None):
 
@@ -20,173 +23,132 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
         target[:, :, 1] = target[:, :, 0]
         target[:, :, 2] = target[:, :, 0]
     else:
-        target = cv2.imread(str(entry.target_fname), cv2.IMREAD_GRAYSCALE)
+        target = cv2.imread(str(entry.target_fname), -1)
+        # Make sure the target is in grayscale
+        if target.ndim == 3:
+            target = cv2.cvtColor(target, cv2.COLOR_BGR2GRAY)
+
     data_max = np.iinfo(target.dtype).max
     # Magnification
     mag = config.training.magnification
     # Antialiasing kernel size
-    if config.training.antialiasing is not None:
-        k = config.training.antialiasing
-    else:
-        k = 5
-    if config.training.sigma is not None:
-        s = config.training.sigma
-    else:
-        s = 0
+    if config.training.antialiasing is None:
+        config.training.antialiasing = _DEFAULT_ANTIALIASING_KERNEL
+    if config.training.sigma is None:
+        config.training.sigma = _DEFAULT_ANTIALIASING_SIGMA
 
     # Resize target to 4x magnification respect to input
     if config is not None and not config.training.crossmodality:
-
-        # Resize target to a relevant size (from the 3.2µm resolution to 51.2µm
-        #new_size = (target.shape[1] // 16, target.shape[0] // 16)
-
-        # Antialiasing
-        #target = cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0)
-
-        #target = cv2.resize(target.copy(), new_size)  # .transpose(1, 0, 2)
-        #target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True).astype('uint8')
-
-        new_size = (target.shape[1] // mag, target.shape[0] // mag)
-
-        # No antialias
-        #img = cv2.resize(target, new_size, interpolation=cv2.INTER_LANCZOS4)
-        # Antialias
-        img = cv2.resize(cv2.GaussianBlur(target, ksize=(k, k), sigmaX=s, sigmaY=s), new_size)
-        #img = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=k).astype('uint8')
+        # Add noise if given, always do antialiasing with Gaussian blur
+        input_img = downscale_image(target, factor=(target.shape[1] // mag, target.shape[0] // mag),
+                                    add_noise=config.training.noise,
+                                    blur=True, sigma=config.training.sigma)
+    # Co-registered images
     elif config is not None:
 
         # Read image and target
         if config.training.rgb:
-            img = cv2.imread(str(entry.fname), -1)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img[:, :, 1] = img[:, :, 0]
-            img[:, :, 2] = img[:, :, 0]
+            input_img = cv2.imread(str(entry.fname), -1)
+            input_img = cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB)
+            input_img[:, :, 1] = input_img[:, :, 0]
+            input_img[:, :, 2] = input_img[:, :, 0]
         else:
-            img = cv2.imread(str(entry.fname), cv2.IMREAD_GRAYSCALE)
+            input_img = cv2.imread(str(entry.fname), -1)
+            # Make sure the input is in grayscale
+            if target.ndim == 3:
+                input_img = cv2.cvtColor(input_img, cv2.COLOR_BGR2GRAY)
 
-
-        new_size = (img.shape[1] * mag, img.shape[0] * mag)
-        target = cv2.GaussianBlur(target, ksize=(k, k), sigmaX=s, sigmaY=s)
-        target = cv2.resize(target, new_size)
-        #target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=k).astype('uint8')
+        # If the image sizes do not match, rescale the target image to match the input image
+        if target.shape != tuple([mag * x for x in input_img.shape]):
+            target = downscale_image(target, factor=(target.shape[1] * mag, target.shape[0] * mag), add_noise=False)
     else:
         raise NotImplementedError
 
     # Make sure that grayscale images also possess channel dimension
-    if len(img.shape) != 3:
-        img = np.expand_dims(img, -1)
+    if len(input_img.shape) != 3:
+        input_img = np.expand_dims(input_img, -1)
     if len(target.shape) != 3:
         target = np.expand_dims(target, -1)
 
     # Apply random transforms. Images are returned in format 3xHxW
-    img, target = transform((img, target))
+    input_img, target = transform((input_img, target))
 
     # Target is scaled to -1 to +1 range (for tanh activation)
     target = (target / float(data_max) - 0.5) * 2
 
     # Plot a small random portion of image-target pairs during debug
-    if debug and uniform(0, 1) >= 0.999:
+    if debug and uniform(0, 1) >= 0.995:
         fig = plt.figure(dpi=300)
-        ax1 = fig.add_subplot(121)
-        im = ax1.imshow(np.asarray(img[0, :, :] / 255.), cmap='gray')
+        ax1 = fig.add_subplot(221)
+        im = ax1.imshow(np.asarray(input_img[0, :, :]), cmap='gray')
         plt.colorbar(im, orientation='horizontal')
         plt.title('Input')
 
-        ax2 = fig.add_subplot(122)
+        ax2 = fig.add_subplot(222)
         im2 = ax2.imshow(np.asarray(target[0, :, :]), cmap='gray')
         plt.colorbar(im2, orientation='horizontal')
         plt.title('Target')
+
+        ax3 = fig.add_subplot(223)
+        ax3.hist(np.asarray(input_img).ravel(), bins=2 ** 10)
+        ax4 = fig.add_subplot(224)
+        ax4.hist(np.asarray(target).ravel(), bins=2 ** 10)
         plt.show()
 
-    return {data_key: img, target_key: target}
+    return {data_key: input_img, target_key: target}
 
 
 def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=None):
-
-    # Load the correct target slice
-    target = cv2.imread(str(entry.target_fname), -1)
-    target = cv2.cvtColor(target, cv2.COLOR_GRAY2RGB)
-
+    """
+    Loads neighboring slices as a 3-channel image. If rgb is set to true, target includes neighboring slices.
+    If false, target includes only the center slice and adjacent slices are used as supporting information for input.
+    """
+    # Try to load neighbouring slices
+    target = load_neighbor_slices(entry.target_fname)
     data_max = np.iinfo(target.dtype).max
 
-    # Try to load neighbouring slices
-
-    # Neighbour filenames
-    n_1 = entry.target_fname
-    n_1 = Path(n_1.parent, str(int(n_1.stem[-8:]) - 1).zfill(8) + n_1.suffix)
-    if n_1.exists():
-        target[:, :, 0] = cv2.imread(str(n_1), cv2.IMREAD_GRAYSCALE)
-    n_2 = entry.target_fname
-    n_2 = Path(n_2.parent, str(int(n_2.stem[-8:]) + 1).zfill(8) + n_2.suffix)
-    if n_2.exists():
-        target[:, :, 2] = cv2.imread(str(n_2), cv2.IMREAD_GRAYSCALE)
-
-    # Convert to float
-    #target = ((target - target.min()) / target.max()).astype(np.float32)
-
-    # Magnification
-    mag = config.training.magnification
     # Antialiasing kernel size
-    if config.training.antialiasing is not None:
-        k = config.training.antialiasing
-    else:
-        k = 5
-    if config.training.sigma is not None:
-        s = config.training.sigma
-    else:
-        s = 0
+    if config.training.sigma is None:
+        config.training.sigma = _DEFAULT_ANTIALIASING_SIGMA
+    mag = config.training.magnification
 
     # Resize target to 4x magnification respect to input
     if config is not None and not config.training.crossmodality:
-        # Gaussian filter and downscaling
-        img = rescale(
-            gaussian(target, sigma=3, preserve_range=True), 1 / mag, order=1, channel_axis=2, preserve_range=True).astype('uint16')
+        input_img = downscale_image(target, factor=(target.shape[1] // mag, target.shape[0] // mag),
+                                    add_noise=True, sigma=config.training.sigma)
 
     # Co-registered images
     elif config is not None:
+        # Try to load neighbouring slices for input
+        input_img = load_neighbor_slices(entry.fname)
 
-        img = cv2.imread(str(entry.fname), -1)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-        # Neighbour filenames
-        n_1 = entry.fname
-        n_1 = Path(n_1.parent, str(int(n_1.stem[-8:]) - 1).zfill(8) + n_1.suffix)
-        if n_1.exists():
-            target[:, :, 0] = cv2.imread(str(n_1), cv2.IMREAD_GRAYSCALE)
-        n_2 = entry.fname
-        n_2 = Path(n_2.parent, str(int(n_2.stem[-8:]) + 1).zfill(8) + n_2.suffix)
-        if n_2.exists():
-            target[:, :, 2] = cv2.imread(str(n_2), cv2.IMREAD_GRAYSCALE)
-
-        # If the image sizes do not match, rescale the target image to match the input image
-        if target.shape != tuple([mag * x for x in img.shape]):  # TODO Check that resizing works properly
-            new_size = (img.shape[1] * mag, img.shape[0] * mag)
-            target = cv2.resize(target, new_size)
-
-        # target = resize(target.astype('float64'), new_size, order=0, anti_aliasing=True, preserve_range=True, anti_aliasing_sigma=k).astype('uint8')
+        # If the image sizes (not counting channel dim) do not match, rescale the target image to match the input image
+        if target.shape[:-1] != tuple([mag * x for x in input_img.shape[:-1]]):
+            target = downscale_image(target, factor=(input_img.shape[1] * mag, input_img.shape[0] * mag), add_noise=False)
     else:
         raise NotImplementedError
 
     # Make sure that grayscale images also possess channel dimension
-    if len(img.shape) != 3:
-        img = np.expand_dims(img, -1)
+    if len(input_img.shape) != 3:
+        input_img = np.expand_dims(input_img, -1)
     if len(target.shape) != 3:
         target = np.expand_dims(target, -1)
 
-    # Apply random transforms. Images are returned in format 3xHxW TODO conserve dynamic range with transforms
-    img, target = transform((img, target))
+    # Apply random transforms. Images are returned in format 3xHxW
+    input_img, target = transform((input_img, target))
 
     # Target is scaled to -1 to +1 range (tanh activation)
     target = (target / float(data_max) - 0.5) * 2
 
-    # Keep only the center slice of target TODO should this be optional?
-    target = target[[1], :, :]
-    target = target.repeat(3, 1, 1)
+    # Keep only the center slice of target if rgb is not True
+    if not config.training.rgb:
+        target = target[[1], :, :]
+        target = target.repeat(3, 1, 1)
 
     # Plot a small random portion of image-target pairs during debug
-    if debug and uniform(0, 1) >= 0.999:
+    if debug and uniform(0, 1) >= 0.995:
         fig, ax = plt.subplots(2, 2)
-        im = ax[0, 0].imshow(np.asarray(img[0, :, :] / float(data_max)), cmap='gray')
+        im = ax[0, 0].imshow(np.asarray(input_img[0, :, :]), cmap='gray')
         fig.colorbar(im, ax=ax[0, 0], orientation='horizontal')
         ax[0, 0].set_title('Input')
 
@@ -195,11 +157,11 @@ def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=
         ax[0, 1].set_title('Target')
 
         # Histogram
-        ax[1, 0].hist(np.asarray(img).ravel(), bins=2 ** 10)
+        ax[1, 0].hist(np.asarray(input_img).ravel(), bins=2 ** 10)
         ax[1, 1].hist(np.asarray(target).ravel(), bins=2 ** 10)
         plt.show()
 
-    return {data_key: img, target_key: target}
+    return {data_key: input_img, target_key: target}
 
 
 def parse_segmentation(root, entry, transform, data_key, target_key, debug=False, config=None):
@@ -218,14 +180,19 @@ def parse_segmentation(root, entry, transform, data_key, target_key, debug=False
 
     # Magnification
     mag = config.training.magnification
-    k = choice([5])
+    # Antialiasing kernel size
+    if config.training.antialiasing is None:
+        config.training.antialiasing = _DEFAULT_ANTIALIASING_KERNEL
+    if config.training.sigma is None:
+        config.training.sigma = _DEFAULT_ANTIALIASING_SIGMA
 
     # Binarize µCT image, then downscale
     if not config.training.crossmodality:
         # Get the downscaled input image
         new_size = (img.shape[1] // mag, img.shape[0] // mag)
         # Antialiasing and downscaling
-        img = cv2.resize(cv2.GaussianBlur(target, ksize=(k, k), sigmaX=0), new_size)
+        img = cv2.resize(cv2.GaussianBlur(target, ksize=(config.training.antialiasing, config.training.antialiasing),
+                                          sigmaX=config.training.sigma), new_size)
 
         img = np.expand_dims(img, -1)
         if config.training.rgb:
@@ -234,12 +201,10 @@ def parse_segmentation(root, entry, transform, data_key, target_key, debug=False
     # No modifications needed when using CBCT img
 
     # Segmentation target
-    if type(config.training.threshold) is int:
-        threshold = config.training.threshold
-    else:  # Default segmentation threshold
-        threshold = 90
+    if type(config.training.threshold) is not int:
+        config.training.threshold = _DEFAULT_SEGMENTATION_THRESHOLD
 
-    target = (target > threshold).astype('uint8')
+    target = (target > config.training.threshold).astype('uint8')
 
     # Set target size to 4x input
     #new_size = (img.shape[1] * mag, img.shape[0] * mag)

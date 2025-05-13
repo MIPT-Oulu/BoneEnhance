@@ -5,18 +5,53 @@ import random
 import torch
 import os
 import cv2
+import warnings
 from copy import deepcopy
 from functools import partial
+from pathlib import Path
 from pydicom import dcmread, dcmwrite, Dataset
 from pydicom.pixel_data_handlers.util import apply_modality_lut
 from pydicom.dataset import FileDataset, FileMetaDataset
 from pydicom.uid import UID
+from skimage.util.noise import random_noise
+from skimage.transform import resize
 from datetime import datetime
 from tqdm import tqdm
 from joblib import Parallel, delayed
 from glob import glob
 #from skimage import measure
 
+_ADD_NOISE = ['gaussian', 'poisson', 'localvar', 's&p', None]
+def downscale_image(image, factor, add_noise: _ADD_NOISE = None, blur=True, sigma=1):
+    data_max = np.iinfo(image.dtype).max
+    target_type = np.iinfo(image.dtype)
+
+    # Add Poisson noise and downscale the image
+    if add_noise is not None and add_noise in _ADD_NOISE:
+        image = random_noise(image, mode=add_noise)
+
+    # No need to warn for aliasing on channel-axis
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        image = resize(image, factor, order=0, preserve_range=True, anti_aliasing=blur, anti_aliasing_sigma=sigma)
+
+    # Scale from 0-1 to 0 - max
+    image = (image * data_max).astype(target_type)
+    return image
+
+def load_neighbor_slices(img_path: Path):
+    # Load the correct target slice
+    stack_3ch = cv2.imread(str(img_path), -1)
+    stack_3ch = cv2.cvtColor(stack_3ch, cv2.COLOR_GRAY2RGB)
+
+    n_1 = Path(img_path.parent, img_path.stem[:-8] + str(int(img_path.stem[-8:]) - 1).zfill(8) + img_path.suffix)
+    if n_1.exists():
+        stack_3ch[:, :, 0] = cv2.imread(str(n_1), -1)
+    n_2 = Path(img_path.parent, img_path.stem[:-8] + str(int(img_path.stem[-8:]) + 1).zfill(8) + img_path.suffix)
+    if n_2.exists():
+        stack_3ch[:, :, 2] = cv2.imread(str(n_2), -1)
+
+    return stack_3ch
 
 def threshold(data, method='otsu', block=11):
     """Thresholds 3D or 2D array using the Otsu method. Returns mask and threshold value."""
