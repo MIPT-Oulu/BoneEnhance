@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 from glob import glob
 
-from ..models import EnhanceNet, ConvNet, PerceptualNet#, SREncoderDecoder
-from collagen.modelzoo.segmentation import EncoderDecoder
+from ..training.session import load_model
 
 
 class InferenceModel(nn.Module):
@@ -34,48 +33,25 @@ class InferenceModel(nn.Module):
         return res / self.n_folds
 
 
-def load_models(model_path, config, n_gpus=1, magnification=4, fold=None):
+def load_and_list_models(model_path, config, n_gpus=1, magnification=4, fold=None):
     # Load models
     if fold is not None:
         models = glob(model_path + f'/*fold_{fold}*.pth')
     else:
         models = glob(model_path + '/*fold_*.pth')
     models.sort()
-    vol = len(config.training.crop_small) == 3
-    architecture = config.training.architecture
 
     # List the models
     model_list = []
     for fold in range(len(models)):
+        # Load model architecture
+        model = load_model(config)
 
-        if architecture == 'srencoderdecoder':
-            config.model.magnification = config.training.magnification
-            model = SREncoderDecoder(**config['model'])
-        elif architecture == 'encoderdecoder':
-            model = EncoderDecoder(**config['model'])
-        elif architecture == 'enhance':
-            model = EnhanceNet(config.training.crop_small, config.training.magnification,
-                               activation=config.training.activation,
-                               add_residual=config.training.add_residual,
-                               upscale_input=config.training.upscale_input)
-        elif architecture == 'convnet':
-            model = ConvNet(config.training.magnification,
-                            activation=config.training.activation,
-                            upscale_input=config.training.upscale_input,
-                            n_blocks=config.training.n_blocks,
-                            normalization=config.training.normalization)
-        elif architecture == 'perceptualnet':
-            model = PerceptualNet(config.training.magnification,
-                                  resize_convolution=config.training.upscale_input,
-                                  norm=config.training.normalization,
-                                  vol=vol, rgb=config.training.rgb,
-                                  residual_layers=config.training.n_blocks)
-        else:
-            raise Exception('Model architecture unavailable.')
-
+        # Parallel GPU processing
         if n_gpus > 1:
             model = nn.DataParallel(model)
 
+        # Load saved weights for the model architecture
         model.load_state_dict(torch.load(models[fold]))
         model_list.append(model)
 

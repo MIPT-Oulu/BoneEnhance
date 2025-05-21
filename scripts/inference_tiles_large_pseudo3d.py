@@ -108,7 +108,6 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
         if args.calculate_mean_std:
             mean, std = calculate_mean_std(data_xy, config.training.rgb)
 
-
         # In case of MRI, make the resolution isotropic
         if args.mri:
             slice_thickness = 1.0

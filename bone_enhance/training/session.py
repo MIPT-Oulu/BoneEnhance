@@ -219,10 +219,36 @@ def init_model(config, device='cuda', gpus=1, args=None):
     :param args:
     :return:
     """
-    architecture = config.training.architecture
-    vol = len(config.training.crop_small) == 3
+    # Load selected model architecture
+    model = load_model(config)
 
-    # List available model architectures
+    # Check for multi-gpu
+    if gpus > 1:
+        model = nn.DataParallel(model)
+
+    # Save the model architecture
+    with open(args.snapshots_dir / config.training.snapshot / 'architecture.yml', 'w') as f:
+        print(model, file=f)
+
+    # Pretrained model from a previous snapshot
+    if config.training.pretrain:
+        # Set up path
+        model_path = args.snapshots_dir / config.training.existing_model
+        model_path = glob(str(model_path) + '/*fold_*.pth')
+        model_path.sort()
+        # Load weights from first fold
+        model.load_state_dict(torch.load(model_path[0]))
+    # Randomly initialized weights (from Gaussian distribution)
+    else:
+        init = InitWeight(init_weight_normal, [0.0, 0.02], type='conv')
+        model.apply(init)
+
+    return model.to(device)
+
+
+def load_model(config):
+    # Model selection
+    architecture = config.training.architecture
 
     # Collagen encoderdecoder for super-resolution
     if architecture == 'srencoderdecoder':
@@ -249,33 +275,14 @@ def init_model(config, device='cuda', gpus=1, args=None):
         model = PerceptualNet(config.training.magnification,
                               resize_convolution=config.training.upscale_input,
                               norm=config.training.normalization,
-                              vol=vol, rgb=config.training.rgb,
-                              residual_layers=config.training.n_blocks)
+                              vol=len(config.training.crop_small) == 3,
+                              rgb=config.training.rgb,
+                              residual_layers=config.training.n_blocks,
+                              parser=config.training.parser)
     else:
         raise Exception('Model architecture unavailable.')
 
-    # Check for multi-gpu
-    if gpus > 1:
-        model = nn.DataParallel(model)
-
-    # Save the model architecture
-    with open(args.snapshots_dir / config.training.snapshot / 'architecture.yml', 'w') as f:
-        print(model, file=f)
-
-    # Pretrained model from a previous snapshot
-    if config.training.pretrain:
-        # Set up path
-        model_path = args.snapshots_dir / config.training.existing_model
-        model_path = glob(str(model_path) + '/*fold_*.pth')
-        model_path.sort()
-        # Load weights from first fold
-        model.load_state_dict(torch.load(model_path[0]))
-    # Randomly initialized weights (from Gaussian distribution)
-    else:
-        init = InitWeight(init_weight_normal, [0.0, 0.02], type='conv')
-        model.apply(init)
-
-    return model.to(device)
+    return model
 
 
 def create_data_provider(args, config, parser, metadata, mean, std):

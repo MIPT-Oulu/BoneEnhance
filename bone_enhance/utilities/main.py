@@ -22,21 +22,22 @@ from glob import glob
 #from skimage import measure
 
 _ADD_NOISE = ['gaussian', 'poisson', 'localvar', 's&p', None]
-def downscale_image(image, factor, add_noise: _ADD_NOISE = None, blur=True, sigma=1):
+def downscale_image(image, im_size, add_noise: _ADD_NOISE = None, blur=True, sigma=1):
     data_max = np.iinfo(image.dtype).max
     target_type = np.iinfo(image.dtype)
 
     # Add Poisson noise and downscale the image
     if add_noise is not None and add_noise in _ADD_NOISE:
+        # Random noise returns output in 0-1 range
         image = random_noise(image, mode=add_noise)
+        # Scale from 0-1 to 0 - max
+        image = (image * data_max).astype(target_type)
 
     # No need to warn for aliasing on channel-axis
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        image = resize(image, factor, order=0, preserve_range=True, anti_aliasing=blur, anti_aliasing_sigma=sigma)
+        image = resize(image, im_size, order=0, preserve_range=True, anti_aliasing=blur, anti_aliasing_sigma=sigma)
 
-    # Scale from 0-1 to 0 - max
-    image = (image * data_max).astype(target_type)
     return image
 
 def load_neighbor_slices(img_path: Path):

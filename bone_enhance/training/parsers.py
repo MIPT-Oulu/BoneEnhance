@@ -40,7 +40,7 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     # Resize target to 4x magnification respect to input
     if config is not None and not config.training.crossmodality:
         # Add noise if given, always do antialiasing with Gaussian blur
-        input_img = downscale_image(target, factor=(target.shape[1] // mag, target.shape[0] // mag),
+        input_img = downscale_image(target, im_size=(target.shape[1] // mag, target.shape[0] // mag),
                                     add_noise=config.training.noise,
                                     blur=True, sigma=config.training.sigma)
     # Co-registered images
@@ -60,7 +60,8 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
 
         # If the image sizes do not match, rescale the target image to match the input image
         if target.shape != tuple([mag * x for x in input_img.shape]):
-            target = downscale_image(target, factor=(target.shape[1] * mag, target.shape[0] * mag), add_noise=False)
+            target = downscale_image(target, im_size=(target.shape[1] * mag, target.shape[0] * mag),
+                                     add_noise=config.training.noise)
     else:
         raise NotImplementedError
 
@@ -114,8 +115,8 @@ def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=
 
     # Resize target to 4x magnification respect to input
     if config is not None and not config.training.crossmodality:
-        input_img = downscale_image(target, factor=(target.shape[1] // mag, target.shape[0] // mag),
-                                    add_noise=True, sigma=config.training.sigma)
+        input_img = downscale_image(target, im_size=(target.shape[1] // mag, target.shape[0] // mag),
+                                    add_noise=config.training.noise, sigma=config.training.sigma)
 
     # Co-registered images
     elif config is not None:
@@ -124,15 +125,15 @@ def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=
 
         # If the image sizes (not counting channel dim) do not match, rescale the target image to match the input image
         if target.shape[:-1] != tuple([mag * x for x in input_img.shape[:-1]]):
-            target = downscale_image(target, factor=(input_img.shape[1] * mag, input_img.shape[0] * mag), add_noise=False)
+            target = downscale_image(target, im_size=(input_img.shape[1] * mag, input_img.shape[0] * mag), add_noise=False)
     else:
         raise NotImplementedError
 
     # Make sure that grayscale images also possess channel dimension
-    if len(input_img.shape) != 3:
-        input_img = np.expand_dims(input_img, -1)
-    if len(target.shape) != 3:
-        target = np.expand_dims(target, -1)
+    #if len(input_img.shape) != 3:
+    #    input_img = np.expand_dims(input_img, -1)
+    #if len(target.shape) != 3:
+    #    target = np.expand_dims(target, -1)
 
     # Apply random transforms. Images are returned in format 3xHxW
     input_img, target = transform((input_img, target))
@@ -143,7 +144,6 @@ def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=
     # Keep only the center slice of target if rgb is not True
     if not config.training.rgb:
         target = target[[1], :, :]
-        target = target.repeat(3, 1, 1)
 
     # Plot a small random portion of image-target pairs during debug
     if debug and uniform(0, 1) >= 0.995:

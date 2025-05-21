@@ -92,9 +92,9 @@ class PerceptualNet(nn.Module):
 
         # Kernel
         if not rgb and parser == 'parse_3ch':
-            f_maps = [3, 64, 1]  # RGB
+            f_maps = [3, 64, 1]  # 3-channel input, 1-channel output
         elif rgb:
-            f_maps = [3, 64, 3]  # RGB
+            f_maps = [3, 64, 3]  # RGB input and output
         else:
             f_maps = [1, 64, 1]  # One-channel
         kernel = 3
@@ -145,7 +145,7 @@ class PerceptualNet(nn.Module):
         # Pass through the model
         x = self.net(x)
 
-        # Duplicate 1-channel image to represent RGB
+        # Duplicate 1-channel image to represent RGB when only one channel is returned
         if self.rgb and x.size(1) == 1:
             if len(x.size()) == 5:
                 x = x.repeat(1, 3, 1, 1, 1)

@@ -22,7 +22,7 @@ from pytorch_toolbelt.inference.tiles import CudaTileMerger
 from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
 
 from .tiler3d import Tiler3D, TileMerger3D, ImageSlicer
-from .model_components import InferenceModel, load_models
+from .model_components import InferenceModel, load_and_list_models
 from .thickness_analysis import _local_thickness
 from ..utilities import load, save, print_orthogonal, load_neighbor_slices, threshold, calculate_bvtv, downscale_image
 from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculate_dice, \
@@ -60,7 +60,7 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
         out = (x * mag, y * mag)
 
     # Check the number of channels
-    if ch == 3 and not config.training.rgb:
+    if ch == 3 and not config.training.rgb and not config.training.parser == 'parse_3ch':
         img_full = np.expand_dims(np.mean(img_full, axis=-1), axis=-1)
         ch = 1
     elif ch == 1 and config.training.rgb:
@@ -126,6 +126,7 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     torch.cuda.empty_cache()
     gc.collect()
 
+    # TODO does 2D-inference need a possibility for 3-channel output
     if len(merged_pred.shape) == 3:
         return merged_pred[:, :, 0]
     else:
@@ -178,10 +179,10 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
         if mean is not None and std is not None:
             tiles_batch = tiles_batch.float()
             for c in range(len(mean)):
-                tiles_batch[:, c, :, :] = (((tiles_batch[:, c, :, :] / 255.) - mean[c]) / std[c])
+                tiles_batch[:, c, :, :] = (((tiles_batch[:, c, :, :] / data_max) - mean[c]) / std[c])
             tiles_batch = tiles_batch.to(device)
         else:
-            tiles_batch = (tiles_batch.float() / 255.).to(device)
+            tiles_batch = (tiles_batch.float() / data_max).to(device)
 
         # Predict and move back to CPU
         pred_batch = inference_model(tiles_batch)
@@ -278,7 +279,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
         return None
 
     # List the models
-    model_list = load_models(str(args.snapshots_dir / config.training.snapshot), config, n_gpus=args.gpus)
+    model_list = load_and_list_models(str(args.snapshots_dir / config.training.snapshot), config, n_gpus=args.gpus)
     print(f'Found {len(model_list)} models.')
 
     # Loop for all images
@@ -319,7 +320,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
                 # Resize target with the given magnification to provide the input image
                 if not config.training.crossmodality:
                     factor = (data.shape[0] // mag, data.shape[1] // mag, data.shape[2] // mag)
-                    data = downscale_image(data, factor=factor,
+                    data = downscale_image(data, im_size=factor,
                                     add_noise=config.training.noise,
                                     blur=True, sigma=config.training.sigma)
 
@@ -333,7 +334,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
             # 2D image stack
             else:
                 if config.training.parser == 'parse_3ch':
-                    load_neighbor_slices(str(sample))
+                    data = load_neighbor_slices(sample)
                 else:
                     data = cv2.imread(str(sample), -1)
                     # Make sure the target is in grayscale
@@ -343,7 +344,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
                 # Resize target with the given magnification to provide the input image
                 if not config.training.crossmodality:
                     factor = (data.shape[1] // mag, data.shape[0] // mag)
-                    data = downscale_image(data, factor=factor,
+                    data = downscale_image(data, im_size=factor,
                                            add_noise=config.training.noise,
                                            blur=True, sigma=config.training.sigma)
 
@@ -389,6 +390,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
             #data = (data * image_type.max).astype(image_type)
             data = ((data + data_min) * (data_max - data_min)).astype(image_type)
             #print('Output', np.min(data), np.max(data))
+
             # Save predicted image
             if len(data.shape) == 3:
                 (save_dir / sample.stem).mkdir(exist_ok=True)
@@ -463,15 +465,19 @@ def evaluation_runner(args, config, save_dir, use_bvtv=True, suffix='_3d'):
 
             pred, files_pred = load(str(args.save_dir / snap.name / sample), axis=(1, 2, 0), rgb=False)
 
+            # Save bit depth before it is changed in the pipeline
+            target_type = np.iinfo(target.dtype)
+            pred_type = np.iinfo(pred.dtype)
+
             # Crop in case of inconsistency
             crop = min(pred.shape, target.shape)
             target = target[:crop[0], :crop[1], :crop[2]]
             pred = pred[:crop[0], :crop[1], :crop[2]].squeeze()
 
             # Evaluate metrics
-            mse = mean_squared_error(target / 255., pred / 255.)
-            psnr = peak_signal_noise_ratio(target / 255., pred / 255.)
-            ssim = structural_similarity(target / 255., pred / 255.)
+            mse = mean_squared_error(target / float(target_type.max), pred / float(pred_type.max))
+            psnr = peak_signal_noise_ratio(target / float(target_type.max), pred / float(pred_type.max))
+            ssim = structural_similarity(target / float(target_type.max), pred / float(pred_type.max))
 
             print(f'Sample {sample}: MSE = {mse}, PSNR = {psnr}, SSIM = {ssim}')
 
@@ -604,7 +610,7 @@ def morphometric_analysis(array, parameters,
     parameters['BVTV'].append(bvtv)
 
     # Separation map
-    array = np.logical_and(np.invert(array), voi).astype(np.uint8) * 255
+    array = np.logical_and(np.invert(array), voi).astype(np.uint16) * 65535
     th_map = _local_thickness(array, mode=mode, spacing_mm=resolution, stack_axis=1,
                               thickness_max_mm=max_th, verbose=False)
     th_map = th_map[np.nonzero(th_map)].flatten()
