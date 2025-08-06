@@ -8,7 +8,7 @@ import os
 import yaml
 
 from collagen.core.utils import auto_detect_device
-from bone_enhance.inference.model_components import load_models
+from bone_enhance.inference.model_components import load_and_list_models
 from bone_enhance.inference.pipeline_components import inference_runner_oof, evaluation_runner
 
 cv2.ocl.setUseOpenCL(False)
@@ -17,17 +17,18 @@ cv2.setNumThreads(0)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--save_dir', type=Path, default='../../Data/predictions_oof_wacv')
-    parser.add_argument('--eval_dir', type=Path, default='../../Data/evaluation_oof_wacv')
+    parser.add_argument('--save_dir', type=Path, default='../../Data/predictions_oof_bbs')
+    parser.add_argument('--eval_dir', type=Path, default='../../Data/evaluation_oof_bbs')
     parser.add_argument('--data_location', type=Path, default='../../Data')
-    parser.add_argument('--snap_id', type=int, default=None)
+    parser.add_argument('--snap_id', type=int, default=0)
     parser.add_argument('--bs', type=int, default=4)
     parser.add_argument('--magnification', type=int, default=4)
     parser.add_argument('--plot', type=bool, default=False)
     parser.add_argument('--gpus', type=int, default=2)
-    parser.add_argument('--weight', type=str, choices=['gaussian', 'mean'], default='gaussian')
+    parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'crop'], default='crop')
+    parser.add_argument('--step', type=int, default=2)
     # µCT snapshot
-    parser.add_argument('--snapshots', type=Path, default='../../Workdir/snapshots/')
+    parser.add_argument('--snapshots', type=Path, default='../../Workdir/Erkko_experiments/')
     args = parser.parse_args()
 
     # Snapshots to be evaluated
@@ -40,8 +41,9 @@ if __name__ == "__main__":
     suffixes = ['']
     snaps = [Path(os.path.join(path, snap)) for snap in snaps if os.path.isdir(os.path.join(path, snap))]
     if args.snap_id is not None:
-        snaps = [snaps[args.snap_id - 1]]
-    #snaps = [args.snapshots / '2021_06_29_15_08_12_3D_perceptual_tv_IVD_4x_pretrained_isotropic_seed42']
+        print(f'Running inference for {snaps[args.snap_id]}')
+        snaps = [Path(snaps[args.snap_id])]
+    #snaps = [args.snapshots / '2025_05_22_10_18_26_BBS_16bit_2D_ssim_3ch_rgb_seed42']
 
     # Iterate through snapshots
     args.save_dir.mkdir(exist_ok=True)
@@ -52,6 +54,8 @@ if __name__ == "__main__":
         with open(snap / 'config.yml', 'r') as f:
             config = yaml.load(f, Loader=yaml.Loader)
             config = OmegaConf.create(config)
+            config.inference.weight = args.weight
+            config.inference.step = args.step
 
         with open(snap / 'args.dill', 'rb') as f:
             args_experiment = dill.load(f)
@@ -64,7 +68,7 @@ if __name__ == "__main__":
         device = auto_detect_device()
 
         # Load models
-        model_list = load_models(str(snap), config, n_gpus=args_experiment.gpus)
+        model_list = load_and_list_models(str(snap), config, n_gpus=args_experiment.gpus)
 
         print(f'Found {len(model_list)} models.')
 

@@ -21,19 +21,24 @@ class Tiler3D:
         self.mag = mag
         self.out = out
 
-        self.step = tuple([s // step for s in tile])
+        #self.step = tuple([s // step for s in tile])
+        self.step = tuple([s - 20 for s in tile])
 
         # Sizes for magnified image
         tile_out = tuple([s * mag for s in tile])
         self.tile_out = np.min((tile_out, out), axis=0)
         self.step_out = tuple([s // step for s in tile_out])
 
-        overlap = [(self.tile[x] - self.step[x]) for x in range(self.dim)]
-
-        if weight == 'mean':
+        # Weights and overlaps
+        if weight == 'crop':
+            self.weight = self._crop(self.tile_out)
+            overlap = [0 for _ in range(self.dim)]
+        elif weight == 'mean':
             self.weight = self._mean(self.tile_out)
+            overlap = [(self.tile[x] - self.step[x]) for x in range(self.dim)]
         elif weight == 'gaussian':
             self.weight = self._gaussian(self.tile_out, step)
+            overlap = [(self.tile[x] - self.step[x]) for x in range(self.dim)]
         else:
             raise Exception('Weight not implemented!')
 
@@ -170,6 +175,11 @@ class Tiler3D:
 
     def _mean(self, tile_size):
         return np.ones(tile_size, dtype=np.float32)
+
+    def _crop(self, tile_size, crop_size=10):
+        c = np.zeros(tile_size, dtype=np.float32)
+        c[crop_size:-crop_size, crop_size:-crop_size] = 1
+        return c
 
     def _gaussian(self, tile_size, step):
         m = np.zeros(tile_size, dtype=np.float32)

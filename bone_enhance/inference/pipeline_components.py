@@ -20,6 +20,7 @@ from skimage.metrics import mean_squared_error, peak_signal_noise_ratio, structu
 from torch.utils.data import DataLoader
 from pytorch_toolbelt.inference.tiles import CudaTileMerger
 from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
+from ..transforms.main import numpy2tens
 
 from .tiler3d import Tiler3D, TileMerger3D, ImageSlicer
 from .model_components import InferenceModel, load_and_list_models
@@ -70,7 +71,7 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     tiler = Tiler3D(img_full.shape, tile=tile, out=out, step=step, mag=mag, weight=weight)
 
     # HCW -> CHW. Optionally, do normalization here
-    tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]
+    tiles = [numpy2tens(tile) for tile in tiler.split(img_full)]
 
     # Allocate a CUDA buffer for holding entire mask
     merger = TileMerger3D(tiler.target_shape, channels=ch, weight=tiler.weight, cuda=cuda)
@@ -80,12 +81,12 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
                                                 pin_memory=True):
         # Move tile to GPU
         if mean is not None and std is not None:
-            tiles_batch = tiles_batch.float()
+            #tiles_batch = tiles_batch.float()
             for c in range(tiles_batch.size(1)):
                 tiles_batch[:, c, :, :] = (((tiles_batch[:, c, :, :] / data_max) - mean[c]) / std[c])
             tiles_batch = tiles_batch.to(device)
         else:
-            tiles_batch = (tiles_batch.float() / data_max).to(device)
+            tiles_batch = (tiles_batch / data_max).to(device)
         # Predict and move back to CPU
         pred_batch = inference_model(tiles_batch)
 
@@ -388,7 +389,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False, verbose
 
             # Convert from 0-1 to proper bit depth
             #data = (data * image_type.max).astype(image_type)
-            data = ((data + data_min) * (data_max - data_min)).astype(image_type)
+            data = (data * (data_max - data_min) + data_min).astype(image_type)
             #print('Output', np.min(data), np.max(data))
 
             # Save predicted image

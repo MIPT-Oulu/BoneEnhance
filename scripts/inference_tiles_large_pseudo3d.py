@@ -17,7 +17,7 @@ from skimage.transform import resize
 from omegaconf import OmegaConf
 
 from bone_enhance.utilities import load, save, print_orthogonal, render_volume, calculate_mean_std
-from bone_enhance.inference import InferenceModel, inference, largest_object, load_models
+from bone_enhance.inference import InferenceModel, inference, largest_object, load_and_list_models
 from bone_enhance.models import ConvNet, EnhanceNet
 
 cv2.ocl.setUseOpenCL(False)
@@ -49,7 +49,7 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
     mean, std = tmp['mean'], tmp['std']
 
     # List the models
-    model_list = load_models(str(args.snapshot), config, n_gpus=args_experiment.gpus)
+    model_list = load_and_list_models(str(args.snapshot), config, n_gpus=args_experiment.gpus)
     model = InferenceModel(model_list, sigmoid=config.training.segmentation).to(device)
     model.eval()
     print(f'Found {len(model_list)} models.')
@@ -59,7 +59,7 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
     samples = os.listdir(args.dataset_root)
     samples.sort()
     if sample_id is not None:
-        samples = [samples[id] for id in [sample_id]]  # Get intended samples from list
+        samples = [samples[id] for id in sample_id]  # Get intended samples from list
 
     # Skip the completed samples
     if args.completed > 0:
@@ -207,22 +207,23 @@ if __name__ == "__main__":
     #snap_path = '../../Workdir/wacv_experiments_new_2D'
     #snap_path = '../../Workdir/dental_experiments'
     #snap_path = '../../Workdir/IVD_experiments_2D'
-    snap_path = '../../Workdir/snapshots'
+    snap_path = '../../Workdir/Erkko_experiments'
     snaps = os.listdir(snap_path)
     snaps.sort()
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(snap_path, snap))]
     # Skip snapshots
-    #snaps = [snaps[-1]]
+    snaps = [snaps[10]]
     # List of specific snapshots
     #snaps = ['2021_05_27_08_56_20_2D_perceptual_tv_IVD_4x_pretrained_seed42']
-    snaps = ['2022_02_11_01_21_26_2D_ssim_dental_seed10']
-    snaps = [#'2021_06_11_11_59_53_2D_perceptual_tv_1176_seed10',
-             '2021_06_10_23_57_51_2D_ssim_1176_seed10',
-             #'2021_06_10_23_24_54_2D_mse_tv_1176_seed10'
-    ]
-    snaps = ['2024_07_24_14_53_50_3D_ssim_3channel_seed42']  # 3-channel model
-    snaps = ['2024_08_30_08_35_46_2D_ssim_residual_depth_seed42']  # Deeper model
-    snaps = ['2024_09_12_17_26_06_2D_ssim_deep_3ch_seed42'] # Deeper 3-ch model
+    #snaps = ['2022_02_11_01_21_26_2D_ssim_dental_seed10']
+    #snaps = [#'2021_06_11_11_59_53_2D_perceptual_tv_1176_seed10',
+    #         '2021_06_10_23_57_51_2D_ssim_1176_seed10',
+    #         #'2021_06_10_23_24_54_2D_mse_tv_1176_seed10'
+    #]
+    #snaps = ['2024_07_24_14_53_50_3D_ssim_3channel_seed42']  # 3-channel model
+    #snaps = ['2024_08_30_08_35_46_2D_ssim_residual_depth_seed42']  # Deeper model
+    #snaps = ['2024_09_12_17_26_06_2D_ssim_deep_3ch_seed42'] # Deeper 3-ch model
+
 
     for snap_id in range(len(snaps)):
 
@@ -230,6 +231,7 @@ if __name__ == "__main__":
         print(f'Calculating inference for snapshot: {snap} {snap_id+1}/{len(snaps)}')
 
         parser = argparse.ArgumentParser()
+        #parser.add_argument('--dataset_root', type=Path, default='../../Data/input_BBS')
         parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/Fantomi/H5B-fantomi/Series1/Series1/')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/dental/')
@@ -237,7 +239,7 @@ if __name__ == "__main__":
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Repeatability/')
         #parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}_avg')
         parser.add_argument('--save_dir', type=Path,
-                            default=f'../../Data/predictions_3D_clinical/wrist_experiments/{snap}_avg')
+                            default=f'../../Data/predictions_erkko/{snap}')
         parser.add_argument('--bs', type=int, default=64)
         parser.add_argument('--step', type=int, default=2)
         parser.add_argument('--plot', type=bool, default=False)
@@ -247,8 +249,8 @@ if __name__ == "__main__":
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
         parser.add_argument('--completed', type=int, default=0)
         parser.add_argument('--res', type=float, default=0.200, help='Input image pixel size')
-        parser.add_argument('--sample_id', type=list, default=10, help='Process specific samples unless None.')
-        parser.add_argument('--avg_planes', type=bool, default=True)
+        parser.add_argument('--sample_id', type=list, default=[11], help='Process specific samples unless None.')
+        parser.add_argument('--avg_planes', type=bool, default=False)
         parser.add_argument('--mri', type=bool, default=False, help='Is anisotropic MRI data used?')
         parser.add_argument('--snapshot', type=Path,
                             default=os.path.join(snap_path, snap))
