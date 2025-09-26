@@ -1,55 +1,137 @@
-FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+# Nvidia CUDA image with Ubuntu 20.04 LTS
+FROM nvidia/cudagl:11.2.1-devel-ubuntu20.04
 
-RUN apt-get update && apt-get install -y python3.7\
+# Conda environment
+
+# Install package prerequisite software with auto-confirmation (-y)
+# ppa:deadsnakes allows installation of old Python versions that would not be available on current Ubuntu
+RUN apt-get update  \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get install -y libglib2.0-0 \
+    python3-pip \
+    libglib2.0-0 \
+    zlib1g-dev \
+    libjpeg-dev \
     libsm6 \
     libxext6 \
     libxrender-dev \
-    zlib1g-dev \
-    libjpeg-dev \
-    vim \
     git \
-    bash
-    #python3.7.9 \
-    #python3-pip
+    wget \
+    curl \
+    gnupg \
+    ca-certificates \
+    software-properties-common \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3.7-venv \
+    && rm -rf /var/lib/apt/lists/*
 
-# Python package management and basic dependencies
-#RUN apt-get install -y curl python3.7 python3.7-dev python3.7-distutils
+# Move to home directory
+WORKDIR /home
 
-# Register the version in alternatives
-#RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.7 1
+# Clone BoneEnhance (development branch)
+# TODO freeze commit
+RUN git clone --branch development https://github.com/MIPT-Oulu/BoneEnhance.git
+#RUN git clone --branch collagen-super-resolution https://github.com/MIPT-Oulu/Collagen.git
 
-# Set python 3 as the default python
-#RUN update-alternatives --set python /usr/bin/python3.7
-
-# Upgrade pip to latest version
-#RUN curl -s https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-#    python get-pip.py --force-reinstall && \
-#    rm get-pip.py
 
 WORKDIR /home/BoneEnhance
 
-RUN git clone https://github.com/MIPT-Oulu/BoneEnhance.git@development
+# Conda environment with Python 3.7
+RUN apt-get install -y wget \
+    && wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh \
+    && bash miniconda.sh -b -p /opt/conda \
+    && rm miniconda.sh
+# Add Conda to path variable
+ENV PATH=/opt/conda/bin:$PATH
 
-# Install dependencies
-RUN pip3 install --no-cache-dir --trusted-host pypi.python.org h5py==2.8.0 \
-    deep-pipeline==0.2.5 \
-    git+https://github.com/MIPT-Oulu/Collagen.git@collagen-super-resolution \
-    git+https://github.com/imedslab/solt.git \
-    h5py==2.10.0 \
-    omegaconf==2.0.0 \
-    opencv-python==4.3.0.36 \
-    opencv-python-headless==4.3.0.36 \
-    pillow==6.1.0 \
-    pretrainedmodels==0.7.4 \
-    pydicom \
-    pytorch-toolbelt==0.3.2 \
-    segmentation-models-pytorch==0.1.0 \
-    solt==0.1.9 \
-    tensorboard==2.3.0 \
-    tensorboardx==2.1 \
-    termcolor==1.1.0 \
-    torchcontrib==0.0.2 \
-    torchfile==0.1.0 \
-    torchnet==0.0.4 \
-    torchvision==0.7.0 \
-    vtk==9.0.1
+# Local files TODO
+COPY requirements_full.txt /home/BoneEnhance/requirements_full.txt
+COPY environment2.yml /home/BoneEnhance/environment2.yml
+
+# Accept Anaconda terms of service
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main \
+ && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+RUN conda env create -n boneenhance -f environment.yml
+#RUN conda create -n boneenhance python=3.7 cudatoolkit=10.1 -y
+RUN conda run -n boneenhance pip install --no-cache-dir "protobuf==3.15.2"
+
+# Downgrade packages for compatibility
+#RUN conda run -n boneenhance pip install "protobuf<3.20" --force-reinstall
+WORKDIR /home
+RUN git clone https://github.com/imedslab/solt.git \
+    && cd solt \
+    && git checkout 4201cd1 \
+    && pip install -e .
+
+# Add Python to virtual environment
+#RUN python3.7 -m venv /venv
+#ENV PATH=/venv/bin:$PATH
+
+# Install Python dependencies
+RUN python3 -m pip install --upgrade pip setuptools wheel
+
+# Install pypi packages
+#RUN pip install -r requirements_full.txt \
+RUN conda run -n boneenhance pip install --trusted-host pypi.python.org \
+    jupyterlab \
+    notebook \
+    ipykernel \
+    ipywidgets==7.7.1 \
+    jupyterlab_widgets
+
+#RUN conda run -n boneenhance pip install git+https://github.com/Po-Hsun-Su/pytorch-ssim.git \
+#    git+https://github.com/MIPT-Oulu/Collagen.git@collagen-super-resolution
+
+# Change line in SOLT data.validate()
+#RUN sed -i 's/self.state_dict\["frame"\] = data.validate()/self.state_dict["frame"] = data.data[0].shape[:-1]/' $(python -c "import solt.core._base_transforms as bt; print(bt.__file__)")
+RUN conda run -n boneenhance bash -lc 'f=$(python -c "import solt.core._base_transforms as bt; print(bt.__file__)"); sed -i '\''76s|.*|        self.state_dict["frame"] = data.data[0].shape[:-1]|'\'' "$f"'
+
+
+# Register boneenhance to Jupyter kernels
+RUN conda run -n boneenhance python -m ipykernel install --user --name boneenhance --display-name "Python (boneenhance)"
+
+# Copy in username file
+WORKDIR /home
+COPY users.txt /home/
+COPY create_users.sh /home/
+RUN ./create_users.sh && \
+    rm users.txt create_users.sh
+WORKDIR /home/BoneEnhance
+
+# Ensure the user has required permissions
+ARG GROUPNAME
+ARG USERNAME
+RUN mkdir -p /home/predictions \
+    && chown -R $USERNAME:$GROUPNAME /home/predictions  \
+    && chmod -R 770 /home/predictions \
+    && chown -R $USERNAME:$GROUPNAME /home/BoneEnhance \
+    && chmod -R 770 /home/BoneEnhance \
+    && mkdir -p /home/santeri \
+    && chown -R $USERNAME:$GROUPNAME /home/santeri \
+    && chmod -R 770 /home/santeri \
+    && mkdir -p /home/.local/share/jupyter \
+    && chown -R $USERNAME:$GROUPNAME /home/.local/share/jupyter \
+    && chmod -R 770 /home/.local/share/jupyter
+
+ENV PYTHONPATH=/home/BoneEnhance
+
+# Mount position for data and snapshots
+RUN mkdir Data
+VOLUME ["/home/BoneEnhance/Data"]
+RUN mkdir Workdir
+VOLUME ["/home/BoneEnhance/Workdir"]
+
+# Expose Jupyter port
+EXPOSE 8888
+
+# Activate environment by default
+SHELL ["conda", "run", "-n", "boneenhance", "/bin/bash", "-c"]
+
+#RUN conda run -n boneenhance python -c "import collagen; print(collagen.__version__)"
+
+# Default command (can be overridden)
+#CMD ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
+CMD ["conda", "run", "--no-capture-output", "-n", "boneenhance", "jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
+
+

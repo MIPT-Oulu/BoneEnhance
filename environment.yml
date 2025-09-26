@@ -30,7 +30,9 @@ dependencies:
   - tqdm=4.47.0=py_0
   - yaml=0.2.5=h7b6447c_0
   - pip:
+    #- git+https://github.com/MIPT-Oulu/Collagen.git@8b0065f
     - git+https://github.com/MIPT-Oulu/Collagen.git@collagen-super-resolution
+    - git+https://github.com/Po-Hsun-Su/pytorch-ssim.git
     - deep-pipeline==0.2.5
     - h5py==2.10.0
     - omegaconf==2.0.0
@@ -41,8 +43,10 @@ dependencies:
     - pydicom
     - pytorch-toolbelt==0.3.2
     - segmentation-models-pytorch==0.1.0
-    - solt==0.1.9
+    #- solt==0.1.9
+    #- git+https://github.com/imedslab/solt.git@4201cd1
     - tensorboard==2.3.0
+    - protobuf==3.15.2
     - tensorboardx==2.1
     - termcolor==1.1.0
     - torchcontrib==0.0.2

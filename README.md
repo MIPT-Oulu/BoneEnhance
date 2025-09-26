@@ -29,6 +29,15 @@ self.state_dict["frame"] = data.validate()
 self.state_dict["frame"] = data.data[0].shape[:-1]
 ```
 
+Container
+```
+docker compose build
+docker compose up
+# In container terminal
+cd solt
+pip install -e . --no-deps
+```
+
 ## Usage
 
 ### Model training
