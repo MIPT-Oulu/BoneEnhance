@@ -69,6 +69,8 @@ def init_experiment(experiments='../experiments/run'):
             with open(args.experiment / config_path, 'r') as f:
                 config = yaml.load(f, Loader=yaml.FullLoader)
                 config_list.append(config)
+        else:
+            continue
 
         # Snapshot directory
         snapshot_name = time.strftime(f'%Y_%m_%d_%H_%M_%S_{config_path[:-4]}_seed{args.seed}')

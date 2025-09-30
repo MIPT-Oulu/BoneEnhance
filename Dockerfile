@@ -47,7 +47,7 @@ ENV PATH=/opt/conda/bin:$PATH
 
 # Local files TODO
 COPY requirements_full.txt /home/BoneEnhance/requirements_full.txt
-COPY environment2.yml /home/BoneEnhance/environment2.yml
+#COPY environment.yml /home/BoneEnhance/environment.yml
 
 # Accept Anaconda terms of service
 RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main \
@@ -59,9 +59,8 @@ RUN conda run -n boneenhance pip install --no-cache-dir "protobuf==3.15.2"
 # Downgrade packages for compatibility
 #RUN conda run -n boneenhance pip install "protobuf<3.20" --force-reinstall
 WORKDIR /home
-RUN git clone https://github.com/imedslab/solt.git \
+RUN git clone --branch scalable-augmentations https://github.com/sarytky/solt.git \
     && cd solt \
-    && git checkout 4201cd1 \
     && pip install -e .
 
 # Add Python to virtual environment
@@ -78,15 +77,11 @@ RUN conda run -n boneenhance pip install --trusted-host pypi.python.org \
     notebook \
     ipykernel \
     ipywidgets==7.7.1 \
+    numpy==1.21.6 \
     jupyterlab_widgets
 
-#RUN conda run -n boneenhance pip install git+https://github.com/Po-Hsun-Su/pytorch-ssim.git \
-#    git+https://github.com/MIPT-Oulu/Collagen.git@collagen-super-resolution
-
-# Change line in SOLT data.validate()
-#RUN sed -i 's/self.state_dict\["frame"\] = data.validate()/self.state_dict["frame"] = data.data[0].shape[:-1]/' $(python -c "import solt.core._base_transforms as bt; print(bt.__file__)")
-RUN conda run -n boneenhance bash -lc 'f=$(python -c "import solt.core._base_transforms as bt; print(bt.__file__)"); sed -i '\''76s|.*|        self.state_dict["frame"] = data.data[0].shape[:-1]|'\'' "$f"'
-
+# Downgrade protobuf
+RUN conda run -n boneenhance pip install --force-reinstall "protobuf==3.9.2"
 
 # Register boneenhance to Jupyter kernels
 RUN conda run -n boneenhance python -m ipykernel install --user --name boneenhance --display-name "Python (boneenhance)"
