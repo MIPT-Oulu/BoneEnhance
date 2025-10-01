@@ -92,7 +92,6 @@ COPY users.txt /home/
 COPY create_users.sh /home/
 RUN ./create_users.sh && \
     rm users.txt create_users.sh
-WORKDIR /home/BoneEnhance
 
 # Ensure the user has required permissions
 ARG GROUPNAME
@@ -110,12 +109,13 @@ RUN mkdir -p /home/predictions \
     && chmod -R 770 /home/.local/share/jupyter
 
 ENV PYTHONPATH=/home/BoneEnhance
+WORKDIR /home
 
 # Mount position for data and snapshots
 RUN mkdir Data
-VOLUME ["/home/BoneEnhance/Data"]
+VOLUME ["/home/Data"]
 RUN mkdir Workdir
-VOLUME ["/home/BoneEnhance/Workdir"]
+VOLUME ["/home/Workdir"]
 
 # Expose Jupyter port
 EXPOSE 8888

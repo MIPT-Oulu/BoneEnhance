@@ -1,0 +1,32 @@
+services:
+  bone_enhance:
+    build:
+      context: .
+      args:
+        USERNAME: user
+        GROUPNAME: group
+    image: bone_enhance:development
+    container_name: bone_enhance
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: [ '0', '1' ]
+              capabilities: [ gpu ]
+    shm_size: "16g"
+    ipc: host
+    environment:
+      - NCCL_P2P_DISABLE=1
+      - NCCL_IB_DISABLE=1
+
+    ports:
+      - "8888:8888"
+    volumes:
+      # host_path : container_path
+      - /media/user/data/BoneEnhance/Data:/home/Data
+      - /media/user/data/BoneEnhance/Workdir:/home/Workdir
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+
