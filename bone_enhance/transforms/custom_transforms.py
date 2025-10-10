@@ -24,7 +24,6 @@ from solt.constants import (
     ALLOWED_COLOR_CONVERSIONS,
     ALLOWED_CROPS,
     ALLOWED_INTERPOLATIONS,
-    ALLOWED_GRIDMASK_MODES,
 )
 from solt.core import Stream
 from solt.core import DataContainer, Keypoints
@@ -396,7 +395,7 @@ class Blur(ImageTransform):
         if self.blur == "g":
             return gaussian(img, sigma=self.state_dict["sigma"])
         if self.blur == "m":
-            return median(img, selem=np.expand_dims(ball(self.state_dict["k_size"]), axis=3))
+            return median(img, footprint=np.expand_dims(ball(self.state_dict["k_size"]), axis=3))
 
         if self.blur == "mo":
             return cv2.filter2D(img, -1, self.state_dict["motion_kernel"])

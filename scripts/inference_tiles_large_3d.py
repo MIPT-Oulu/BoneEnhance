@@ -3,6 +3,8 @@ import numpy as np
 import os
 from pathlib import Path
 import argparse
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import dill
 import torch
@@ -17,7 +19,7 @@ from skimage.transform import resize
 import h5py
 
 from bone_enhance.utilities import load, save, print_orthogonal, render_volume, threshold, calculate_mean_std
-from bone_enhance.inference import InferenceModel, inference, largest_object, load_models, inference_3d
+from bone_enhance.inference import InferenceModel, inference, largest_object, load_and_list_models, inference_3d
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
@@ -43,7 +45,7 @@ def main(args, config, args_experiment, sample_id=None, render=False):
     mean, std = tmp['mean'], tmp['std']
 
     # Load models
-    model_list = load_models(str(args.snapshot), config, n_gpus=args_experiment.gpus)  # , fold=0)
+    model_list = load_and_list_models(str(args.snapshot), config, n_gpus=args_experiment.gpus)  # , fold=0)
     model = InferenceModel(model_list).to(device)
     model.eval()
     print(f'Found {len(model_list)} models.')
@@ -70,7 +72,11 @@ def main(args, config, args_experiment, sample_id=None, render=False):
             with h5py.File(str(args.dataset_root / sample), 'r') as f:
                 data_xy = f['data'][:]
         else:
-            data_xy, files = load(str(args.dataset_root / sample), rgb=False, axis=(1, 2, 0), dicom=args.dicom)
+            data_xy, files = load(str(args.dataset_root / sample), rgb=False, axis=(1, 2, 0),
+                                  dicom=args.dicom, scales=args.dicom_scales)
+
+        # TODO
+        data_xy = data_xy[300:400, 300:400, 400:500]
 
         # Channel dimension
         if len(data_xy.shape) != 4:
@@ -107,12 +113,22 @@ def main(args, config, args_experiment, sample_id=None, render=False):
         if args.scale:
             prediction -= np.min(prediction)
             prediction /= pred_max
-        elif pred_max > 1:
+        elif pred_max > 1 and not config.training.no_mean_std:
             print(f'Maximum value {pred_max} will be scaled to one')
             prediction[prediction > 1] = 1
 
-        # Convert to uint8
-        prediction = (prediction * 255).astype('uint8')
+        # Keep the original data type of the image
+        data_max = float(np.iinfo(data_xy.dtype).max)
+        if config.training.no_mean_std:
+            pass
+        elif data_max == 65535:
+            prediction = (prediction * data_max).astype('uint16')
+        elif data_max == 255:
+            prediction = (prediction * data_max).astype('uint8')
+        elif data_max == 4095:
+            prediction = (prediction * data_max).astype('uint12')  # TODO Should this read uint16?
+        else:
+            raise NotImplementedError
 
         # Background removal
         if args.mask:
@@ -155,14 +171,13 @@ if __name__ == "__main__":
     #snap = '2021_03_04_10_11_34_1_3D_mse_tv_1176'  # Low resolution 1176 model (mse+tv)
 
     # List all snapshots from a path
-    path = '../../Workdir/wacv_experiments_new'
+    #path = '../../Workdir/wacv_experiments_new'
     #path = '../../Workdir/IVD_experiments'
     #path = '../../Workdir/ankle_experiments'
     snaps = os.listdir(path)
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(path, snap))]
     # List of specific snapshots
-    #snaps = ['2021_05_05_11_05_36_3D_perceptual_tv_1176_seed10', '2021_05_05_11_05_36_3D_ssim_1176_seed10',
-    #         '2021_05_05_11_05_36_3D_mse_tv_1176_seed10']
+    snaps = ['2025_10_10_08_12_35_0_Skyscan1176_16bit_3D_ssim_combined_seed42', '2025_10_09_14_39_08_0_Skyscan1176_16bit_3D_ssim_seed42']
 
     for snap_id in range(len(snaps)):
         # Print snapshot info
@@ -171,29 +186,31 @@ if __name__ == "__main__":
 
         # Input arguments
         parser = argparse.ArgumentParser()
-        #parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
+        parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/Test set (full)/input_3d')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/MRI_IVD/Repeatability/')
-        parser.add_argument('--dataset_root', type=Path, default='../../Data/Fantomi/H5B-fantomi/Series1/Series1/PNG/')
+        #parser.add_argument('--dataset_root', type=Path, default='../../Data/Fantomi/H5B-fantomi/Series1/Series1/PNG/')
         #parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}')
         parser.add_argument('--save_dir', type=Path,
-                            default=f'../../Data/predictions_3D_clinical/phantom_experiments/{snap}')
-        #parser.add_argument('--save_dir', type=Path,
-        #                    default=f'../../Data/Test set (full)/predictions_wacv_meanstd/{snap}')
+                            #default=f'../../Data/predictions_3D_clinical/phantom_experiments/{snap}')
+                            default=f'../../Data/predictions_erkko/{snap}')
         parser.add_argument('--bs', type=int, default=16)
         parser.add_argument('--plot', type=bool, default=False)
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean'], default='gaussian')
         parser.add_argument('--completed', type=int, default=0)
-        parser.add_argument('--step', type=int, default=3, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
+        parser.add_argument('--step', type=int, default=2, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
         parser.add_argument('--cuda', type=bool, default=False, help='Whether to merge the inference tiles on GPU or CPU')
         parser.add_argument('--mask', type=bool, default=False, help='Whether to remove background with postprocessing')
         parser.add_argument('--scale', type=bool, default=False, help='Whether to scale prediction to full dynamic range')
-        parser.add_argument('--res', type=float, default=0.400, help='Input image pixel size')
+        parser.add_argument('--res', type=float, default=0.200, help='Input image pixel size')
         parser.add_argument('--mri', type=bool, default=False, help='Is anisotropic MRI data used?')
-        parser.add_argument('--dicom', type=bool, default=False, help='Is DICOM format used for loading?')
-        parser.add_argument('--calculate_mean_std', type=bool, default=True, help='Whether to calculate individual mean and std')
+        parser.add_argument('--dicom', type=bool, default=True, help='Is DICOM format used for loading?')
+        parser.add_argument('--dicom_scales', type=list, default=[-1000, 2600],
+                            help='Windowing for HU scale. Returns in uint16. Pass None if no scaling is applied.')
+        parser.add_argument('--calculate_mean_std', type=bool, default=False, help='Whether to calculate individual mean and std')
+        parser.add_argument('--sample_id', type=list, default=11, help='Process specific samples unless None.')
         parser.add_argument('--snapshot', type=Path, default=os.path.join(path, snap))
-        parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
+        parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.tif')
         args = parser.parse_args()
 
         # Load snapshot configuration
@@ -204,4 +221,4 @@ if __name__ == "__main__":
         with open(args.snapshot / 'args.dill', 'rb') as f:
             args_experiment = dill.load(f)
 
-        main(args, config, args_experiment, sample_id=2)
+        main(args, config, args_experiment, sample_id=args.sample_id)

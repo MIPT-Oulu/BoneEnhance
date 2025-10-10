@@ -23,7 +23,7 @@ from glob import glob
 
 _ADD_NOISE = ['gaussian', 'poisson', 'localvar', 's&p', None]
 def downscale_image(image, im_size, add_noise: _ADD_NOISE = None, blur=True, sigma=1):
-    data_max = np.iinfo(image.dtype).max
+    data_max = np.max(image)
     target_type = np.iinfo(image.dtype)
 
     # Add Poisson noise and downscale the image
@@ -203,7 +203,7 @@ def load_images(path, n_jobs=12, rgb=False, uCT=False):
         return files, np.array(data)
 
 
-def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False, dicom=False):
+def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False, dicom=False, scales=None):
     """
     Loads an image stack as numpy array.
 
@@ -232,6 +232,7 @@ def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False, dicom=False):
                     dicom = True
                     continue
 
+                # Try integer conversion to figure out if a slice is loaded
                 int(file[-7:-4])
 
                 # Do not load files with different prefix into the stack
@@ -243,7 +244,9 @@ def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False, dicom=False):
                 continue
     files = newlist[:]  # replace list
     # Load images
-    if dicom:
+    if scales is not None and dicom:
+        data = Parallel(n_jobs=n_jobs)(delayed(read_scaled_dicom_uint16)(path, file, scales[0], scales[1]) for file in files)
+    elif dicom:
         data = Parallel(n_jobs=n_jobs)(delayed(read_image_dicom)(path, file) for file in files)
     elif rgb:
         data = Parallel(n_jobs=n_jobs)(delayed(read_image_rgb)(path, file) for file in files)
@@ -256,9 +259,6 @@ def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False, dicom=False):
         Warning('Image dimensions are not consistent! Returning a list of images.')
         return data, files
 
-    # Zero the data (remove negative values from HU units)
-    if np.min(data) < 0:
-        data -= np.min(data)
 
     # Transpose array
     if axis != (0, 1, 2) and rgb and data.ndim == 4:
@@ -284,9 +284,25 @@ def read_image_dicom(path, file):
     f = os.path.join(path, file)
     image = dcmread(f)
 
+    # Typical slope is 1 and intercept -1024 for 4095 values and -8192 for 65535 values
+
     return apply_modality_lut(image.pixel_array, image)
     #return image.SOPInstanceUID
 
+def read_scaled_dicom_uint16(path, file, hu_min=-1000, hu_max=2600):
+    """Reads the dicom file, applies modality LUT, scales to given HU range """
+    hu_image = read_image_dicom(path, file)
+
+    # Clip values to the specified HU range
+    hu_clipped = np.clip(hu_image, hu_min, hu_max)
+
+    # Scale from HU range to 0-65535
+    # Formula: (value - min) / (max - min) * 65535
+    hu_range = hu_max - hu_min
+    scaled = ((hu_clipped - hu_min) / hu_range) * 65535.0
+
+    # Convert to uint16
+    return scaled.astype(np.uint16)
 
 def read_image_rgb(path, file):
     """Reads image from given path."""

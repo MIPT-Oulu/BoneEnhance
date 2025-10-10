@@ -11,7 +11,7 @@ from collagen.strategies import Strategy
 
 from bone_enhance.training.session import create_data_provider, init_experiment, init_callbacks, \
     save_transforms, init_loss, init_model
-from bone_enhance.training import parse_grayscale, parse_3d, parse_3d_debug, parse_segmentation, parse_3ch
+from bone_enhance.training import parse_grayscale, parse_3d, parse_3d_debug, parse_segmentation, parse_3ch, parse_adjacent_prediction
 from bone_enhance.splits import build_splits
 from bone_enhance.inference.pipeline_components import inference_runner_oof, evaluation_runner
 
@@ -39,7 +39,8 @@ if __name__ == "__main__":
             'parse_3d': parse_3d,
             'parse_segmentation': parse_segmentation,
             'parse_3ch': parse_3ch,
-            'parse_grayscale': parse_grayscale
+            'parse_grayscale': parse_grayscale,
+            'parse_adjacent_prediction': parse_adjacent_prediction
         }
         # Select parser from log file if available
         if config.training.parser is not None:
@@ -48,7 +49,7 @@ if __name__ == "__main__":
             parser = partial(parse_grayscale, config=config)
 
         # Split training folds
-        parser_debug = partial(parser)#, debug=True)  # Display figures
+        parser_debug = partial(parser, debug=True)  # Display figures
         splits_metadata = build_splits(args.data_location, args, config, parser_debug,
                                        args.snapshots_dir, config.training.snapshot)
 
@@ -115,7 +116,7 @@ if __name__ == "__main__":
             args.bs = config.training.bs
             save_dir = inference_runner_oof(args, config, splits_metadata, device)
 
-            evaluation_runner(args, config, save_dir, suffix=config.training.suffix)
+            #evaluation_runner(args, config, save_dir, suffix=config.training.suffix)
 
     # Duration of the whole script
     dur = time() - start

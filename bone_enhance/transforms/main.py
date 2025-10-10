@@ -142,8 +142,8 @@ def train_test_transforms(conf, mean=None, std=None):
         ApplyTransform(numpy2tens, axis)
     ]
 
-    # Use normalize_channel_wise if mean and std are calculated (training and evaluation)
-    if mean is not None and std is not None:
+    # Use normalize_channel_wise if mean and std are calculated (training and evaluation) and normalization not suppressed
+    if mean is not None and std is not None and not conf.training.no_mean_std:
         random_trf.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
         val_trf.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
 

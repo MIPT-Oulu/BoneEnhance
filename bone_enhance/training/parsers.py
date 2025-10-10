@@ -99,6 +99,94 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False, c
     return {data_key: input_img, target_key: target}
 
 
+def parse_adjacent_prediction(root, entry, transform, data_key, target_key, debug=False, config=None):
+    """
+    Loads every mag (e.g. 4th) image as adjacent input images (idx -4, 0, 4) and
+    the next mag adjacent slices as target (idx 0, 1, 2, 3).
+    """
+    # Load the center slice
+    center_img = cv2.imread(str(entry.target_fname), -1)
+    data_max = np.iinfo(center_img.dtype).max
+
+    # Antialiasing kernel size
+    if config.training.sigma is None:
+        config.training.sigma = _DEFAULT_ANTIALIASING_SIGMA
+    mag = config.training.magnification
+
+    # Build target: slices at indices 0, 1, 2, 3
+    target = np.zeros((center_img.shape[0], center_img.shape[1], mag), dtype=center_img.dtype)
+    target[:, :, 0] = center_img
+
+    # Load next 3 slices for target (idx 1, 2, 3)
+    for i in range(1, mag):
+        next_slice = Path(entry.target_fname.parent,
+                          entry.target_fname.stem[:-8] +
+                          str(int(entry.target_fname.stem[-8:]) + i).zfill(8) +
+                          entry.target_fname.suffix)
+        if next_slice.exists():
+            target[:, :, i] = cv2.imread(str(next_slice), -1)
+        else:
+            target[:, :, i] = center_img  # Fallback to center if not exists
+
+    # Build input: slices at indices -4, 0, 4
+    input_img = np.zeros((center_img.shape[0], center_img.shape[1], 3), dtype=center_img.dtype)
+    input_img[:, :, 1] = center_img  # Center at channel 1
+
+    # Load slice at idx -4
+    prev_slice = Path(entry.fname.parent,
+                      entry.fname.stem[:-8] +
+                      str(int(entry.fname.stem[-8:]) - 4).zfill(8) +
+                      entry.fname.suffix)
+    if prev_slice.exists():
+        input_img[:, :, 0] = cv2.imread(str(prev_slice), -1)
+    else:
+        input_img[:, :, 0] = center_img
+
+    # Load slice at idx +4
+    next_slice = Path(entry.fname.parent,
+                      entry.fname.stem[:-8] +
+                      str(int(entry.fname.stem[-8:]) + 4).zfill(8) +
+                      entry.fname.suffix)
+    if next_slice.exists():
+        input_img[:, :, 2] = cv2.imread(str(next_slice), -1)
+    else:
+        input_img[:, :, 2] = center_img
+
+    input_img = downscale_image(input_img, im_size=(input_img.shape[0] // mag, input_img.shape[1] // mag),
+                                add_noise=config.training.noise, sigma=config.training.sigma)
+
+    # Apply random transforms. Images are returned in format CxHxW
+    input_img, target = transform((input_img, target))
+
+    if config.training.no_mean_std:
+        # Scale input to from 0 to +1 range
+        input_img = input_img / float(data_max)
+
+    # Target is scaled to -1 to +1 range (tanh activation)
+    target = (target / float(data_max) - 0.5) * 2
+
+    # Plot a small random portion of image-target pairs during debug
+    if debug and uniform(0, 1) >= 0.995:
+        fig, ax = plt.subplots(2, 3, figsize=(12, 8))
+
+        # Input channels (idx -4, 0, 4)
+        for i in range(3):
+            im = ax[0, i].imshow(np.asarray(input_img[i, :, :]), cmap='gray')
+            fig.colorbar(im, ax=ax[0, i], orientation='horizontal')
+            ax[0, i].set_title(f'Input ch{i} (idx {-4 + i * 4})')
+
+        # Target channels (idx 0, 1, 2)
+        for i in range(3):
+            im = ax[1, i].imshow(np.asarray(target[i, :, :]), cmap='gray')
+            fig.colorbar(im, ax=ax[1, i], orientation='horizontal')
+            ax[1, i].set_title(f'Target ch{i} (idx {i})')
+
+        plt.tight_layout()
+        plt.show()
+
+    return {data_key: input_img, target_key: target}
+
+
 def parse_3ch(root, entry, transform, data_key, target_key, debug=False, config=None):
     """
     Loads neighboring slices as a 3-channel image. If rgb is set to true, target includes neighboring slices.
@@ -286,7 +374,8 @@ def parse_3d(root, entry, transform, data_key, target_key, debug=False, config=N
 
     # Images are in the format 3xHxWxD
     # and scaled to 0-1 range
-    #img /= data_max
+    if config.training.no_mean_std:
+        img /= data_max
     # Target is scaled to -1 to +1 range
     target = (target / data_max - 0.5) * 2
 

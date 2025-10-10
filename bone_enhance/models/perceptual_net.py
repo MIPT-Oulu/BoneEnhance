@@ -93,6 +93,8 @@ class PerceptualNet(nn.Module):
         # Kernel
         if not rgb and parser == 'parse_3ch':
             f_maps = [3, 64, 1]  # 3-channel input, 1-channel output
+        elif parser == 'parse_adjacent_prediction':
+            f_maps = [3, 64, magnification]  # 3-channel input, mag-channel output
         elif rgb:
             f_maps = [3, 64, 3]  # RGB input and output
         else:

@@ -61,7 +61,9 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
         out = (x * mag, y * mag)
 
     # Check the number of channels
-    if ch == 3 and not config.training.rgb and not config.training.parser == 'parse_3ch':
+    if config.training.parser == 'parse_adjacent_prediction':
+        ch = 4
+    elif ch == 3 and not config.training.rgb and not config.training.parser == 'parse_3ch':
         img_full = np.expand_dims(np.mean(img_full, axis=-1), axis=-1)
         ch = 1
     elif ch == 1 and config.training.rgb:
@@ -80,7 +82,7 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler.crops_out)), batch_size=args.bs,
                                                 pin_memory=True):
         # Move tile to GPU
-        if mean is not None and std is not None:
+        if mean is not None and std is not None and not config.training.no_mean_std:
             #tiles_batch = tiles_batch.float()
             for c in range(tiles_batch.size(1)):
                 tiles_batch[:, c, :, :] = (((tiles_batch[:, c, :, :] / data_max) - mean[c]) / std[c])
@@ -127,8 +129,10 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     torch.cuda.empty_cache()
     gc.collect()
 
-    # TODO does 2D-inference need a possibility for 3-channel output
-    if len(merged_pred.shape) == 3:
+    if config.training.no_mean_std:
+        merged_pred = np.clip(merged_pred, 0, 1)
+        return (merged_pred * 65535).astype('uint16')
+    elif len(merged_pred.shape) == 3:
         return merged_pred[:, :, 0]
     else:
         return merged_pred
@@ -177,7 +181,7 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
     for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler.crops_out)), batch_size=config.training.bs,
                                                 pin_memory=True):
         # Move tile to GPU
-        if mean is not None and std is not None:
+        if mean is not None and std is not None and not config.training.no_mean_std:
             tiles_batch = tiles_batch.float()
             for c in range(len(mean)):
                 tiles_batch[:, c, :, :] = (((tiles_batch[:, c, :, :] / data_max) - mean[c]) / std[c])
@@ -227,7 +231,11 @@ def inference_3d(inference_model, args, config, img_full, device='cuda', plot=Fa
     torch.cuda.empty_cache()
     gc.collect()
 
-    return merged_pred[:, :, :, 0]
+    if config.training.no_mean_std:
+        merged_pred = np.clip(merged_pred, 0, 1)
+        return (merged_pred[:, :, :, 0] * 65535).astype('uint16')
+    else:
+        return merged_pred[:, :, :, 0]
 
 
 def inference_runner_oof(args, config, split_config, device, plot=False, verbose=False):

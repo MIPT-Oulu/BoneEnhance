@@ -3,6 +3,8 @@ import numpy as np
 import os
 from pathlib import Path
 import argparse
+import matplotlib
+matplotlib.use('Agg')  # Set non-interactive backend before importing pyplot
 import matplotlib.pyplot as plt
 import h5py
 import dill
@@ -14,6 +16,7 @@ from tqdm import tqdm
 from glob import glob
 from scipy.ndimage import zoom
 from skimage.transform import resize
+from skimage.measure import block_reduce
 from omegaconf import OmegaConf
 
 from bone_enhance.utilities import load, save, print_orthogonal, render_volume, calculate_mean_std
@@ -78,7 +81,10 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
             with h5py.File(str(args.dataset_root / sample), 'r') as f:
                 data_xy = f['data'][:]
         else:
-            data_xy, files = load(str(args.dataset_root / sample), rgb=False, axis=(1, 2, 0), dicom=args.dicom)
+            data_xy, files = load(str(args.dataset_root / sample), rgb=False, axis=(1, 2, 0),
+                                  dicom=args.dicom, scales=args.dicom_scales)
+
+        data_xy = data_xy[:, :, 350:370]
 
         # Downscale input image
         if ds:
@@ -88,7 +94,7 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
         # Channel dimension
 
         # 3-channel neighborhood (requires z-dimension as first dimension)
-        if config.training.parser == 'parse_3ch':
+        if config.training.parser == 'parse_3ch' or config.training.parser == 'parse_adjacent_prediction':
             data_xy = np.stack([
                 np.pad(data_xy[:, :, :-1], ((0, 0), (0, 0), (1, 0)), 'edge'),
                 data_xy,
@@ -97,7 +103,7 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
                 axis=-1)
         elif len(data_xy.shape) != 4:
             data_xy = np.expand_dims(data_xy, -1)
-        if config.training.rgb and not config.training.parser == 'parse_3ch':
+        if config.training.rgb and not config.training.parser == 'parse_3ch' and not config.training.parser == 'parse_adjacent_prediction':
             data_xy = np.repeat(data_xy, 3, axis=-1)
 
         # Visualize input stack
@@ -105,7 +111,7 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
                          savepath=str(args.save_dir / 'visualizations' / (sample_stem + f'_{snapshot}_input.png')), scale_factor=100)
 
         # Calculate mean and std from the sample
-        if args.calculate_mean_std:
+        if args.calculate_mean_std and not config.no_mean_std:
             mean, std = calculate_mean_std(data_xy, config.training.rgb)
 
         # In case of MRI, make the resolution isotropic
@@ -123,13 +129,17 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
 
         # Interpolate 3rd dimension
         x, y, z, ch = data_xy.shape
-        data_xy = zoom(data_xy, zoom=(1, 1, config.training.magnification, 1))
-        if args.avg_planes:
-            data_xz = zoom(data_xz, zoom=(1, 1, config.training.magnification, 1))
-            data_yz = zoom(data_yz, zoom=(1, 1, config.training.magnification, 1))
+        if not config.training.parser == 'parse_adjacent_prediction':
+            data_xy = zoom(data_xy, zoom=(1, 1, config.training.magnification, 1))
+            if args.avg_planes:
+                data_xz = zoom(data_xz, zoom=(1, 1, config.training.magnification, 1))
+                data_yz = zoom(data_yz, zoom=(1, 1, config.training.magnification, 1))
 
         # Output shape
-        out_xy = np.zeros((x * mag, y * mag, z * mag))
+        if config.training.parser == 'parse_adjacent_prediction':
+            out_xy = np.zeros((x * mag, y * mag, z * mag), dtype='uint16')
+        else:
+            out_xy = np.zeros((x * mag, y * mag, z))
         if args.avg_planes:
             out_xz = np.zeros((x * mag, z * mag, y * mag))
             out_yz = np.zeros((y * mag, z * mag, x * mag))
@@ -139,9 +149,17 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
         with torch.no_grad():  # Do not update gradients
 
             # 1st orientation
-            for slice_idx in tqdm(range(data_xy.shape[2]), desc='Running inference, XY'):
-                out_xy[:, :, slice_idx] = inference(model, args, config, data_xy[:, :, slice_idx, :],
-                                                    weight=args.weight, step=args.step, mean=mean, std=std)
+            if config.training.parser == 'parse_adjacent_prediction':
+                for slice_idx in tqdm(range(data_xy.shape[2]), desc='Running inference, XY'):
+                    out_xy[:, :, slice_idx * mag:(slice_idx + 1 ) * mag] = inference(model, args, config,
+                                                                                     data_xy[:, :, slice_idx, :],
+                                                                                     weight=args.weight, step=args.step,
+                                                                                     mean=mean, std=std)
+                    #out_xy[:, :, slice_idx * mag:(slice_idx + 1 ) * mag] = result
+            else:
+                for slice_idx in tqdm(range(data_xy.shape[2]), desc='Running inference, XY'):
+                    out_xy[:, :, slice_idx] = inference(model, args, config, data_xy[:, :, slice_idx, :],
+                                                        weight=args.weight, step=args.step, mean=mean, std=std)
 
             # 2nd and 3rd orientation
             if args.avg_planes:
@@ -160,18 +178,20 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
                 del out_yz
                 out_xy = (out_xy / 3).astype('float32')
 
-        # Scale the dynamic range
+        # Scale the dynamic range TODO check the HU scaling back to uint16
         pred_max = np.max(out_xy)
         if args.scale:
             out_xy -= np.min(out_xy)
             out_xy /= pred_max
-        elif pred_max > 1:
+        elif pred_max > 1 and not config.training.no_mean_std:
             print(f'Maximum value {pred_max} will be scaled to one')
             out_xy /= pred_max
 
         # Keep the original data type of the image
         data_max = float(np.iinfo(data_xy.dtype).max)
-        if data_max == 65535:
+        if config.training.no_mean_std:
+            pass
+        elif data_max == 65535:
             out_xy = (out_xy * data_max).astype('uint16')
         elif data_max == 255:
             out_xy = (out_xy * data_max).astype('uint8')
@@ -199,23 +219,18 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
 if __name__ == "__main__":
     start = time()
 
-    # Single snapshot
-    snap = '2020_12_15_10_28_57_2D_perceptualnet_ds_16'  # Latest 2D model with fixes, only 1 fold
-    snap = '2021_01_08_09_49_45_2D_perceptualnet_ds_16'  # 2D model, 3 working folds
-
     # List all snapshots from a path
     #snap_path = '../../Workdir/wacv_experiments_new_2D'
     #snap_path = '../../Workdir/dental_experiments'
     #snap_path = '../../Workdir/IVD_experiments_2D'
-    snap_path = '../../Workdir/Erkko_experiments'
+    #snap_path = '../../Workdir/Erkko_experiments'
+    snap_path = '../../Workdir/snapshots'
     snaps = os.listdir(snap_path)
     snaps.sort()
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(snap_path, snap))]
     # Skip snapshots
-    snaps = [snaps[10]]
+    snaps = [snaps[9]]
     # List of specific snapshots
-    #snaps = ['2021_05_27_08_56_20_2D_perceptual_tv_IVD_4x_pretrained_seed42']
-    #snaps = ['2022_02_11_01_21_26_2D_ssim_dental_seed10']
     #snaps = [#'2021_06_11_11_59_53_2D_perceptual_tv_1176_seed10',
     #         '2021_06_10_23_57_51_2D_ssim_1176_seed10',
     #         #'2021_06_10_23_24_54_2D_mse_tv_1176_seed10'
@@ -223,6 +238,7 @@ if __name__ == "__main__":
     #snaps = ['2024_07_24_14_53_50_3D_ssim_3channel_seed42']  # 3-channel model
     #snaps = ['2024_08_30_08_35_46_2D_ssim_residual_depth_seed42']  # Deeper model
     #snaps = ['2024_09_12_17_26_06_2D_ssim_deep_3ch_seed42'] # Deeper 3-ch model
+    snaps = ['2025_10_07_15_40_50_0_Skyscan1176_16bit_2D_ssim_adjacent_predict_seed42'] # 4-channel prediction model
 
 
     for snap_id in range(len(snaps)):
@@ -240,13 +256,15 @@ if __name__ == "__main__":
         #parser.add_argument('--save_dir', type=Path, default=f'../../Data/predictions_3D_clinical/IVD_experiments/{snap}_avg')
         parser.add_argument('--save_dir', type=Path,
                             default=f'../../Data/predictions_erkko/{snap}')
-        parser.add_argument('--bs', type=int, default=64)
-        parser.add_argument('--step', type=int, default=2)
+        parser.add_argument('--bs', type=int, default=6)
+        parser.add_argument('--step', type=int, default=3)
         parser.add_argument('--plot', type=bool, default=False)
         parser.add_argument('--calculate_mean_std', type=bool, default=True)
         parser.add_argument('--scale', type=bool, default=False)
-        parser.add_argument('--dicom', type=bool, default=False, help='Is DICOM format used for loading?')
-        parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='gaussian')
+        parser.add_argument('--dicom', type=bool, default=True, help='Is DICOM format used for loading?')
+        parser.add_argument('--dicom_scales', type=list, default=[-1000, 2600],
+                            help='Windowing for HU scale. Returns in uint16. Pass None if no scaling is applied.')
+        parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='pyramid')
         parser.add_argument('--completed', type=int, default=0)
         parser.add_argument('--res', type=float, default=0.200, help='Input image pixel size')
         parser.add_argument('--sample_id', type=list, default=[11], help='Process specific samples unless None.')
@@ -254,7 +272,7 @@ if __name__ == "__main__":
         parser.add_argument('--mri', type=bool, default=False, help='Is anisotropic MRI data used?')
         parser.add_argument('--snapshot', type=Path,
                             default=os.path.join(snap_path, snap))
-        parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.png')
+        parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.tif')
         args = parser.parse_args()
 
         # Load snapshot configuration

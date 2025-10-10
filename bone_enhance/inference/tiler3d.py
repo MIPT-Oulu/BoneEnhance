@@ -21,8 +21,8 @@ class Tiler3D:
         self.mag = mag
         self.out = out
 
-        #self.step = tuple([s // step for s in tile])
-        self.step = tuple([s - 20 for s in tile])
+        self.step = tuple([s // step for s in tile])
+        #self.step = tuple([s - 20 for s in tile])
 
         # Sizes for magnified image
         tile_out = tuple([s * mag for s in tile])
@@ -33,12 +33,15 @@ class Tiler3D:
         if weight == 'crop':
             self.weight = self._crop(self.tile_out)
             overlap = [0 for _ in range(self.dim)]
-        elif weight == 'mean':
-            self.weight = self._mean(self.tile_out)
+        else:
             overlap = [(self.tile[x] - self.step[x]) for x in range(self.dim)]
+
+        if weight == 'mean':
+            self.weight = self._mean(self.tile_out)
         elif weight == 'gaussian':
             self.weight = self._gaussian(self.tile_out, step)
-            overlap = [(self.tile[x] - self.step[x]) for x in range(self.dim)]
+        elif weight == 'pyramid':
+            self.weight = self._pyramid(self.tile_out)
         else:
             raise Exception('Weight not implemented!')
 
@@ -190,6 +193,10 @@ class Tiler3D:
             m[dim[0], dim[1]] = 1
         return gaussian_filter(m, sigma=dim[0] // step)
 
+    def _pyramid(self, tile_size):
+        w, _, _ = compute_pyramid_patch_weight_loss(tile_size[0], tile_size[1])
+        return w
+
 
 class TileMerger3D:
     """
@@ -237,7 +244,9 @@ class TileMerger3D:
                 self.norm_mask[:, x: x + tile_x, y: y + tile_y] += self.weight
 
     def merge(self) -> torch.Tensor:
-        return self.image / self.norm_mask
+        norm_mask = self.norm_mask.clone()
+        norm_mask[norm_mask == 0] = 1.0
+        return self.image / norm_mask
 
 
 class ImageSlicer:
@@ -445,6 +454,42 @@ class ImageSlicer:
         m = gaussian_filter(m, sigma=dim[0] // step)
         return m / np.max(m)
 
+
+def compute_pyramid_patch_weight_loss(width: int, height: int) -> np.ndarray:
+    """Compute a weight matrix that assigns bigger weight on pixels in center and
+    less weight to pixels on image boundary.
+    This weight matrix then used for merging individual tile predictions and helps dealing
+    with prediction artifacts on tile boundaries.
+
+    :param width: Tile width
+    :param height: Tile height
+    :return: Since-channel image [Width x Height]
+    """
+    xc = width * 0.5
+    yc = height * 0.5
+    xl = 0
+    xr = width
+    yb = 0
+    yt = height
+    Dc = np.zeros((width, height))
+    De = np.zeros((width, height))
+
+    Dcx = np.square(np.arange(width) - xc + 0.5)
+    Dcy = np.square(np.arange(height) - yc + 0.5)
+    Dc = np.sqrt(Dcx[np.newaxis].transpose() + Dcy)
+
+    De_l = np.square(np.arange(width) - xl + 0.5) + np.square(0.5)
+    De_r = np.square(np.arange(width) - xr + 0.5) + np.square(0.5)
+    De_b = np.square(0.5) + np.square(np.arange(height) - yb + 0.5)
+    De_t = np.square(0.5) + np.square(np.arange(height) - yt + 0.5)
+
+    De_x = np.sqrt(np.minimum(De_l, De_r))
+    De_y = np.sqrt(np.minimum(De_b, De_t))
+    De = np.minimum(De_x[np.newaxis].transpose(), De_y)
+
+    alpha = (width * height) / np.sum(np.divide(De, np.add(Dc, De)))
+    W = alpha * np.divide(De, np.add(Dc, De))
+    return W, Dc, De
 
 def compute_pyramid_patch_weight_loss(width: int, height: int) -> np.ndarray:
     """Compute a weight matrix that assigns bigger weight on pixels in center and

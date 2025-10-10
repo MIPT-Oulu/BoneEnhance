@@ -202,12 +202,22 @@ def init_loss(loss, config, device='cuda', mean=None, std=None, args=None):
     # Binary cross-entropy
     elif loss == 'bce':
         return nn.BCELoss().to(device)
+    # Structure similarity index
     elif loss == 'ssim':
         if config.training.window is not None:
             ws = config.training.window
         else:
             ws = 7
         return SSIM(window_size=ws)
+    elif loss == 'ssim_combined':
+        if config.training.window is not None:
+            ws = config.training.window
+        else:
+            ws = 7
+        return CombinedLoss([SSIM(window_size=ws),
+                             TotalVariationLoss().to(device),
+                             nn.MSELoss()],
+                            weights=[0.4, 0.2, 0.4]).to(device)
     else:
         raise Exception('Loss not implememnted!')
 
