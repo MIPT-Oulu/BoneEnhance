@@ -14,6 +14,7 @@ from pydicom.pixel_data_handlers.util import apply_modality_lut
 from pydicom.dataset import FileDataset, FileMetaDataset
 from pydicom.uid import UID
 from skimage.util.noise import random_noise
+from scipy.ndimage import gaussian_filter, zoom
 from skimage.transform import resize
 from datetime import datetime
 from tqdm import tqdm
@@ -26,17 +27,20 @@ def downscale_image(image, im_size, add_noise: _ADD_NOISE = None, blur=True, sig
     data_max = np.max(image)
     target_type = np.iinfo(image.dtype)
 
+    # No need to warn for aliasing on channel-axis
+    #with warnings.catch_warnings():
+    #    warnings.simplefilter("ignore")
+    #    image = resize(image, im_size, order=0, preserve_range=True, anti_aliasing=blur, anti_aliasing_sigma=sigma)
+
+    image = gaussian_filter(image, sigma=sigma, truncate=sigma)
+    image = zoom(image, zoom=im_size/np.array(image.shape), order=3)
+
     # Add Poisson noise and downscale the image
     if add_noise is not None and add_noise in _ADD_NOISE:
         # Random noise returns output in 0-1 range
         image = random_noise(image, mode=add_noise)
         # Scale from 0-1 to 0 - max
         image = (image * data_max).astype(target_type)
-
-    # No need to warn for aliasing on channel-axis
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        image = resize(image, im_size, order=0, preserve_range=True, anti_aliasing=blur, anti_aliasing_sigma=sigma)
 
     return image
 

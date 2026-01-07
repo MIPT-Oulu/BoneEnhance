@@ -93,6 +93,9 @@ COPY create_users.sh /home/
 RUN ./create_users.sh && \
     rm users.txt create_users.sh
 
+WORKDIR /home/BoneEnhance
+RUN git reset --hard HEAD && git pull
+
 # Ensure the user has required permissions
 ARG GROUPNAME
 ARG USERNAME

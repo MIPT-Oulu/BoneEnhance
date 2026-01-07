@@ -11,7 +11,8 @@ from collagen.strategies import Strategy
 
 from bone_enhance.training.session import create_data_provider, init_experiment, init_callbacks, \
     save_transforms, init_loss, init_model
-from bone_enhance.training import parse_grayscale, parse_3d, parse_3d_debug, parse_segmentation, parse_3ch, parse_adjacent_prediction
+from bone_enhance.training import parse_grayscale, parse_3d, parse_3d_debug, parse_segmentation, parse_3ch, \
+    parse_adjacent_prediction
 from bone_enhance.splits import build_splits
 from bone_enhance.inference.pipeline_components import inference_runner_oof, evaluation_runner
 

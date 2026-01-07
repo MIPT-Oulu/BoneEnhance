@@ -76,7 +76,7 @@ def main(args, config, args_experiment, sample_id=None, render=False):
                                   dicom=args.dicom, scales=args.dicom_scales)
 
         # TODO
-        data_xy = data_xy[300:400, 300:400, 400:500]
+        data_xy = data_xy[:, :, 350:354]
 
         # Channel dimension
         if len(data_xy.shape) != 4:
@@ -177,7 +177,7 @@ if __name__ == "__main__":
     snaps = os.listdir(path)
     snaps = [snap for snap in snaps if os.path.isdir(os.path.join(path, snap))]
     # List of specific snapshots
-    snaps = ['2025_10_10_08_12_35_0_Skyscan1176_16bit_3D_ssim_combined_seed42', '2025_10_09_14_39_08_0_Skyscan1176_16bit_3D_ssim_seed42']
+    snaps = ['2025_10_28_13_50_05_Skyscan1176_all_16bit_ssim_combined_3D_seed42']#, '2025_10_10_13_33_43_1_Skyscan1176_16bit_3D_ssim_combined_mag2_seed42', '2025_10_10_13_33_43_0_Skyscan1176_16bit_3D_ssim_combined_seed42', '2025_10_09_14_39_08_0_Skyscan1176_16bit_3D_ssim_seed42']
 
     for snap_id in range(len(snaps)):
         # Print snapshot info
@@ -196,9 +196,9 @@ if __name__ == "__main__":
                             default=f'../../Data/predictions_erkko/{snap}')
         parser.add_argument('--bs', type=int, default=16)
         parser.add_argument('--plot', type=bool, default=False)
-        parser.add_argument('--weight', type=str, choices=['gaussian', 'mean'], default='gaussian')
+        parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='pyramid')
         parser.add_argument('--completed', type=int, default=0)
-        parser.add_argument('--step', type=int, default=2, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
+        parser.add_argument('--step', type=int, default=1, help='Factor for tile step size. 1=no overlap, 2=50% overlap...')
         parser.add_argument('--cuda', type=bool, default=False, help='Whether to merge the inference tiles on GPU or CPU')
         parser.add_argument('--mask', type=bool, default=False, help='Whether to remove background with postprocessing')
         parser.add_argument('--scale', type=bool, default=False, help='Whether to scale prediction to full dynamic range')

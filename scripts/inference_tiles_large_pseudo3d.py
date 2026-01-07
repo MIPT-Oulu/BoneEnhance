@@ -84,7 +84,7 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
             data_xy, files = load(str(args.dataset_root / sample), rgb=False, axis=(1, 2, 0),
                                   dicom=args.dicom, scales=args.dicom_scales)
 
-        data_xy = data_xy[:, :, 350:370]
+        data_xy = data_xy[:, :, 550:554]
 
         # Downscale input image
         if ds:
@@ -139,7 +139,7 @@ def main(args, config, args_experiment, sample_id=None, render=False, ds=False):
         if config.training.parser == 'parse_adjacent_prediction':
             out_xy = np.zeros((x * mag, y * mag, z * mag), dtype='uint16')
         else:
-            out_xy = np.zeros((x * mag, y * mag, z))
+            out_xy = np.zeros((x * mag, y * mag, z * mag))
         if args.avg_planes:
             out_xz = np.zeros((x * mag, z * mag, y * mag))
             out_yz = np.zeros((y * mag, z * mag, x * mag))
@@ -238,17 +238,21 @@ if __name__ == "__main__":
     #snaps = ['2024_07_24_14_53_50_3D_ssim_3channel_seed42']  # 3-channel model
     #snaps = ['2024_08_30_08_35_46_2D_ssim_residual_depth_seed42']  # Deeper model
     #snaps = ['2024_09_12_17_26_06_2D_ssim_deep_3ch_seed42'] # Deeper 3-ch model
-    snaps = ['2025_10_07_15_40_50_0_Skyscan1176_16bit_2D_ssim_adjacent_predict_seed42'] # 4-channel prediction model
-
-
+    snaps = ['2025_10_22_12_31_09_Skyscan1176_all_16bit_2D_ssim_combined_adjacent_predict_seed42']#, '2025_10_10_13_33_43_Skyscan1176_16bit_2D_ssim_combined_adjacent_predict_seed42', '2025_10_07_15_40_50_0_Skyscan1176_16bit_2D_ssim_adjacent_predict_seed42'] # 4-channel prediction model
+    # snaps = ['2025_10_07_15_40_50_0_Skyscan1176_16bit_2D_ssim_adjacent_predict_seed42'] # 4-channel prediction model
+    snaps = ['2025_12_08_08_39_49_0_Skyscan1176_all_16bit_ssim_combined_2D_adjacent_seed42']  # 4-channel prediction model, target s=2, input s=4 + noise
+    snaps = ['2025_10_01_04_53_31_BBS_2D_ssim_3ch_seed42']  # BBS 3ch model
     for snap_id in range(len(snaps)):
 
         snap = snaps[snap_id]
         print(f'Calculating inference for snapshot: {snap} {snap_id+1}/{len(snaps)}')
 
         parser = argparse.ArgumentParser()
-        #parser.add_argument('--dataset_root', type=Path, default='../../Data/input_BBS')
-        parser.add_argument('--dataset_root', type=Path, default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
+        parser.add_argument('--dataset_root', type=Path,
+                            #default='../../Data/input_BBS')
+                            #default='/media/dios/kaappi/Santeri/BoneEnhance/Clinical data')
+                            #default='/media/santeri/data2/BoneEnhance_Data/supersharp/SS_dentomaxillofacial_150µm/')
+                            default='/media/dios/dios3/Lassi/BBS/Superresolution/stacks/')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/Fantomi/H5B-fantomi/Series1/Series1/')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/dental/')
         #parser.add_argument('--dataset_root', type=Path, default='../../Data/Test_set_(full)/input_3d')
@@ -257,17 +261,18 @@ if __name__ == "__main__":
         parser.add_argument('--save_dir', type=Path,
                             default=f'../../Data/predictions_erkko/{snap}')
         parser.add_argument('--bs', type=int, default=6)
-        parser.add_argument('--step', type=int, default=3)
+        parser.add_argument('--step', type=int, default=2)
         parser.add_argument('--plot', type=bool, default=False)
         parser.add_argument('--calculate_mean_std', type=bool, default=True)
         parser.add_argument('--scale', type=bool, default=False)
-        parser.add_argument('--dicom', type=bool, default=True, help='Is DICOM format used for loading?')
+        parser.add_argument('--dicom', type=bool, default=False, help='Is DICOM format used for loading?')
         parser.add_argument('--dicom_scales', type=list, default=[-1000, 2600],
                             help='Windowing for HU scale. Returns in uint16. Pass None if no scaling is applied.')
         parser.add_argument('--weight', type=str, choices=['gaussian', 'mean', 'pyramid'], default='pyramid')
         parser.add_argument('--completed', type=int, default=0)
         parser.add_argument('--res', type=float, default=0.200, help='Input image pixel size')
-        parser.add_argument('--sample_id', type=list, default=[11], help='Process specific samples unless None.')
+        parser.add_argument('--sample_id', type=list, default=[11])
+        #[11], help='Process specific samples unless None.')
         parser.add_argument('--avg_planes', type=bool, default=False)
         parser.add_argument('--mri', type=bool, default=False, help='Is anisotropic MRI data used?')
         parser.add_argument('--snapshot', type=Path,

@@ -3,6 +3,8 @@ import torch
 import cv2
 from typing import List
 import math
+
+from pandas.core.reshape import tile
 from scipy.ndimage import gaussian_filter
 
 
@@ -194,7 +196,10 @@ class Tiler3D:
         return gaussian_filter(m, sigma=dim[0] // step)
 
     def _pyramid(self, tile_size):
-        w, _, _ = compute_pyramid_patch_weight_loss(tile_size[0], tile_size[1])
+        if len(tile_size) == 3:
+            w, _, _ = compute_pyramid_patch_weight_loss_3d(tile_size[0], tile_size[1], tile_size[2])
+        else:
+            w, _, _ = compute_pyramid_patch_weight_loss(tile_size[0], tile_size[1])
         return w
 
 
@@ -245,7 +250,7 @@ class TileMerger3D:
 
     def merge(self) -> torch.Tensor:
         norm_mask = self.norm_mask.clone()
-        norm_mask[norm_mask == 0] = 1.0
+        norm_mask[norm_mask == 0] = 1e6
         return self.image / norm_mask
 
 
@@ -444,7 +449,10 @@ class ImageSlicer:
         return np.ones((tile_size[0], tile_size[1]), dtype=np.float32)
 
     def _pyramid(self, tile_size):
-        w, _, _ = compute_pyramid_patch_weight_loss(tile_size[0], tile_size[1])
+        if len(tile_size) == 3:
+            w, _, _ = compute_pyramid_patch_weight_loss_3d(tile_size[0], tile_size[1], tile_size[2])
+        else:
+            w, _, _ = compute_pyramid_patch_weight_loss(tile_size[0], tile_size[1])
         return w
 
     def _gaussian(self, tile_size, step):
@@ -491,38 +499,44 @@ def compute_pyramid_patch_weight_loss(width: int, height: int) -> np.ndarray:
     W = alpha * np.divide(De, np.add(Dc, De))
     return W, Dc, De
 
-def compute_pyramid_patch_weight_loss(width: int, height: int) -> np.ndarray:
-    """Compute a weight matrix that assigns bigger weight on pixels in center and
-    less weight to pixels on image boundary.
-    This weight matrix then used for merging individual tile predictions and helps dealing
-    with prediction artifacts on tile boundaries.
 
-    :param width: Tile width
-    :param height: Tile height
-    :return: Since-channel image [Width x Height]
+def compute_pyramid_patch_weight_loss_3d(width: int, height: int, depth: int):
     """
-    xc = width * 0.5
-    yc = height * 0.5
-    xl = 0
-    xr = width
-    yb = 0
-    yt = height
-    Dc = np.zeros((width, height))
-    De = np.zeros((width, height))
+    Compute a 3D weight matrix assigning higher weights near the center
+    and lower weights near the volume boundaries.
 
-    Dcx = np.square(np.arange(width) - xc + 0.5)
-    Dcy = np.square(np.arange(height) - yc + 0.5)
-    Dc = np.sqrt(Dcx[np.newaxis].transpose() + Dcy)
+    This helps merge 3D tile predictions and reduce boundary artifacts.
 
-    De_l = np.square(np.arange(width) - xl + 0.5) + np.square(0.5)
-    De_r = np.square(np.arange(width) - xr + 0.5) + np.square(0.5)
-    De_b = np.square(0.5) + np.square(np.arange(height) - yb + 0.5)
-    De_t = np.square(0.5) + np.square(np.arange(height) - yt + 0.5)
+    :param width: Tile width (x-dimension)
+    :param height: Tile height (y-dimension)
+    :param depth: Tile depth (z-dimension)
+    :return: (W, Dc, De)
+             W  - 3D weight matrix [Depth x Height x Width]
+             Dc - distance to center
+             De - distance to closest boundary
+    """
 
-    De_x = np.sqrt(np.minimum(De_l, De_r))
-    De_y = np.sqrt(np.minimum(De_b, De_t))
-    De = np.minimum(De_x[np.newaxis].transpose(), De_y)
+    # Coordinate grids
+    x = np.arange(width)
+    y = np.arange(height)
+    z = np.arange(depth)
+    X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
 
-    alpha = (width * height) / np.sum(np.divide(De, np.add(Dc, De)))
-    W = alpha * np.divide(De, np.add(Dc, De))
+    # Center coordinates
+    xc, yc, zc = (width - 1) / 2, (height - 1) / 2, (depth - 1) / 2
+
+    # Distance to center
+    Dc = np.sqrt((X - xc) ** 2 + (Y - yc) ** 2 + (Z - zc) ** 2)
+
+    # Distance to nearest boundary
+    De_x = np.minimum(X + 0.5, width - X - 0.5)
+    De_y = np.minimum(Y + 0.5, height - Y - 0.5)
+    De_z = np.minimum(Z + 0.5, depth - Z - 0.5)
+    De = np.minimum.reduce([De_x, De_y, De_z])
+
+    # Compute normalized weight
+    W = De / (Dc + De)
+    alpha = (width * height * depth) / np.sum(W)
+    W *= alpha
+
     return W, Dc, De
